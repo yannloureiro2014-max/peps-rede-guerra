@@ -56,3 +56,10 @@
 ## Bugs Críticos
 
 - [x] Corrigir erro removeChild definitivamente - substituir Recharts por CSS puro
+
+## Bugs Reportados - Correção Urgente
+
+- [x] Erro removeChild corrigido - substituiu DashboardLayout por versão sem Sidebar problemático
+- [x] Formato de data dd/mm/aaaa em todas as telas
+- [x] Valores de vendas sincronizados corretamente do ACS
+- [x] Preço unitário corrigido para usar custo_comenc (custo de compra)

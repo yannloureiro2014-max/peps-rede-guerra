@@ -1,3 +1,4 @@
+import React from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,12 +8,12 @@ import { Separator } from "@/components/ui/separator";
 import { trpc } from "@/lib/trpc";
 import { Settings, Database, RefreshCw, Save, CheckCircle, Loader2, AlertCircle } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 
 export default function Configuracoes() {
   const [estoqueMinimo, setEstoqueMinimo] = useState("1000");
   const [toleranciaDiferenca, setToleranciaDiferenca] = useState("0.5");
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
+  const [mensagem, setMensagem] = useState<string | null>(null);
 
   const { data: ultimaSync, refetch: refetchSync } = trpc.dashboard.ultimaSincronizacao.useQuery();
   const { data: configuracoes, isLoading } = trpc.configuracoes.list.useQuery();
@@ -20,23 +21,25 @@ export default function Configuracoes() {
 
   const setConfiguracao = trpc.configuracoes.set.useMutation({
     onSuccess: () => {
-      toast.success("Configuração salva com sucesso!");
+      setMensagem("Configuração salva com sucesso!");
       utils.configuracoes.list.invalidate();
+      setTimeout(() => setMensagem(null), 3000);
     },
     onError: (error) => {
-      toast.error("Erro ao salvar: " + error.message);
+      setMensagem("Erro ao salvar: " + error.message);
+      setTimeout(() => setMensagem(null), 5000);
     }
   });
 
   const sincronizarTudo = trpc.sync.sincronizarTudo.useMutation({
     onMutate: () => {
       setSyncStatus("syncing");
-      toast.info("Iniciando sincronização com ACS...");
+      setMensagem("Sincronizando com ACS...");
     },
     onSuccess: (result) => {
-      setSyncStatus("success");
       if (result.success) {
-        toast.success("Sincronização concluída com sucesso!");
+        setSyncStatus("success");
+        setMensagem("Sincronização concluída com sucesso!");
         utils.postos.list.invalidate();
         utils.produtos.list.invalidate();
         utils.tanques.list.invalidate();
@@ -44,12 +47,21 @@ export default function Configuracoes() {
         utils.dashboard.stats.invalidate();
         refetchSync();
       } else {
-        toast.error("Sincronização concluída com erros");
+        setSyncStatus("error");
+        setMensagem("Sincronização concluída com erros");
       }
+      setTimeout(() => {
+        setMensagem(null);
+        setSyncStatus("idle");
+      }, 5000);
     },
     onError: (error) => {
       setSyncStatus("error");
-      toast.error("Erro na sincronização: " + error.message);
+      setMensagem("Erro na sincronização: " + error.message);
+      setTimeout(() => {
+        setMensagem(null);
+        setSyncStatus("idle");
+      }, 5000);
     }
   });
 
@@ -78,6 +90,19 @@ export default function Configuracoes() {
           <h1 className="text-2xl font-bold text-foreground">Configurações</h1>
           <p className="text-muted-foreground">Parâmetros e configurações do sistema</p>
         </div>
+
+        {/* Mensagem de feedback */}
+        {mensagem && (
+          <div className={`p-4 rounded-lg ${
+            mensagem.includes("Erro") 
+              ? "bg-red-50 border border-red-200 text-red-800" 
+              : mensagem.includes("sucesso") || mensagem.includes("concluída")
+                ? "bg-green-50 border border-green-200 text-green-800"
+                : "bg-blue-50 border border-blue-200 text-blue-800"
+          }`}>
+            {mensagem}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Parâmetros do Sistema */}

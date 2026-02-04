@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { Plus, Ruler, AlertTriangle, CheckCircle, TrendingUp } from "lucide-react";
 import { useState, useEffect } from "react";
-import { toast } from "sonner";
+
 
 function formatNumber(value: string | number | null | undefined): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;
@@ -50,13 +50,13 @@ export default function Medicoes() {
 
   const createMedicao = trpc.medicoes.create.useMutation({
     onSuccess: () => {
-      toast.success("Medição registrada com sucesso!");
+      alert("Medição registrada com sucesso!");
       setDialogOpen(false);
       resetForm();
       utils.medicoes.list.invalidate();
     },
     onError: (error) => {
-      toast.error("Erro ao registrar medição: " + error.message);
+      alert("Erro ao registrar medição: " + error.message);
     }
   });
 
@@ -73,7 +73,7 @@ export default function Medicoes() {
 
   const handleSubmit = () => {
     if (!tanqueSelecionado || !volumeMedido) {
-      toast.error("Preencha todos os campos obrigatórios");
+      alert("Preencha todos os campos obrigatórios");
       return;
     }
 

@@ -543,7 +543,7 @@ export async function sincronizarComprasACS(diasAtras: number = 180) {
         i.cod_tanque,
         i.cod_combustivel,
         i.quantidade,
-        i.preco as valor_unitario,
+        i.custo_comenc as valor_unitario,
         i.valor_nominal as valor_total
       FROM compras_comb c
       JOIN itens_compra_comb i ON c.cod_empresa = i.cod_empresa AND c.codigo = i.cod_compra
@@ -589,7 +589,7 @@ export async function sincronizarComprasACS(diasAtras: number = 180) {
 
       const quantidade = parseFloat(row.quantidade || "0");
       const custoUnitario = parseFloat(row.valor_unitario || "0");
-      const custoTotal = parseFloat(row.valor_total || "0") || (quantidade * custoUnitario);
+      const custoTotal = quantidade * custoUnitario; // Recalcular com base no custo real
 
       // Verificar se já existe
       const existente = await db.select().from(lotes)

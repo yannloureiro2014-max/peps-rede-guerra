@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { trpc } from "@/lib/trpc";
 import { Building2, Plus, Fuel } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
+
 
 export default function Postos() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -23,13 +23,13 @@ export default function Postos() {
 
   const createPosto = trpc.postos.create.useMutation({
     onSuccess: () => {
-      toast.success("Posto cadastrado com sucesso!");
+      alert("Posto cadastrado com sucesso!");
       setDialogOpen(false);
       resetForm();
       utils.postos.list.invalidate();
     },
     onError: (error) => {
-      toast.error("Erro ao cadastrar posto: " + error.message);
+      alert("Erro ao cadastrar posto: " + error.message);
     }
   });
 
@@ -42,7 +42,7 @@ export default function Postos() {
 
   const handleSubmit = () => {
     if (!codigoAcs || !nome) {
-      toast.error("Preencha os campos obrigatórios");
+      alert("Preencha os campos obrigatórios");
       return;
     }
     createPosto.mutate({ codigoAcs, nome, cnpj, endereco });

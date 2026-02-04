@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
 import { Plus, Package, FileText, Calendar, Edit, Trash2, RefreshCw } from "lucide-react";
 import { useState, useMemo } from "react";
-import { toast } from "sonner";
+
 
 function formatNumber(value: string | number | null | undefined): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;
@@ -98,38 +98,38 @@ export default function Compras() {
 
   const createLote = trpc.lotes.create.useMutation({
     onSuccess: () => {
-      toast.success("Compra registrada com sucesso!");
+      alert("Compra registrada com sucesso!");
       setDialogOpen(false);
       resetForm();
       refetchAtivos();
       refetchTodos();
     },
     onError: (error) => {
-      toast.error("Erro ao registrar compra: " + error.message);
+      alert("Erro ao registrar compra: " + error.message);
     }
   });
 
   const updateLote = trpc.lotes.update.useMutation({
     onSuccess: () => {
-      toast.success("Compra atualizada com sucesso!");
+      alert("Compra atualizada com sucesso!");
       setEditDialogOpen(false);
       setEditingLote(null);
       refetchAtivos();
       refetchTodos();
     },
     onError: (error) => {
-      toast.error("Erro ao atualizar compra: " + error.message);
+      alert("Erro ao atualizar compra: " + error.message);
     }
   });
 
   const deleteLote = trpc.lotes.delete.useMutation({
     onSuccess: () => {
-      toast.success("Compra excluída com sucesso!");
+      alert("Compra excluída com sucesso!");
       refetchAtivos();
       refetchTodos();
     },
     onError: (error) => {
-      toast.error("Erro ao excluir compra: " + error.message);
+      alert("Erro ao excluir compra: " + error.message);
     }
   });
 
@@ -147,7 +147,7 @@ export default function Compras() {
 
   const handleSubmit = () => {
     if (!tanqueSelecionado || !quantidade || !custoUnitario) {
-      toast.error("Preencha todos os campos obrigatórios");
+      alert("Preencha todos os campos obrigatórios");
       return;
     }
 
@@ -182,7 +182,7 @@ export default function Compras() {
 
   const handleDelete = (id: number, origem: string) => {
     if (origem === "acs") {
-      toast.error("Não é possível excluir compras importadas do ACS");
+      alert("Não é possível excluir compras importadas do ACS");
       return;
     }
     if (confirm("Tem certeza que deseja excluir esta compra?")) {

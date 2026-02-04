@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { Bell, CheckCircle, AlertTriangle, Fuel, Ruler, RefreshCw } from "lucide-react";
-import { toast } from "sonner";
+
 
 export default function Alertas() {
   const { data: alertas, isLoading, refetch } = trpc.alertas.pendentes.useQuery();
@@ -12,11 +12,11 @@ export default function Alertas() {
 
   const resolverAlerta = trpc.alertas.resolver.useMutation({
     onSuccess: () => {
-      toast.success("Alerta resolvido!");
+      alert("Alerta resolvido!");
       utils.alertas.pendentes.invalidate();
     },
     onError: (error) => {
-      toast.error("Erro ao resolver alerta: " + error.message);
+      alert("Erro ao resolver alerta: " + error.message);
     }
   });
 
