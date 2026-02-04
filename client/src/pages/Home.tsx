@@ -2,10 +2,9 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { Fuel, DollarSign, Building2, Gauge, TrendingUp, TrendingDown } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { useMemo } from "react";
 
-const COLORS = ['#2563eb', '#16a34a', '#eab308', '#ea580c', '#dc2626'];
+const COLORS = ['#2563eb', '#16a34a', '#eab308', '#ea580c', '#dc2626', '#8b5cf6', '#06b6d4'];
 
 function formatNumber(value: string | number | null | undefined): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;
@@ -19,6 +18,7 @@ function formatCurrency(value: string | number | null | undefined): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
 }
 
+// Gráfico de barras horizontais usando CSS puro
 function VendasPorPostoChart({ data }: { data: Array<{ nome: string; litros: number; valor: number }> }) {
   if (!data || data.length === 0) {
     return (
@@ -28,22 +28,32 @@ function VendasPorPostoChart({ data }: { data: Array<{ nome: string; litros: num
     );
   }
 
+  const maxLitros = Math.max(...data.map(d => d.litros));
+
   return (
-    <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={data} layout="vertical" margin={{ left: 20, right: 20 }}>
-        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-        <XAxis type="number" tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} />
-        <YAxis type="category" dataKey="nome" width={100} tick={{ fontSize: 12 }} />
-        <Tooltip 
-          formatter={(value: number) => [`${formatNumber(value)} L`, 'Litros']}
-          contentStyle={{ borderRadius: '8px' }}
-        />
-        <Bar dataKey="litros" fill="#2563eb" radius={[0, 4, 4, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="space-y-3">
+      {data.map((item, index) => (
+        <div key={item.nome} className="space-y-1">
+          <div className="flex justify-between text-sm">
+            <span className="font-medium truncate max-w-[150px]">{item.nome}</span>
+            <span className="text-muted-foreground">{formatNumber(item.litros)} L</span>
+          </div>
+          <div className="h-6 bg-gray-100 rounded-full overflow-hidden">
+            <div 
+              className="h-full rounded-full transition-all duration-500"
+              style={{ 
+                width: `${(item.litros / maxLitros) * 100}%`,
+                backgroundColor: COLORS[index % COLORS.length]
+              }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
+// Gráfico de pizza usando CSS puro (conic-gradient)
 function DistribuicaoCombustivelChart({ data }: { data: Array<{ nome: string; litros: number }> }) {
   if (!data || data.length === 0) {
     return (
@@ -53,29 +63,44 @@ function DistribuicaoCombustivelChart({ data }: { data: Array<{ nome: string; li
     );
   }
 
+  const total = data.reduce((acc, item) => acc + item.litros, 0);
+  
+  // Calcular gradiente cônico
+  let currentAngle = 0;
+  const gradientParts: string[] = [];
+  const legendItems: Array<{ nome: string; percent: number; color: string }> = [];
+  
+  data.forEach((item, index) => {
+    const percent = (item.litros / total) * 100;
+    const color = COLORS[index % COLORS.length];
+    const startAngle = currentAngle;
+    currentAngle += percent * 3.6; // 360 graus / 100%
+    
+    gradientParts.push(`${color} ${startAngle}deg ${currentAngle}deg`);
+    legendItems.push({ nome: item.nome, percent, color });
+  });
+
+  const gradient = `conic-gradient(${gradientParts.join(', ')})`;
+
   return (
-    <ResponsiveContainer width="100%" height={300}>
-      <PieChart>
-        <Pie
-          data={data}
-          cx="50%"
-          cy="50%"
-          labelLine={false}
-          label={({ nome, percent }) => `${nome} (${(percent * 100).toFixed(0)}%)`}
-          outerRadius={100}
-          fill="#8884d8"
-          dataKey="litros"
-        >
-          {data.map((_, index) => (
-            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip 
-          formatter={(value: number) => [`${formatNumber(value)} L`, 'Litros']}
-          contentStyle={{ borderRadius: '8px' }}
-        />
-      </PieChart>
-    </ResponsiveContainer>
+    <div className="flex flex-col items-center gap-4">
+      <div 
+        className="w-48 h-48 rounded-full shadow-inner"
+        style={{ background: gradient }}
+      />
+      <div className="grid grid-cols-2 gap-2 w-full">
+        {legendItems.map((item) => (
+          <div key={item.nome} className="flex items-center gap-2 text-xs">
+            <div 
+              className="w-3 h-3 rounded-full flex-shrink-0"
+              style={{ backgroundColor: item.color }}
+            />
+            <span className="truncate">{item.nome}</span>
+            <span className="text-muted-foreground ml-auto">{item.percent.toFixed(0)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -92,7 +117,7 @@ export default function Home() {
       nome: item.postoNome?.replace('POSTO ', '').replace('REDE ', '') || 'N/A',
       litros: parseFloat(item.totalLitros || '0'),
       valor: parseFloat(item.totalValor || '0'),
-    }));
+    })).sort((a, b) => b.litros - a.litros);
   }, [vendasPorPosto]);
 
   const chartDataCombustivel = useMemo(() => {
@@ -100,7 +125,7 @@ export default function Home() {
     return vendasPorCombustivel.map(item => ({
       nome: item.produtoDescricao?.replace('OLEO ', '').replace(' HIDRATADO', '').replace(' COMUM', '') || 'N/A',
       litros: parseFloat(item.totalLitros || '0'),
-    }));
+    })).sort((a, b) => b.litros - a.litros);
   }, [vendasPorCombustivel]);
 
   return (
