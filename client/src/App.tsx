@@ -5,31 +5,37 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
+import Estoque from "./pages/Estoque";
+import Compras from "./pages/Compras";
+import Medicoes from "./pages/Medicoes";
+import Vendas from "./pages/Vendas";
+import Relatorios from "./pages/Relatorios";
+import Alertas from "./pages/Alertas";
+import Postos from "./pages/Postos";
+import Configuracoes from "./pages/Configuracoes";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
       <Route path={"/"} component={Home} />
+      <Route path={"/estoque"} component={Estoque} />
+      <Route path={"/compras"} component={Compras} />
+      <Route path={"/medicoes"} component={Medicoes} />
+      <Route path={"/vendas"} component={Vendas} />
+      <Route path={"/relatorios"} component={Relatorios} />
+      <Route path={"/alertas"} component={Alertas} />
+      <Route path={"/postos"} component={Postos} />
+      <Route path={"/configuracoes"} component={Configuracoes} />
       <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
+      <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
           <Router />

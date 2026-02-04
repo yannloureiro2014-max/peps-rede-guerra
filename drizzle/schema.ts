@@ -1,22 +1,13 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, date } from "drizzle-orm/mysql-core";
 
-/**
- * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
- */
+// Tabela de usuários (autenticação)
 export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  role: mysqlEnum("role", ["user", "admin", "operator", "viewer"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -25,4 +16,165 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+// Tabela de Postos
+export const postos = mysqlTable("postos", {
+  id: int("id").autoincrement().primaryKey(),
+  codigoAcs: varchar("codigoAcs", { length: 10 }).notNull().unique(),
+  nome: varchar("nome", { length: 200 }).notNull(),
+  cnpj: varchar("cnpj", { length: 20 }),
+  endereco: text("endereco"),
+  ativo: int("ativo").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Posto = typeof postos.$inferSelect;
+export type InsertPosto = typeof postos.$inferInsert;
+
+// Tabela de Produtos (Combustíveis)
+export const produtos = mysqlTable("produtos", {
+  id: int("id").autoincrement().primaryKey(),
+  codigoAcs: varchar("codigoAcs", { length: 20 }).notNull().unique(),
+  descricao: varchar("descricao", { length: 200 }).notNull(),
+  tipo: varchar("tipo", { length: 10 }).default("C").notNull(),
+  ativo: int("ativo").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Produto = typeof produtos.$inferSelect;
+export type InsertProduto = typeof produtos.$inferInsert;
+
+// Tabela de Tanques
+export const tanques = mysqlTable("tanques", {
+  id: int("id").autoincrement().primaryKey(),
+  postoId: int("postoId").notNull(),
+  codigoAcs: varchar("codigoAcs", { length: 10 }).notNull(),
+  produtoId: int("produtoId").notNull(),
+  capacidade: decimal("capacidade", { precision: 12, scale: 3 }).default("0").notNull(),
+  estoqueMinimo: decimal("estoqueMinimo", { precision: 12, scale: 3 }).default("1000").notNull(),
+  ativo: int("ativo").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Tanque = typeof tanques.$inferSelect;
+export type InsertTanque = typeof tanques.$inferInsert;
+
+// Tabela de Lotes (Compras - PEPS/FIFO)
+export const lotes = mysqlTable("lotes", {
+  id: int("id").autoincrement().primaryKey(),
+  tanqueId: int("tanqueId").notNull(),
+  numeroNf: varchar("numeroNf", { length: 50 }),
+  fornecedor: varchar("fornecedor", { length: 200 }),
+  dataEntrada: date("dataEntrada").notNull(),
+  quantidadeOriginal: decimal("quantidadeOriginal", { precision: 12, scale: 3 }).notNull(),
+  quantidadeDisponivel: decimal("quantidadeDisponivel", { precision: 12, scale: 3 }).notNull(),
+  custoUnitario: decimal("custoUnitario", { precision: 12, scale: 4 }).notNull(),
+  ordemConsumo: int("ordemConsumo").default(0).notNull(),
+  status: mysqlEnum("status", ["ativo", "consumido", "cancelado"]).default("ativo").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Lote = typeof lotes.$inferSelect;
+export type InsertLote = typeof lotes.$inferInsert;
+
+// Tabela de Vendas
+export const vendas = mysqlTable("vendas", {
+  id: int("id").autoincrement().primaryKey(),
+  uuidAcs: varchar("uuidAcs", { length: 64 }).unique(),
+  tanqueId: int("tanqueId").notNull(),
+  dataVenda: date("dataVenda").notNull(),
+  quantidade: decimal("quantidade", { precision: 12, scale: 3 }).notNull(),
+  valorUnitario: decimal("valorUnitario", { precision: 12, scale: 4 }).notNull(),
+  valorTotal: decimal("valorTotal", { precision: 14, scale: 2 }).notNull(),
+  cmvCalculado: decimal("cmvCalculado", { precision: 14, scale: 2 }).default("0"),
+  cmvUnitario: decimal("cmvUnitario", { precision: 12, scale: 4 }).default("0"),
+  statusCmv: mysqlEnum("statusCmv", ["pendente", "calculado", "erro"]).default("pendente").notNull(),
+  origem: varchar("origem", { length: 20 }).default("acs").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Venda = typeof vendas.$inferSelect;
+export type InsertVenda = typeof vendas.$inferInsert;
+
+// Tabela de Consumo de Lotes (relação N:N entre vendas e lotes para PEPS)
+export const consumoLotes = mysqlTable("consumoLotes", {
+  id: int("id").autoincrement().primaryKey(),
+  vendaId: int("vendaId").notNull(),
+  loteId: int("loteId").notNull(),
+  quantidadeConsumida: decimal("quantidadeConsumida", { precision: 12, scale: 3 }).notNull(),
+  custoUnitario: decimal("custoUnitario", { precision: 12, scale: 4 }).notNull(),
+  custoTotal: decimal("custoTotal", { precision: 14, scale: 2 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ConsumoLote = typeof consumoLotes.$inferSelect;
+export type InsertConsumoLote = typeof consumoLotes.$inferInsert;
+
+// Tabela de Medições Físicas
+export const medicoes = mysqlTable("medicoes", {
+  id: int("id").autoincrement().primaryKey(),
+  tanqueId: int("tanqueId").notNull(),
+  dataMedicao: date("dataMedicao").notNull(),
+  horaMedicao: varchar("horaMedicao", { length: 10 }),
+  volumeMedido: decimal("volumeMedido", { precision: 12, scale: 3 }).notNull(),
+  temperatura: decimal("temperatura", { precision: 5, scale: 2 }),
+  estoqueEscritural: decimal("estoqueEscritural", { precision: 12, scale: 3 }).notNull(),
+  diferenca: decimal("diferenca", { precision: 12, scale: 3 }).notNull(),
+  percentualDiferenca: decimal("percentualDiferenca", { precision: 8, scale: 4 }).notNull(),
+  tipoDiferenca: mysqlEnum("tipoDiferenca", ["sobra", "perda", "ok"]).notNull(),
+  observacoes: text("observacoes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Medicao = typeof medicoes.$inferSelect;
+export type InsertMedicao = typeof medicoes.$inferInsert;
+
+// Tabela de Alertas
+export const alertas = mysqlTable("alertas", {
+  id: int("id").autoincrement().primaryKey(),
+  tipo: mysqlEnum("tipo", ["estoque_baixo", "diferenca_medicao", "cmv_pendente", "sincronizacao"]).notNull(),
+  postoId: int("postoId"),
+  tanqueId: int("tanqueId"),
+  titulo: varchar("titulo", { length: 200 }).notNull(),
+  mensagem: text("mensagem").notNull(),
+  dados: text("dados"),
+  status: mysqlEnum("status", ["pendente", "visualizado", "resolvido"]).default("pendente").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  resolvedAt: timestamp("resolvedAt"),
+});
+
+export type Alerta = typeof alertas.$inferSelect;
+export type InsertAlerta = typeof alertas.$inferInsert;
+
+// Tabela de Configurações
+export const configuracoes = mysqlTable("configuracoes", {
+  id: int("id").autoincrement().primaryKey(),
+  chave: varchar("chave", { length: 100 }).notNull().unique(),
+  valor: text("valor"),
+  tipo: varchar("tipo", { length: 20 }).default("text").notNull(),
+  descricao: text("descricao"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Configuracao = typeof configuracoes.$inferSelect;
+export type InsertConfiguracao = typeof configuracoes.$inferInsert;
+
+// Tabela de Log de Sincronização ACS
+export const syncLogs = mysqlTable("syncLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  tipo: varchar("tipo", { length: 50 }).notNull(),
+  dataInicio: timestamp("dataInicio").notNull(),
+  dataFim: timestamp("dataFim"),
+  registrosProcessados: int("registrosProcessados").default(0),
+  registrosInseridos: int("registrosInseridos").default(0),
+  registrosIgnorados: int("registrosIgnorados").default(0),
+  erros: int("erros").default(0),
+  status: mysqlEnum("status", ["executando", "sucesso", "erro"]).default("executando").notNull(),
+  mensagem: text("mensagem"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SyncLog = typeof syncLogs.$inferSelect;
+export type InsertSyncLog = typeof syncLogs.$inferInsert;
