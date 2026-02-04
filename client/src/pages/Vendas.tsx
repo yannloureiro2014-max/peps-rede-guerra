@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
-import { BarChart3, Download, Fuel, DollarSign } from "lucide-react";
+import { BarChart3, Download, Fuel, DollarSign, Calendar } from "lucide-react";
 import { useState, useMemo } from "react";
 
 function formatNumber(value: string | number | null | undefined): string {
@@ -19,24 +20,44 @@ function formatCurrency(value: string | number | null | undefined): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
 }
 
+function formatDateBR(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return d.toLocaleDateString('pt-BR');
+}
+
+function getDateString(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
 export default function Vendas() {
   const [postoFiltro, setPostoFiltro] = useState<string>("todos");
   const [produtoFiltro, setProdutoFiltro] = useState<string>("todos");
+  const [tipoFiltroData, setTipoFiltroData] = useState<string>("periodo");
   const [periodoFiltro, setPeriodoFiltro] = useState<string>("30");
+  const [dataEspecifica, setDataEspecifica] = useState<string>(getDateString(new Date()));
 
   const { data: postos } = trpc.postos.list.useQuery();
   const { data: produtos } = trpc.produtos.list.useQuery();
 
-  // Calcular datas baseado no período
+  // Calcular datas baseado no tipo de filtro
   const { dataInicio, dataFim } = useMemo(() => {
-    const fim = new Date();
-    const inicio = new Date();
-    inicio.setDate(inicio.getDate() - parseInt(periodoFiltro));
-    return {
-      dataInicio: inicio.toISOString().split('T')[0],
-      dataFim: fim.toISOString().split('T')[0]
-    };
-  }, [periodoFiltro]);
+    if (tipoFiltroData === "especifica") {
+      // Filtro por data específica
+      return {
+        dataInicio: dataEspecifica,
+        dataFim: dataEspecifica
+      };
+    } else {
+      // Filtro por período
+      const fim = new Date();
+      const inicio = new Date();
+      inicio.setDate(inicio.getDate() - parseInt(periodoFiltro));
+      return {
+        dataInicio: getDateString(inicio),
+        dataFim: getDateString(fim)
+      };
+    }
+  }, [tipoFiltroData, periodoFiltro, dataEspecifica]);
 
   const { data: vendas, isLoading } = trpc.vendas.list.useQuery({
     postoId: postoFiltro !== "todos" ? parseInt(postoFiltro) : undefined,
@@ -55,13 +76,33 @@ export default function Vendas() {
     }), { litros: 0, valor: 0, registros: 0 });
   }, [vendas]);
 
+  // Atalhos de data
+  const setDataHoje = () => {
+    setTipoFiltroData("especifica");
+    setDataEspecifica(getDateString(new Date()));
+  };
+
+  const setDataOntem = () => {
+    setTipoFiltroData("especifica");
+    const ontem = new Date();
+    ontem.setDate(ontem.getDate() - 1);
+    setDataEspecifica(getDateString(ontem));
+  };
+
+  const setDataAnteontem = () => {
+    setTipoFiltroData("especifica");
+    const anteontem = new Date();
+    anteontem.setDate(anteontem.getDate() - 2);
+    setDataEspecifica(getDateString(anteontem));
+  };
+
   // Exportar CSV
   const exportarCSV = () => {
     if (!vendas || vendas.length === 0) return;
     
     const headers = ['Data', 'Posto', 'Tanque', 'Combustível', 'Quantidade (L)', 'Preço Unit.', 'Valor Total'];
     const rows = vendas.map(v => [
-      new Date(v.dataVenda).toLocaleDateString('pt-BR'),
+      formatDateBR(v.dataVenda),
       v.postoNome,
       v.tanqueCodigo,
       v.produtoDescricao,
@@ -96,7 +137,7 @@ export default function Vendas() {
         {/* Filtros */}
         <Card>
           <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Posto</label>
                 <Select value={postoFiltro} onValueChange={setPostoFiltro}>
@@ -132,19 +173,74 @@ export default function Vendas() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Período</label>
-                <Select value={periodoFiltro} onValueChange={setPeriodoFiltro}>
+                <label className="text-sm font-medium">Tipo de Filtro</label>
+                <Select value={tipoFiltroData} onValueChange={setTipoFiltroData}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="7">Últimos 7 dias</SelectItem>
-                    <SelectItem value="30">Últimos 30 dias</SelectItem>
-                    <SelectItem value="60">Últimos 60 dias</SelectItem>
-                    <SelectItem value="90">Últimos 90 dias</SelectItem>
+                    <SelectItem value="periodo">Por Período</SelectItem>
+                    <SelectItem value="especifica">Data Específica</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              {tipoFiltroData === "periodo" ? (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Período</label>
+                  <Select value={periodoFiltro} onValueChange={setPeriodoFiltro}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Hoje</SelectItem>
+                      <SelectItem value="7">Últimos 7 dias</SelectItem>
+                      <SelectItem value="15">Últimos 15 dias</SelectItem>
+                      <SelectItem value="30">Últimos 30 dias</SelectItem>
+                      <SelectItem value="60">Últimos 60 dias</SelectItem>
+                      <SelectItem value="90">Últimos 90 dias</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Data (dd/mm/aaaa)</label>
+                  <Input
+                    type="date"
+                    value={dataEspecifica}
+                    onChange={(e) => setDataEspecifica(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Atalhos de data */}
+            {tipoFiltroData === "especifica" && (
+              <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
+                <span className="text-sm text-muted-foreground mr-2 self-center">Atalhos:</span>
+                <Button variant="outline" size="sm" onClick={setDataHoje}>
+                  <Calendar className="h-3 w-3 mr-1" />
+                  Hoje ({formatDateBR(new Date())})
+                </Button>
+                <Button variant="outline" size="sm" onClick={setDataOntem}>
+                  Ontem ({formatDateBR(new Date(Date.now() - 86400000))})
+                </Button>
+                <Button variant="outline" size="sm" onClick={setDataAnteontem}>
+                  Anteontem ({formatDateBR(new Date(Date.now() - 172800000))})
+                </Button>
+              </div>
+            )}
+
+            {/* Indicador de período selecionado */}
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                <strong>Período selecionado:</strong>{" "}
+                {tipoFiltroData === "especifica" 
+                  ? formatDateBR(dataEspecifica)
+                  : `${formatDateBR(dataInicio)} a ${formatDateBR(dataFim)}`
+                }
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -217,7 +313,7 @@ export default function Vendas() {
                   <TableBody>
                     {vendas.slice(0, 100).map(venda => (
                       <TableRow key={venda.id}>
-                        <TableCell>{new Date(venda.dataVenda).toLocaleDateString('pt-BR')}</TableCell>
+                        <TableCell>{formatDateBR(venda.dataVenda)}</TableCell>
                         <TableCell className="font-medium">{venda.postoNome}</TableCell>
                         <TableCell>{venda.tanqueCodigo}</TableCell>
                         <TableCell>{venda.produtoDescricao}</TableCell>

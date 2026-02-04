@@ -154,12 +154,17 @@ export async function getLotesAtivos(tanqueId?: number) {
   return db.select({
     id: lotes.id,
     tanqueId: lotes.tanqueId,
+    postoId: lotes.postoId,
     numeroNf: lotes.numeroNf,
+    chaveNfe: lotes.chaveNfe,
     fornecedorId: lotes.fornecedorId,
     dataEntrada: lotes.dataEntrada,
     quantidadeOriginal: lotes.quantidadeOriginal,
     quantidadeDisponivel: lotes.quantidadeDisponivel,
     custoUnitario: lotes.custoUnitario,
+    custoTotal: lotes.custoTotal,
+    origem: lotes.origem,
+    ordemConsumo: lotes.ordemConsumo,
     postoNome: postos.nome,
     tanqueCodigo: tanques.codigoAcs,
     produtoDescricao: produtos.descricao

@@ -527,29 +527,29 @@ export async function sincronizarComprasACS(diasAtras: number = 180) {
     dataInicio.setDate(dataInicio.getDate() - diasAtras);
     const dataInicioStr = dataInicio.toISOString().split("T")[0];
 
-    // Buscar compras de combustível do ACS
+    // Buscar compras de combustível do ACS (tabela compras_comb + itens_compra_comb)
     const result = await acsClient.query(`
       SELECT 
         c.cod_empresa,
         c.codigo,
-        c.cod_tanque,
-        c.cod_combustivel,
-        c.cod_fornecedor,
-        c.numero_nf,
-        c.serie_nf,
-        c.chave_nfe,
+        c.documento as numero_nf,
+        c.serie as serie_nf,
+        c.chave_eletronica as chave_nfe,
         c.dt_emissao,
-        c.dt_entrada,
+        c.dt_recebimento as dt_entrada,
         c.dt_lmc,
-        c.quantidade,
-        c.valor_unitario,
-        c.valor_total,
-        f.nome as fornecedor_nome,
-        f.cnpj as fornecedor_cnpj
+        c.cod_fornecedor,
+        c.total_nota,
+        i.cod_tanque,
+        i.cod_combustivel,
+        i.quantidade,
+        i.preco as valor_unitario,
+        i.valor_nominal as valor_total
       FROM compras_comb c
-      LEFT JOIN fornecedores f ON c.cod_fornecedor = f.codigo
-      WHERE c.dt_entrada >= $1
-      ORDER BY c.dt_entrada DESC
+      JOIN itens_compra_comb i ON c.cod_empresa = i.cod_empresa AND c.codigo = i.cod_compra
+      WHERE c.dt_recebimento >= $1
+        AND (c.cancelada = 'N' OR c.cancelada IS NULL)
+      ORDER BY c.dt_recebimento DESC
     `, [dataInicioStr]);
 
     // Buscar postos, tanques e produtos do PEPS

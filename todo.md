@@ -45,3 +45,10 @@
 - [x] CRUD completo para notas fiscais (incluir, editar, excluir)
 - [x] CRUD completo para medições físicas (incluir, editar, excluir)
 - [x] Manter histórico de alterações em NFs e medições
+
+## Correções Solicitadas
+
+- [x] Sincronizar histórico de compras/NFes do banco ACS
+- [x] Filtro de data com seleção específica (hoje, ontem, dia X)
+- [x] Formato de data brasileiro dd/mm/aaaa em todas as telas
+- [ ] Campo para ordenar lotes por ordem de consumo PEPS
