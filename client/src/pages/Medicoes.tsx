@@ -84,14 +84,12 @@ export default function Medicoes() {
 
     createMedicao.mutate({
       tanqueId: parseInt(tanqueSelecionado),
+      postoId: parseInt(postoSelecionado),
       dataMedicao,
       horaMedicao,
       volumeMedido: volumeMedido,
       temperatura,
       estoqueEscritural: estoqueEscritural.toString(),
-      diferenca: diferenca.toString(),
-      percentualDiferenca: percentual.toString(),
-      tipoDiferenca: tipo,
       observacoes,
     });
   };

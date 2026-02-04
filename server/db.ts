@@ -1,4 +1,4 @@
-import { eq, desc, and, gte, lte, sql, sum } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, sum, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { 
   users, InsertUser,
@@ -11,7 +11,8 @@ import {
   medicoes, InsertMedicao,
   alertas, InsertAlerta,
   configuracoes, InsertConfiguracao,
-  syncLogs, InsertSyncLog
+  syncLogs, InsertSyncLog,
+  historicoAlteracoes, InsertHistoricoAlteracao
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -134,16 +135,27 @@ export async function createTanque(data: InsertTanque) {
   await db.insert(tanques).values(data);
 }
 
-// ==================== LOTES ====================
+export async function getEstoquePorTanque(tanqueId: number) {
+  const db = await getDb();
+  if (!db) return "0";
+  const result = await db.select({
+    total: sum(lotes.quantidadeDisponivel)
+  })
+  .from(lotes)
+  .where(and(eq(lotes.tanqueId, tanqueId), eq(lotes.status, "ativo")));
+  return result[0]?.total || "0";
+}
+
+// ==================== LOTES (CRUD COMPLETO) ====================
 export async function getLotesAtivos(tanqueId?: number) {
   const db = await getDb();
   if (!db) return [];
   
-  let query = db.select({
+  return db.select({
     id: lotes.id,
     tanqueId: lotes.tanqueId,
     numeroNf: lotes.numeroNf,
-    fornecedor: lotes.fornecedor,
+    fornecedorId: lotes.fornecedorId,
     dataEntrada: lotes.dataEntrada,
     quantidadeOriginal: lotes.quantidadeOriginal,
     quantidadeDisponivel: lotes.quantidadeDisponivel,
@@ -158,25 +170,88 @@ export async function getLotesAtivos(tanqueId?: number) {
   .leftJoin(produtos, eq(tanques.produtoId, produtos.id))
   .where(eq(lotes.status, "ativo"))
   .orderBy(postos.nome, tanques.codigoAcs, lotes.dataEntrada);
+}
+
+export async function getLotes(postoId?: number, status?: string, limite?: number) {
+  const db = await getDb();
+  if (!db) return [];
   
-  return query;
-}
-
-export async function createLote(data: InsertLote) {
-  const db = await getDb();
-  if (!db) return;
-  await db.insert(lotes).values(data);
-}
-
-export async function getEstoquePorTanque(tanqueId: number) {
-  const db = await getDb();
-  if (!db) return "0";
-  const result = await db.select({
-    total: sum(lotes.quantidadeDisponivel)
+  const conditions = [];
+  if (postoId) conditions.push(eq(lotes.postoId, postoId));
+  if (status) conditions.push(eq(lotes.status, status as any));
+  
+  return db.select({
+    id: lotes.id,
+    codigoAcs: lotes.codigoAcs,
+    tanqueId: lotes.tanqueId,
+    postoId: lotes.postoId,
+    produtoId: lotes.produtoId,
+    numeroNf: lotes.numeroNf,
+    serieNf: lotes.serieNf,
+    chaveNfe: lotes.chaveNfe,
+    dataEmissao: lotes.dataEmissao,
+    dataEntrada: lotes.dataEntrada,
+    dataLmc: lotes.dataLmc,
+    quantidadeOriginal: lotes.quantidadeOriginal,
+    quantidadeDisponivel: lotes.quantidadeDisponivel,
+    custoUnitario: lotes.custoUnitario,
+    custoTotal: lotes.custoTotal,
+    status: lotes.status,
+    origem: lotes.origem,
+    fornecedorId: lotes.fornecedorId,
+    postoNome: postos.nome,
+    tanqueCodigo: tanques.codigoAcs,
+    produtoDescricao: produtos.descricao
   })
   .from(lotes)
-  .where(and(eq(lotes.tanqueId, tanqueId), eq(lotes.status, "ativo")));
-  return result[0]?.total || "0";
+  .leftJoin(postos, eq(lotes.postoId, postos.id))
+  .leftJoin(tanques, eq(lotes.tanqueId, tanques.id))
+  .leftJoin(produtos, eq(lotes.produtoId, produtos.id))
+  .where(conditions.length > 0 ? and(...conditions) : undefined)
+  .orderBy(desc(lotes.dataEntrada))
+  .limit(limite || 500);
+}
+
+export async function getLoteById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(lotes).where(eq(lotes.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createLote(data: InsertLote, usuarioId?: number, usuarioNome?: string) {
+  const db = await getDb();
+  if (!db) return;
+  const result = await db.insert(lotes).values(data);
+  
+  // Registrar no histórico
+  if (result[0]?.insertId) {
+    await registrarHistorico("lotes", result[0].insertId, "insert", null, data, usuarioId, usuarioNome);
+  }
+}
+
+export async function updateLote(id: number, data: Record<string, any>, usuarioId?: number, usuarioNome?: string, justificativa?: string) {
+  const db = await getDb();
+  if (!db) return;
+  
+  const antigo = await getLoteById(id);
+  await db.update(lotes).set(data).where(eq(lotes.id, id));
+  
+  if (antigo) {
+    await registrarHistorico("lotes", id, "update", antigo, data, usuarioId, usuarioNome, justificativa);
+  }
+}
+
+export async function deleteLote(id: number, usuarioId?: number, usuarioNome?: string, justificativa?: string) {
+  const db = await getDb();
+  if (!db) return;
+  
+  const antigo = await getLoteById(id);
+  await db.update(lotes).set({ status: "cancelado" }).where(eq(lotes.id, id));
+  
+  if (antigo) {
+    await registrarHistorico("lotes", id, "delete", antigo, { status: "cancelado" }, usuarioId, usuarioNome, justificativa);
+  }
 }
 
 // ==================== VENDAS ====================
@@ -277,50 +352,177 @@ export async function getVendasPorCombustivel(dias: number = 30) {
   .orderBy(desc(sum(vendas.quantidade)));
 }
 
-// ==================== MEDIÇÕES ====================
-export async function getMedicoes(tanqueId?: number, limite: number = 100) {
+// ==================== MEDIÇÕES (CRUD COMPLETO) ====================
+export async function getMedicoes(tanqueId?: number, postoId?: number, limite: number = 100) {
   const db = await getDb();
   if (!db) return [];
   
-  const conditions = tanqueId ? eq(medicoes.tanqueId, tanqueId) : undefined;
+  const conditions = [];
+  if (tanqueId) conditions.push(eq(medicoes.tanqueId, tanqueId));
+  if (postoId) conditions.push(eq(medicoes.postoId, postoId));
   
   return db.select({
     id: medicoes.id,
+    codigoAcs: medicoes.codigoAcs,
+    tanqueId: medicoes.tanqueId,
+    postoId: medicoes.postoId,
     dataMedicao: medicoes.dataMedicao,
     horaMedicao: medicoes.horaMedicao,
     volumeMedido: medicoes.volumeMedido,
+    temperatura: medicoes.temperatura,
     estoqueEscritural: medicoes.estoqueEscritural,
     diferenca: medicoes.diferenca,
     percentualDiferenca: medicoes.percentualDiferenca,
     tipoDiferenca: medicoes.tipoDiferenca,
     observacoes: medicoes.observacoes,
+    origem: medicoes.origem,
     postoNome: postos.nome,
     tanqueCodigo: tanques.codigoAcs,
     produtoDescricao: produtos.descricao
   })
   .from(medicoes)
   .leftJoin(tanques, eq(medicoes.tanqueId, tanques.id))
-  .leftJoin(postos, eq(tanques.postoId, postos.id))
+  .leftJoin(postos, eq(medicoes.postoId, postos.id))
   .leftJoin(produtos, eq(tanques.produtoId, produtos.id))
-  .where(conditions)
+  .where(conditions.length > 0 ? and(...conditions) : undefined)
   .orderBy(desc(medicoes.dataMedicao))
   .limit(limite);
 }
 
-export async function createMedicao(data: InsertMedicao) {
+export async function getMedicaoById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(medicoes).where(eq(medicoes.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createMedicao(data: InsertMedicao, usuarioId?: number, usuarioNome?: string) {
   const db = await getDb();
   if (!db) return;
-  await db.insert(medicoes).values(data);
+  const result = await db.insert(medicoes).values(data);
+  
+  if (result[0]?.insertId) {
+    await registrarHistorico("medicoes", result[0].insertId, "insert", null, data, usuarioId, usuarioNome);
+  }
+}
+
+export async function updateMedicao(id: number, data: Record<string, any>, usuarioId?: number, usuarioNome?: string, justificativa?: string) {
+  const db = await getDb();
+  if (!db) return;
+  
+  const antigo = await getMedicaoById(id);
+  await db.update(medicoes).set(data).where(eq(medicoes.id, id));
+  
+  if (antigo) {
+    await registrarHistorico("medicoes", id, "update", antigo, data, usuarioId, usuarioNome, justificativa);
+  }
+}
+
+export async function deleteMedicao(id: number, usuarioId?: number, usuarioNome?: string, justificativa?: string) {
+  const db = await getDb();
+  if (!db) return;
+  
+  const antigo = await getMedicaoById(id);
+  await db.delete(medicoes).where(eq(medicoes.id, id));
+  
+  if (antigo) {
+    await registrarHistorico("medicoes", id, "delete", antigo, null, usuarioId, usuarioNome, justificativa);
+  }
+}
+
+export async function getMedicoesFaltantes(dias: number = 30) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const postosAtivos = await db.select().from(postos).where(eq(postos.ativo, 1));
+  
+  const hoje = new Date();
+  const datasEsperadas: string[] = [];
+  for (let i = 1; i <= dias; i++) {
+    const data = new Date(hoje);
+    data.setDate(data.getDate() - i);
+    datasEsperadas.push(data.toISOString().split('T')[0]);
+  }
+  
+  const dataInicio = new Date();
+  dataInicio.setDate(dataInicio.getDate() - dias);
+  
+  const medicoesExistentes = await db.select({
+    postoId: medicoes.postoId,
+    dataMedicao: medicoes.dataMedicao,
+  }).from(medicoes)
+    .where(gte(medicoes.dataMedicao, dataInicio));
+  
+  const medicoesMap = new Set(
+    medicoesExistentes.map(m => `${m.postoId}-${m.dataMedicao?.toISOString().split('T')[0]}`)
+  );
+  
+  const faltantes: Array<{ postoId: number; postoNome: string; datasFaltantes: string[] }> = [];
+  
+  for (const posto of postosAtivos) {
+    const datasFaltantes: string[] = [];
+    
+    for (const data of datasEsperadas) {
+      if (!medicoesMap.has(`${posto.id}-${data}`)) {
+        datasFaltantes.push(data);
+      }
+    }
+    
+    if (datasFaltantes.length > 0) {
+      faltantes.push({
+        postoId: posto.id,
+        postoNome: posto.nome,
+        datasFaltantes: datasFaltantes.sort().reverse(),
+      });
+    }
+  }
+  
+  return faltantes;
 }
 
 // ==================== ALERTAS ====================
 export async function getAlertasPendentes() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(alertas)
-    .where(eq(alertas.status, "pendente"))
-    .orderBy(desc(alertas.createdAt))
-    .limit(50);
+  return db.select({
+    id: alertas.id,
+    tipo: alertas.tipo,
+    postoId: alertas.postoId,
+    tanqueId: alertas.tanqueId,
+    titulo: alertas.titulo,
+    mensagem: alertas.mensagem,
+    dados: alertas.dados,
+    status: alertas.status,
+    createdAt: alertas.createdAt,
+    postoNome: postos.nome
+  })
+  .from(alertas)
+  .leftJoin(postos, eq(alertas.postoId, postos.id))
+  .where(eq(alertas.status, "pendente"))
+  .orderBy(desc(alertas.createdAt))
+  .limit(50);
+}
+
+export async function getAlertasPorTipo(tipo: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: alertas.id,
+    tipo: alertas.tipo,
+    postoId: alertas.postoId,
+    tanqueId: alertas.tanqueId,
+    titulo: alertas.titulo,
+    mensagem: alertas.mensagem,
+    dados: alertas.dados,
+    status: alertas.status,
+    createdAt: alertas.createdAt,
+    postoNome: postos.nome
+  })
+  .from(alertas)
+  .leftJoin(postos, eq(alertas.postoId, postos.id))
+  .where(eq(alertas.tipo, tipo as any))
+  .orderBy(desc(alertas.createdAt))
+  .limit(100);
 }
 
 export async function createAlerta(data: InsertAlerta) {
@@ -335,6 +537,50 @@ export async function resolverAlerta(id: number) {
   await db.update(alertas)
     .set({ status: "resolvido", resolvedAt: new Date() })
     .where(eq(alertas.id, id));
+}
+
+// ==================== HISTÓRICO ====================
+export async function registrarHistorico(
+  tabela: string, 
+  registroId: number, 
+  acao: "insert" | "update" | "delete",
+  valoresAntigos: any,
+  valoresNovos: any,
+  usuarioId?: number,
+  usuarioNome?: string,
+  justificativa?: string
+) {
+  const db = await getDb();
+  if (!db) return;
+  
+  const camposAlterados = valoresNovos ? Object.keys(valoresNovos).join(", ") : null;
+  
+  await db.insert(historicoAlteracoes).values({
+    tabela,
+    registroId,
+    acao,
+    camposAlterados,
+    valoresAntigos: valoresAntigos ? JSON.stringify(valoresAntigos) : null,
+    valoresNovos: valoresNovos ? JSON.stringify(valoresNovos) : null,
+    usuarioId,
+    usuarioNome,
+    justificativa,
+  });
+}
+
+export async function getHistorico(tabela?: string, registroId?: number, limite: number = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const conditions = [];
+  if (tabela) conditions.push(eq(historicoAlteracoes.tabela, tabela));
+  if (registroId) conditions.push(eq(historicoAlteracoes.registroId, registroId));
+  
+  return db.select()
+    .from(historicoAlteracoes)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(historicoAlteracoes.createdAt))
+    .limit(limite);
 }
 
 // ==================== CONFIGURAÇÕES ====================

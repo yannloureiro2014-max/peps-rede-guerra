@@ -1,6 +1,6 @@
 import { getDb } from "./db";
-import { postos, produtos, tanques, vendas, syncLogs } from "../drizzle/schema";
-import { eq, sql } from "drizzle-orm";
+import { postos, produtos, tanques, vendas, syncLogs, medicoes, lotes, fornecedores, alertas } from "../drizzle/schema";
+import { eq, sql, and, between, isNull } from "drizzle-orm";
 import pg from "pg";
 
 // Configuração do banco ACS (PostgreSQL externo)
@@ -135,7 +135,6 @@ export async function sincronizarProdutosACS() {
     for (const row of result.rows) {
       const codigoAcs = row.codigo.trim();
       const descricao = row.descricao?.trim() || `Combustível ${codigoAcs}`;
-      const tipoComb = row.tipo_combustivel?.trim() || "GC";
 
       // Verificar se já existe
       const existente = await db.select().from(produtos)
@@ -176,7 +175,7 @@ export async function sincronizarTanquesACS() {
   try {
     console.log("[ETL] Sincronizando tanques do ACS...");
 
-    // Buscar tanques ativos do ACS
+    // Buscar tanques ativos do ACS com saldo atual
     const result = await acsClient.query(`
       SELECT 
         t.cod_empresa,
@@ -185,6 +184,7 @@ export async function sincronizarTanquesACS() {
         t.capacidade,
         t.estoque_minimo,
         t.ativo,
+        t.saldo,
         p.descricao as produto_descricao,
         p.tipo_combustivel
       FROM tanques t
@@ -215,7 +215,6 @@ export async function sincronizarTanquesACS() {
       // Encontrar produto correspondente
       let produto = produtosDb.find(p => p.codigoAcs === codCombustivel);
       if (!produto) {
-        // Tentar encontrar por descrição
         const descProduto = row.produto_descricao?.trim();
         produto = produtosDb.find(p => p.descricao?.includes(descProduto?.split(" ")[0] || ""));
       }
@@ -232,6 +231,7 @@ export async function sincronizarTanquesACS() {
           produtoId: produto?.id || null,
           capacidade: row.capacidade?.toString() || "10000",
           estoqueMinimo: row.estoque_minimo?.toString() || "1000",
+          saldoAtual: row.saldo?.toString() || "0",
         });
         inseridos++;
       } else {
@@ -239,6 +239,7 @@ export async function sincronizarTanquesACS() {
           .set({
             produtoId: produto?.id || existente[0].produtoId,
             capacidade: row.capacidade?.toString() || existente[0].capacidade,
+            saldoAtual: row.saldo?.toString() || existente[0].saldoAtual,
           })
           .where(eq(tanques.id, existente[0].id));
         atualizados++;
@@ -319,7 +320,6 @@ export async function sincronizarVendasACS(diasAtras: number = 30) {
       const codCombustivel = row.cod_combustivel?.trim();
       let produto = produtosDb.find(p => p.codigoAcs === codCombustivel);
       if (!produto) {
-        // Tentar por tipo_combustivel
         const tipoComb = row.tipo_combustivel?.trim();
         const descPadrao = MAPEAMENTO_COMBUSTIVEL[tipoComb] || tipoComb;
         produto = produtosDb.find(p => p.descricao?.includes(descPadrao?.split(" ")[0] || ""));
@@ -368,6 +368,409 @@ export async function sincronizarVendasACS(diasAtras: number = 30) {
   }
 }
 
+// NOVA FUNÇÃO: Sincronizar medições físicas do LMC (Livro de Movimentação de Combustíveis)
+export async function sincronizarMedicoesACS(diasAtras: number = 90) {
+  const db = await getDb();
+  if (!db) {
+    return { success: false, error: "Database PEPS not available" };
+  }
+
+  const acsClient = await getAcsClient();
+  if (!acsClient) {
+    return { success: false, error: "Não foi possível conectar ao banco ACS" };
+  }
+
+  try {
+    console.log(`[ETL] Sincronizando medições físicas dos últimos ${diasAtras} dias...`);
+
+    const dataInicio = new Date();
+    dataInicio.setDate(dataInicio.getDate() - diasAtras);
+    const dataInicioStr = dataInicio.toISOString().split("T")[0];
+
+    // Buscar medições do LMC no ACS
+    // A tabela lmc_tanques contém as medições diárias de cada tanque
+    const result = await acsClient.query(`
+      SELECT 
+        l.cod_empresa,
+        l.cod_tanque,
+        l.data_lmc,
+        l.estoque_abertura,
+        l.estoque_fechamento,
+        l.volume_medido,
+        l.diferenca,
+        l.hora_medicao,
+        l.temperatura,
+        l.observacao
+      FROM lmc_tanques l
+      WHERE l.data_lmc >= $1
+      ORDER BY l.data_lmc DESC, l.cod_empresa, l.cod_tanque
+    `, [dataInicioStr]);
+
+    // Buscar postos e tanques do PEPS
+    const postosDb = await db.select().from(postos);
+    const tanquesDb = await db.select().from(tanques);
+
+    let inseridos = 0;
+    let atualizados = 0;
+    let ignorados = 0;
+
+    for (const row of result.rows) {
+      const codEmpresa = row.cod_empresa?.trim();
+      const codTanque = row.cod_tanque?.trim();
+      const dataLmc = row.data_lmc;
+
+      // Encontrar posto
+      const posto = postosDb.find(p => p.codigoAcs === codEmpresa);
+      if (!posto) {
+        ignorados++;
+        continue;
+      }
+
+      // Encontrar tanque
+      const tanque = tanquesDb.find(t => t.postoId === posto.id && t.codigoAcs === codTanque);
+      if (!tanque) {
+        ignorados++;
+        continue;
+      }
+
+      // Código único para a medição
+      const codigoMedicaoAcs = `${codEmpresa}-${codTanque}-${dataLmc.toISOString().split('T')[0]}`;
+
+      // Calcular diferença e tipo
+      const volumeMedido = parseFloat(row.volume_medido || row.estoque_fechamento || "0");
+      const estoqueEscritural = parseFloat(row.estoque_abertura || "0");
+      const diferenca = volumeMedido - estoqueEscritural;
+      const percentualDiferenca = estoqueEscritural > 0 ? (diferenca / estoqueEscritural) * 100 : 0;
+      
+      let tipoDiferenca: "sobra" | "perda" | "ok" = "ok";
+      if (diferenca > 0.5) tipoDiferenca = "sobra";
+      else if (diferenca < -0.5) tipoDiferenca = "perda";
+
+      // Verificar se já existe
+      const existente = await db.select().from(medicoes)
+        .where(eq(medicoes.codigoAcs, codigoMedicaoAcs))
+        .limit(1);
+
+      if (existente.length === 0) {
+        await db.insert(medicoes).values({
+          codigoAcs: codigoMedicaoAcs,
+          tanqueId: tanque.id,
+          postoId: posto.id,
+          dataMedicao: new Date(dataLmc),
+          horaMedicao: row.hora_medicao?.trim() || null,
+          volumeMedido: volumeMedido.toFixed(3),
+          temperatura: row.temperatura?.toString() || null,
+          estoqueEscritural: estoqueEscritural.toFixed(3),
+          diferenca: diferenca.toFixed(3),
+          percentualDiferenca: percentualDiferenca.toFixed(4),
+          tipoDiferenca,
+          observacoes: row.observacao?.trim() || null,
+          origem: "acs",
+        });
+        inseridos++;
+      } else {
+        // Atualizar apenas se for do ACS (não sobrescrever edições manuais)
+        if (existente[0].origem === "acs") {
+          await db.update(medicoes)
+            .set({
+              volumeMedido: volumeMedido.toFixed(3),
+              estoqueEscritural: estoqueEscritural.toFixed(3),
+              diferenca: diferenca.toFixed(3),
+              percentualDiferenca: percentualDiferenca.toFixed(4),
+              tipoDiferenca,
+              observacoes: row.observacao?.trim() || existente[0].observacoes,
+            })
+            .where(eq(medicoes.id, existente[0].id));
+          atualizados++;
+        }
+      }
+    }
+
+    console.log(`[ETL] Medições: ${inseridos} inseridas, ${atualizados} atualizadas, ${ignorados} ignoradas`);
+
+    // Registrar log de sincronização
+    await db.insert(syncLogs).values({
+      tipo: "medicoes",
+      dataInicio: new Date(),
+      dataFim: new Date(),
+      registrosProcessados: result.rows.length,
+      registrosInseridos: inseridos,
+      status: "sucesso",
+      mensagem: `Sincronizadas ${inseridos} medições dos últimos ${diasAtras} dias`,
+    });
+
+    return { success: true, inseridos, atualizados, ignorados, total: result.rows.length };
+  } catch (error) {
+    console.error("[ETL] Erro ao sincronizar medições:", error);
+    return { success: false, error: String(error) };
+  } finally {
+    await acsClient.end();
+  }
+}
+
+// NOVA FUNÇÃO: Sincronizar notas fiscais de compra do ACS
+export async function sincronizarComprasACS(diasAtras: number = 180) {
+  const db = await getDb();
+  if (!db) {
+    return { success: false, error: "Database PEPS not available" };
+  }
+
+  const acsClient = await getAcsClient();
+  if (!acsClient) {
+    return { success: false, error: "Não foi possível conectar ao banco ACS" };
+  }
+
+  try {
+    console.log(`[ETL] Sincronizando notas fiscais de compra dos últimos ${diasAtras} dias...`);
+
+    const dataInicio = new Date();
+    dataInicio.setDate(dataInicio.getDate() - diasAtras);
+    const dataInicioStr = dataInicio.toISOString().split("T")[0];
+
+    // Buscar compras de combustível do ACS
+    const result = await acsClient.query(`
+      SELECT 
+        c.cod_empresa,
+        c.codigo,
+        c.cod_tanque,
+        c.cod_combustivel,
+        c.cod_fornecedor,
+        c.numero_nf,
+        c.serie_nf,
+        c.chave_nfe,
+        c.dt_emissao,
+        c.dt_entrada,
+        c.dt_lmc,
+        c.quantidade,
+        c.valor_unitario,
+        c.valor_total,
+        f.nome as fornecedor_nome,
+        f.cnpj as fornecedor_cnpj
+      FROM compras_comb c
+      LEFT JOIN fornecedores f ON c.cod_fornecedor = f.codigo
+      WHERE c.dt_entrada >= $1
+      ORDER BY c.dt_entrada DESC
+    `, [dataInicioStr]);
+
+    // Buscar postos, tanques e produtos do PEPS
+    const postosDb = await db.select().from(postos);
+    const tanquesDb = await db.select().from(tanques);
+    const produtosDb = await db.select().from(produtos);
+
+    let inseridos = 0;
+    let atualizados = 0;
+    let ignorados = 0;
+
+    for (const row of result.rows) {
+      const codEmpresa = row.cod_empresa?.trim();
+      const codCompra = row.codigo?.trim();
+      const codTanque = row.cod_tanque?.trim();
+
+      // Encontrar posto
+      const posto = postosDb.find(p => p.codigoAcs === codEmpresa);
+      if (!posto) {
+        ignorados++;
+        continue;
+      }
+
+      // Encontrar tanque
+      const tanque = tanquesDb.find(t => t.postoId === posto.id && t.codigoAcs === codTanque);
+      if (!tanque) {
+        ignorados++;
+        continue;
+      }
+
+      // Encontrar produto
+      const codCombustivel = row.cod_combustivel?.trim();
+      const produto = produtosDb.find(p => p.codigoAcs === codCombustivel);
+
+      // Código único para a compra
+      const codigoCompraAcs = `${codEmpresa}-${codCompra}`;
+
+      const quantidade = parseFloat(row.quantidade || "0");
+      const custoUnitario = parseFloat(row.valor_unitario || "0");
+      const custoTotal = parseFloat(row.valor_total || "0") || (quantidade * custoUnitario);
+
+      // Verificar se já existe
+      const existente = await db.select().from(lotes)
+        .where(eq(lotes.codigoAcs, codigoCompraAcs))
+        .limit(1);
+
+      if (existente.length === 0) {
+        await db.insert(lotes).values({
+          codigoAcs: codigoCompraAcs,
+          tanqueId: tanque.id,
+          postoId: posto.id,
+          produtoId: produto?.id || null,
+          numeroNf: row.numero_nf?.trim() || null,
+          serieNf: row.serie_nf?.trim() || null,
+          chaveNfe: row.chave_nfe?.trim() || null,
+          dataEmissao: row.dt_emissao ? new Date(row.dt_emissao) : null,
+          dataEntrada: new Date(row.dt_entrada),
+          dataLmc: row.dt_lmc ? new Date(row.dt_lmc) : null,
+          quantidadeOriginal: quantidade.toFixed(3),
+          quantidadeDisponivel: quantidade.toFixed(3), // Inicialmente igual à original
+          custoUnitario: custoUnitario.toFixed(4),
+          custoTotal: custoTotal.toFixed(2),
+          origem: "acs",
+          status: "ativo",
+        });
+        inseridos++;
+      } else {
+        // Atualizar apenas se for do ACS
+        if (existente[0].origem === "acs") {
+          await db.update(lotes)
+            .set({
+              numeroNf: row.numero_nf?.trim() || existente[0].numeroNf,
+              serieNf: row.serie_nf?.trim() || existente[0].serieNf,
+              chaveNfe: row.chave_nfe?.trim() || existente[0].chaveNfe,
+              custoUnitario: custoUnitario.toFixed(4),
+              custoTotal: custoTotal.toFixed(2),
+            })
+            .where(eq(lotes.id, existente[0].id));
+          atualizados++;
+        }
+      }
+    }
+
+    console.log(`[ETL] Compras: ${inseridos} inseridas, ${atualizados} atualizadas, ${ignorados} ignoradas`);
+
+    // Registrar log de sincronização
+    await db.insert(syncLogs).values({
+      tipo: "compras",
+      dataInicio: new Date(),
+      dataFim: new Date(),
+      registrosProcessados: result.rows.length,
+      registrosInseridos: inseridos,
+      status: "sucesso",
+      mensagem: `Sincronizadas ${inseridos} notas fiscais dos últimos ${diasAtras} dias`,
+    });
+
+    return { success: true, inseridos, atualizados, ignorados, total: result.rows.length };
+  } catch (error) {
+    console.error("[ETL] Erro ao sincronizar compras:", error);
+    return { success: false, error: String(error) };
+  } finally {
+    await acsClient.end();
+  }
+}
+
+// NOVA FUNÇÃO: Verificar medições faltantes e gerar alertas
+export async function verificarMedicoesFaltantes(diasVerificar: number = 30) {
+  const db = await getDb();
+  if (!db) {
+    return { success: false, error: "Database PEPS not available" };
+  }
+
+  try {
+    console.log(`[ETL] Verificando medições faltantes dos últimos ${diasVerificar} dias...`);
+
+    // Buscar todos os postos e tanques ativos
+    const postosDb = await db.select().from(postos).where(eq(postos.ativo, 1));
+    const tanquesDb = await db.select().from(tanques).where(eq(tanques.ativo, 1));
+
+    // Gerar lista de datas esperadas
+    const hoje = new Date();
+    const datasEsperadas: string[] = [];
+    for (let i = 1; i <= diasVerificar; i++) {
+      const data = new Date(hoje);
+      data.setDate(data.getDate() - i);
+      datasEsperadas.push(data.toISOString().split('T')[0]);
+    }
+
+    // Buscar medições existentes
+    const dataInicio = new Date();
+    dataInicio.setDate(dataInicio.getDate() - diasVerificar);
+    
+    const medicoesExistentes = await db.select({
+      postoId: medicoes.postoId,
+      tanqueId: medicoes.tanqueId,
+      dataMedicao: medicoes.dataMedicao,
+    }).from(medicoes)
+      .where(sql`${medicoes.dataMedicao} >= ${dataInicio.toISOString().split('T')[0]}`);
+
+    // Criar mapa de medições existentes
+    const medicoesMap = new Set(
+      medicoesExistentes.map(m => `${m.postoId}-${m.tanqueId}-${m.dataMedicao?.toISOString().split('T')[0]}`)
+    );
+
+    // Verificar faltantes por posto
+    const faltantesPorPosto: Record<number, { posto: string; datasFaltantes: string[] }> = {};
+
+    for (const posto of postosDb) {
+      const tanquesDoPosto = tanquesDb.filter(t => t.postoId === posto.id);
+      const datasFaltantes: Set<string> = new Set();
+
+      for (const data of datasEsperadas) {
+        // Verificar se pelo menos um tanque do posto tem medição nessa data
+        const temMedicao = tanquesDoPosto.some(t => 
+          medicoesMap.has(`${posto.id}-${t.id}-${data}`)
+        );
+
+        if (!temMedicao) {
+          datasFaltantes.add(data);
+        }
+      }
+
+      if (datasFaltantes.size > 0) {
+        faltantesPorPosto[posto.id] = {
+          posto: posto.nome,
+          datasFaltantes: Array.from(datasFaltantes).sort().reverse(),
+        };
+      }
+    }
+
+    // Gerar alertas para medições faltantes
+    let alertasCriados = 0;
+    for (const [postoId, info] of Object.entries(faltantesPorPosto)) {
+      const postoIdNum = parseInt(postoId);
+      
+      // Verificar se já existe alerta pendente para este posto
+      const alertaExistente = await db.select().from(alertas)
+        .where(and(
+          eq(alertas.tipo, "medicao_faltante"),
+          eq(alertas.postoId, postoIdNum),
+          eq(alertas.status, "pendente")
+        ))
+        .limit(1);
+
+      const datasStr = info.datasFaltantes.slice(0, 10).join(", ");
+      const mensagem = `Medições físicas faltantes para ${info.posto}: ${datasStr}${info.datasFaltantes.length > 10 ? ` e mais ${info.datasFaltantes.length - 10} datas` : ""}`;
+
+      if (alertaExistente.length === 0) {
+        await db.insert(alertas).values({
+          tipo: "medicao_faltante",
+          postoId: postoIdNum,
+          titulo: `Medições Faltantes - ${info.posto}`,
+          mensagem,
+          dados: JSON.stringify(info.datasFaltantes),
+          status: "pendente",
+        });
+        alertasCriados++;
+      } else {
+        // Atualizar alerta existente
+        await db.update(alertas)
+          .set({
+            mensagem,
+            dados: JSON.stringify(info.datasFaltantes),
+          })
+          .where(eq(alertas.id, alertaExistente[0].id));
+      }
+    }
+
+    console.log(`[ETL] Alertas de medições faltantes: ${alertasCriados} criados`);
+    return { 
+      success: true, 
+      alertasCriados, 
+      faltantesPorPosto: Object.values(faltantesPorPosto) 
+    };
+  } catch (error) {
+    console.error("[ETL] Erro ao verificar medições faltantes:", error);
+    return { success: false, error: String(error) };
+  }
+}
+
+// Função de sincronização completa atualizada
 export async function sincronizarTudo(diasVendas: number = 60) {
   console.log("[ETL] Iniciando sincronização completa com ACS...");
   
@@ -376,6 +779,9 @@ export async function sincronizarTudo(diasVendas: number = 60) {
     produtos: await sincronizarProdutosACS(),
     tanques: await sincronizarTanquesACS(),
     vendas: await sincronizarVendasACS(diasVendas),
+    medicoes: await sincronizarMedicoesACS(90),
+    compras: await sincronizarComprasACS(180),
+    alertasMedicoes: await verificarMedicoesFaltantes(30),
   };
 
   const sucesso = Object.values(resultados).every(r => r.success);

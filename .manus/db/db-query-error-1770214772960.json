@@ -1,0 +1,8 @@
+{
+  "query": "\n-- Adicionar novas colunas na tabela lotes\nALTER TABLE lotes ADD COLUMN codigoAcs VARCHAR(50) UNIQUE;\nALTER TABLE lotes ADD COLUMN postoId INT NOT NULL DEFAULT 0;\nALTER TABLE lotes ADD COLUMN produtoId INT;\nALTER TABLE lotes ADD COLUMN fornecedorId INT;\nALTER TABLE lotes ADD COLUMN serieNf VARCHAR(10);\nALTER TABLE lotes ADD COLUMN chaveNfe VARCHAR(60);\nALTER TABLE lotes ADD COLUMN dataEmissao DATE;\nALTER TABLE lotes ADD COLUMN dataLmc DATE;\nALTER TABLE lotes ADD COLUMN custoTotal DECIMAL(14,2) NOT NULL DEFAULT 0;\nALTER TABLE lotes ADD COLUMN origem ENUM('acs', 'manual') DEFAULT 'manual' NOT NULL;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute \n-- Adicionar novas colunas na tabela lotes\nALTER TABLE lotes ADD COLUMN codigoAcs VARCHAR(50) UNIQUE;\nALTER TABLE lotes ADD COLUMN postoId INT NOT NULL DEFAULT 0;\nALTER TABLE lotes ADD COLUMN produtoId INT;\nALTER TABLE lotes ADD COLUMN fornecedorId INT;\nALTER TABLE lotes ADD COLUMN serieNf VARCHAR(10);\nALTER TABLE lotes ADD COLUMN chaveNfe VARCHAR(60);\nALTER TABLE lotes ADD COLUMN dataEmissao DATE;\nALTER TABLE lotes ADD COLUMN dataLmc DATE;\nALTER TABLE lotes ADD COLUMN custoTotal DECIMAL(14,2) NOT NULL DEFAULT 0;\nALTER TABLE lotes ADD COLUMN origem ENUM('acs', 'manual') DEFAULT 'manual' NOT NULL;\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 8200 (HY000) at line 3: unsupported add column 'codigoacs' constraint UNIQUE KEY when altering 'GsoitYr3hHiyZTgQLwp9sV.lotes'"
+  ]
+}

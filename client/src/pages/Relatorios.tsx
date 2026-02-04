@@ -274,7 +274,7 @@ export default function Relatorios() {
                       Tanque: l.tanqueCodigo,
                       Combustível: l.produtoDescricao,
                       NF: l.numeroNf,
-                      Fornecedor: l.fornecedor,
+                      Fornecedor: l.fornecedorId || 'N/A',
                       'Data Entrada': new Date(l.dataEntrada).toLocaleDateString('pt-BR'),
                       'Qtd Original': l.quantidadeOriginal,
                       'Qtd Disponível': l.quantidadeDisponivel,

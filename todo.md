@@ -36,3 +36,12 @@
 - [x] Sincronizar tanques automaticamente do banco ACS
 - [x] Sincronizar vendas automaticamente do banco ACS
 - [x] Sincronizar produtos automaticamente do banco ACS
+
+## Novas Funcionalidades - Medições e NFs
+
+- [x] Sincronizar medições físicas (LMC) automaticamente do ACS
+- [x] Gerar alertas de medições faltantes por posto/data
+- [x] Sincronizar notas fiscais de compra do ACS
+- [x] CRUD completo para notas fiscais (incluir, editar, excluir)
+- [x] CRUD completo para medições físicas (incluir, editar, excluir)
+- [x] Manter histórico de alterações em NFs e medições

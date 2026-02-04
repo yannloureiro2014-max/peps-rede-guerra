@@ -71,11 +71,11 @@ export default function Compras() {
 
     createLote.mutate({
       tanqueId: parseInt(tanqueSelecionado),
+      postoId: parseInt(postoSelecionado),
       numeroNf,
-      fornecedor,
+      fornecedorNome: fornecedor,
       dataEntrada,
       quantidadeOriginal: quantidade,
-      quantidadeDisponivel: quantidade,
       custoUnitario,
     });
   };

@@ -4,7 +4,16 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
-import { sincronizarTudo, sincronizarPostosACS, sincronizarProdutosACS, sincronizarTanquesACS, sincronizarVendasACS } from "./etl-acs";
+import { 
+  sincronizarTudo, 
+  sincronizarPostosACS, 
+  sincronizarProdutosACS, 
+  sincronizarTanquesACS, 
+  sincronizarVendasACS,
+  sincronizarMedicoesACS,
+  sincronizarComprasACS,
+  verificarMedicoesFaltantes
+} from "./etl-acs";
 
 export const appRouter = router({
   system: systemRouter,
@@ -87,26 +96,104 @@ export const appRouter = router({
       }),
   }),
 
-  // ==================== LOTES (COMPRAS) ====================
+  // ==================== LOTES (COMPRAS/NFs) ====================
   lotes: router({
+    list: publicProcedure
+      .input(z.object({ 
+        postoId: z.number().optional(),
+        status: z.string().optional(),
+        limite: z.number().optional()
+      }).optional())
+      .query(async ({ input }) => {
+        return db.getLotes(input?.postoId, input?.status, input?.limite);
+      }),
     listAtivos: publicProcedure.query(async () => {
       return db.getLotesAtivos();
     }),
+    getById: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return db.getLoteById(input.id);
+      }),
     create: protectedProcedure
       .input(z.object({
         tanqueId: z.number(),
+        postoId: z.number(),
+        produtoId: z.number().optional(),
         numeroNf: z.string().optional(),
-        fornecedor: z.string().optional(),
+        serieNf: z.string().optional(),
+        chaveNfe: z.string().optional(),
+        dataEmissao: z.string().optional(),
         dataEntrada: z.string(),
+        dataLmc: z.string().optional(),
         quantidadeOriginal: z.string(),
-        quantidadeDisponivel: z.string(),
         custoUnitario: z.string(),
+        fornecedorNome: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const custoTotal = (parseFloat(input.quantidadeOriginal) * parseFloat(input.custoUnitario)).toFixed(2);
         await db.createLote({
-          ...input,
+          tanqueId: input.tanqueId,
+          postoId: input.postoId,
+          produtoId: input.produtoId || null,
+          numeroNf: input.numeroNf || null,
+          serieNf: input.serieNf || null,
+          chaveNfe: input.chaveNfe || null,
+          dataEmissao: input.dataEmissao ? new Date(input.dataEmissao) : null,
           dataEntrada: new Date(input.dataEntrada),
-        });
+          dataLmc: input.dataLmc ? new Date(input.dataLmc) : null,
+          quantidadeOriginal: input.quantidadeOriginal,
+          quantidadeDisponivel: input.quantidadeOriginal,
+          custoUnitario: input.custoUnitario,
+          custoTotal,
+          origem: "manual",
+          status: "ativo",
+        }, ctx.user?.id, ctx.user?.name || undefined);
+        return { success: true };
+      }),
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        numeroNf: z.string().optional(),
+        serieNf: z.string().optional(),
+        chaveNfe: z.string().optional(),
+        dataEmissao: z.string().optional(),
+        dataEntrada: z.string().optional(),
+        dataLmc: z.string().optional(),
+        quantidadeOriginal: z.string().optional(),
+        custoUnitario: z.string().optional(),
+        justificativa: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { id, justificativa, ...dados } = input;
+        const updateData: Record<string, any> = {};
+        
+        if (dados.numeroNf !== undefined) updateData.numeroNf = dados.numeroNf;
+        if (dados.serieNf !== undefined) updateData.serieNf = dados.serieNf;
+        if (dados.chaveNfe !== undefined) updateData.chaveNfe = dados.chaveNfe;
+        if (dados.dataEmissao !== undefined) updateData.dataEmissao = new Date(dados.dataEmissao);
+        if (dados.dataEntrada !== undefined) updateData.dataEntrada = new Date(dados.dataEntrada);
+        if (dados.dataLmc !== undefined) updateData.dataLmc = new Date(dados.dataLmc);
+        if (dados.quantidadeOriginal !== undefined) {
+          updateData.quantidadeOriginal = dados.quantidadeOriginal;
+          updateData.quantidadeDisponivel = dados.quantidadeOriginal;
+        }
+        if (dados.custoUnitario !== undefined) updateData.custoUnitario = dados.custoUnitario;
+        
+        if (updateData.quantidadeOriginal && updateData.custoUnitario) {
+          updateData.custoTotal = (parseFloat(updateData.quantidadeOriginal) * parseFloat(updateData.custoUnitario)).toFixed(2);
+        }
+        
+        await db.updateLote(id, updateData, ctx.user?.id, ctx.user?.name || undefined, justificativa);
+        return { success: true };
+      }),
+    delete: protectedProcedure
+      .input(z.object({ 
+        id: z.number(),
+        justificativa: z.string().optional()
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await db.deleteLote(input.id, ctx.user?.id, ctx.user?.name || undefined, input.justificativa);
         return { success: true };
       }),
   }),
@@ -143,28 +230,108 @@ export const appRouter = router({
   // ==================== MEDIÇÕES ====================
   medicoes: router({
     list: publicProcedure
-      .input(z.object({ tanqueId: z.number().optional(), limite: z.number().optional() }))
+      .input(z.object({ 
+        tanqueId: z.number().optional(), 
+        postoId: z.number().optional(),
+        limite: z.number().optional() 
+      }).optional())
       .query(async ({ input }) => {
-        return db.getMedicoes(input.tanqueId, input.limite || 100);
+        return db.getMedicoes(input?.tanqueId, input?.postoId, input?.limite || 100);
+      }),
+    getById: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return db.getMedicaoById(input.id);
+      }),
+    faltantes: publicProcedure
+      .input(z.object({ dias: z.number().optional() }).optional())
+      .query(async ({ input }) => {
+        return db.getMedicoesFaltantes(input?.dias || 30);
       }),
     create: protectedProcedure
       .input(z.object({
         tanqueId: z.number(),
+        postoId: z.number(),
         dataMedicao: z.string(),
         horaMedicao: z.string().optional(),
         volumeMedido: z.string(),
         temperatura: z.string().optional(),
-        estoqueEscritural: z.string(),
-        diferenca: z.string(),
-        percentualDiferenca: z.string(),
-        tipoDiferenca: z.enum(["sobra", "perda", "ok"]),
+        estoqueEscritural: z.string().optional(),
         observacoes: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        // Calcular diferença
+        const volumeMedido = parseFloat(input.volumeMedido);
+        const estoqueEscritural = parseFloat(input.estoqueEscritural || "0");
+        const diferenca = volumeMedido - estoqueEscritural;
+        const percentualDiferenca = estoqueEscritural > 0 ? (diferenca / estoqueEscritural) * 100 : 0;
+        
+        let tipoDiferenca: "sobra" | "perda" | "ok" = "ok";
+        if (diferenca > 0.5) tipoDiferenca = "sobra";
+        else if (diferenca < -0.5) tipoDiferenca = "perda";
+        
         await db.createMedicao({
-          ...input,
+          tanqueId: input.tanqueId,
+          postoId: input.postoId,
           dataMedicao: new Date(input.dataMedicao),
-        });
+          horaMedicao: input.horaMedicao || null,
+          volumeMedido: input.volumeMedido,
+          temperatura: input.temperatura || null,
+          estoqueEscritural: input.estoqueEscritural || "0",
+          diferenca: diferenca.toFixed(3),
+          percentualDiferenca: percentualDiferenca.toFixed(4),
+          tipoDiferenca,
+          observacoes: input.observacoes || null,
+          origem: "manual",
+        }, ctx.user?.id, ctx.user?.name || undefined);
+        return { success: true };
+      }),
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        volumeMedido: z.string().optional(),
+        temperatura: z.string().optional(),
+        horaMedicao: z.string().optional(),
+        estoqueEscritural: z.string().optional(),
+        observacoes: z.string().optional(),
+        justificativa: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { id, justificativa, ...dados } = input;
+        const updateData: Record<string, any> = {};
+        
+        if (dados.volumeMedido !== undefined) updateData.volumeMedido = dados.volumeMedido;
+        if (dados.temperatura !== undefined) updateData.temperatura = dados.temperatura;
+        if (dados.horaMedicao !== undefined) updateData.horaMedicao = dados.horaMedicao;
+        if (dados.estoqueEscritural !== undefined) updateData.estoqueEscritural = dados.estoqueEscritural;
+        if (dados.observacoes !== undefined) updateData.observacoes = dados.observacoes;
+        
+        // Recalcular diferença se volumeMedido ou estoqueEscritural mudaram
+        if (updateData.volumeMedido || updateData.estoqueEscritural) {
+          const medicaoAtual = await db.getMedicaoById(id);
+          const volumeMedido = parseFloat(updateData.volumeMedido || medicaoAtual?.volumeMedido || "0");
+          const estoqueEscritural = parseFloat(updateData.estoqueEscritural || medicaoAtual?.estoqueEscritural || "0");
+          const diferenca = volumeMedido - estoqueEscritural;
+          const percentualDiferenca = estoqueEscritural > 0 ? (diferenca / estoqueEscritural) * 100 : 0;
+          
+          updateData.diferenca = diferenca.toFixed(3);
+          updateData.percentualDiferenca = percentualDiferenca.toFixed(4);
+          
+          if (diferenca > 0.5) updateData.tipoDiferenca = "sobra";
+          else if (diferenca < -0.5) updateData.tipoDiferenca = "perda";
+          else updateData.tipoDiferenca = "ok";
+        }
+        
+        await db.updateMedicao(id, updateData, ctx.user?.id, ctx.user?.name || undefined, justificativa);
+        return { success: true };
+      }),
+    delete: protectedProcedure
+      .input(z.object({ 
+        id: z.number(),
+        justificativa: z.string().optional()
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await db.deleteMedicao(input.id, ctx.user?.id, ctx.user?.name || undefined, input.justificativa);
         return { success: true };
       }),
   }),
@@ -174,6 +341,11 @@ export const appRouter = router({
     pendentes: publicProcedure.query(async () => {
       return db.getAlertasPendentes();
     }),
+    porTipo: publicProcedure
+      .input(z.object({ tipo: z.string() }))
+      .query(async ({ input }) => {
+        return db.getAlertasPorTipo(input.tipo);
+      }),
     resolver: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
@@ -182,7 +354,7 @@ export const appRouter = router({
       }),
     create: protectedProcedure
       .input(z.object({
-        tipo: z.enum(["estoque_baixo", "diferenca_medicao", "cmv_pendente", "sincronizacao"]),
+        tipo: z.enum(["estoque_baixo", "diferenca_medicao", "cmv_pendente", "sincronizacao", "medicao_faltante"]),
         postoId: z.number().optional(),
         tanqueId: z.number().optional(),
         titulo: z.string(),
@@ -192,6 +364,19 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         await db.createAlerta(input);
         return { success: true };
+      }),
+  }),
+
+  // ==================== HISTÓRICO ====================
+  historico: router({
+    list: publicProcedure
+      .input(z.object({ 
+        tabela: z.string().optional(),
+        registroId: z.number().optional(),
+        limite: z.number().optional()
+      }).optional())
+      .query(async ({ input }) => {
+        return db.getHistorico(input?.tabela, input?.registroId, input?.limite || 100);
       }),
   }),
 
@@ -247,6 +432,21 @@ export const appRouter = router({
       .input(z.object({ dias: z.number().optional() }).optional())
       .mutation(async ({ input }) => {
         return sincronizarVendasACS(input?.dias || 30);
+      }),
+    sincronizarMedicoes: protectedProcedure
+      .input(z.object({ dias: z.number().optional() }).optional())
+      .mutation(async ({ input }) => {
+        return sincronizarMedicoesACS(input?.dias || 90);
+      }),
+    sincronizarCompras: protectedProcedure
+      .input(z.object({ dias: z.number().optional() }).optional())
+      .mutation(async ({ input }) => {
+        return sincronizarComprasACS(input?.dias || 180);
+      }),
+    verificarMedicoesFaltantes: protectedProcedure
+      .input(z.object({ dias: z.number().optional() }).optional())
+      .mutation(async ({ input }) => {
+        return verificarMedicoesFaltantes(input?.dias || 30);
       }),
   }),
 });
