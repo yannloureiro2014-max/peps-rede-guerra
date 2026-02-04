@@ -4,7 +4,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
-import { sincronizarDadosIniciais } from "./etl-acs";
+import { sincronizarTudo, sincronizarPostosACS, sincronizarProdutosACS, sincronizarTanquesACS, sincronizarVendasACS } from "./etl-acs";
 
 export const appRouter = router({
   system: systemRouter,
@@ -229,9 +229,25 @@ export const appRouter = router({
 
   // ==================== SYNC ====================
   sync: router({
-    inicializar: protectedProcedure.mutation(async () => {
-      return sincronizarDadosIniciais();
+    sincronizarTudo: protectedProcedure
+      .input(z.object({ diasVendas: z.number().optional() }).optional())
+      .mutation(async ({ input }) => {
+        return sincronizarTudo(input?.diasVendas || 60);
+      }),
+    sincronizarPostos: protectedProcedure.mutation(async () => {
+      return sincronizarPostosACS();
     }),
+    sincronizarProdutos: protectedProcedure.mutation(async () => {
+      return sincronizarProdutosACS();
+    }),
+    sincronizarTanques: protectedProcedure.mutation(async () => {
+      return sincronizarTanquesACS();
+    }),
+    sincronizarVendas: protectedProcedure
+      .input(z.object({ dias: z.number().optional() }).optional())
+      .mutation(async ({ input }) => {
+        return sincronizarVendasACS(input?.dias || 30);
+      }),
   }),
 });
 

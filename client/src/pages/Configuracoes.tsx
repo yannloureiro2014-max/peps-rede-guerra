@@ -5,15 +5,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { trpc } from "@/lib/trpc";
-import { Settings, Database, RefreshCw, Save, CheckCircle } from "lucide-react";
+import { Settings, Database, RefreshCw, Save, CheckCircle, Loader2, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 export default function Configuracoes() {
   const [estoqueMinimo, setEstoqueMinimo] = useState("1000");
   const [toleranciaDiferenca, setToleranciaDiferenca] = useState("0.5");
+  const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
 
-  const { data: ultimaSync } = trpc.dashboard.ultimaSincronizacao.useQuery();
+  const { data: ultimaSync, refetch: refetchSync } = trpc.dashboard.ultimaSincronizacao.useQuery();
   const { data: configuracoes, isLoading } = trpc.configuracoes.list.useQuery();
   const utils = trpc.useUtils();
 
@@ -24,6 +25,31 @@ export default function Configuracoes() {
     },
     onError: (error) => {
       toast.error("Erro ao salvar: " + error.message);
+    }
+  });
+
+  const sincronizarTudo = trpc.sync.sincronizarTudo.useMutation({
+    onMutate: () => {
+      setSyncStatus("syncing");
+      toast.info("Iniciando sincronização com ACS...");
+    },
+    onSuccess: (result) => {
+      setSyncStatus("success");
+      if (result.success) {
+        toast.success("Sincronização concluída com sucesso!");
+        utils.postos.list.invalidate();
+        utils.produtos.list.invalidate();
+        utils.tanques.list.invalidate();
+        utils.vendas.resumo.invalidate();
+        utils.dashboard.stats.invalidate();
+        refetchSync();
+      } else {
+        toast.error("Sincronização concluída com erros");
+      }
+    },
+    onError: (error) => {
+      setSyncStatus("error");
+      toast.error("Erro na sincronização: " + error.message);
     }
   });
 
@@ -38,6 +64,10 @@ export default function Configuracoes() {
       valor: toleranciaDiferenca,
       descricao: "Tolerância para diferenças em medições (%)"
     });
+  };
+
+  const handleSincronizar = () => {
+    sincronizarTudo.mutate({ diasVendas: 60 });
   };
 
   return (
@@ -101,7 +131,7 @@ export default function Configuracoes() {
                 <Database className="h-5 w-5" />
                 Integração ACS
               </CardTitle>
-              <CardDescription>Status da sincronização com o sistema ACS</CardDescription>
+              <CardDescription>Sincronização com o banco de dados ACS</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="p-4 bg-muted rounded-lg space-y-3">
@@ -137,10 +167,40 @@ export default function Configuracoes() {
                 )}
               </div>
 
+              {/* Botão de Sincronização */}
+              <Button 
+                onClick={handleSincronizar} 
+                disabled={syncStatus === "syncing"}
+                className="w-full"
+                variant={syncStatus === "success" ? "outline" : "default"}
+              >
+                {syncStatus === "syncing" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Sincronizando...
+                  </>
+                ) : syncStatus === "success" ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Sincronizado!
+                  </>
+                ) : syncStatus === "error" ? (
+                  <>
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    Tentar Novamente
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Sincronizar com ACS
+                  </>
+                )}
+              </Button>
+
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  <strong>Nota:</strong> A sincronização automática com o ACS está configurada para executar 
-                  periodicamente. Para sincronização manual, entre em contato com o suporte técnico.
+                  <strong>Sincronização:</strong> Importa postos, produtos, tanques e vendas 
+                  diretamente do banco de dados ACS. Vendas dos últimos 60 dias serão carregadas.
                 </p>
               </div>
             </CardContent>

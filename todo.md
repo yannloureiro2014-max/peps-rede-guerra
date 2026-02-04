@@ -29,3 +29,10 @@
 ## Bugs
 
 - [x] Corrigir erro React "removeChild" na renderização dos gráficos
+
+## Melhorias
+
+- [x] Sincronizar postos automaticamente do banco ACS
+- [x] Sincronizar tanques automaticamente do banco ACS
+- [x] Sincronizar vendas automaticamente do banco ACS
+- [x] Sincronizar produtos automaticamente do banco ACS

@@ -49,7 +49,7 @@ export const tanques = mysqlTable("tanques", {
   id: int("id").autoincrement().primaryKey(),
   postoId: int("postoId").notNull(),
   codigoAcs: varchar("codigoAcs", { length: 10 }).notNull(),
-  produtoId: int("produtoId").notNull(),
+  produtoId: int("produtoId"),
   capacidade: decimal("capacidade", { precision: 12, scale: 3 }).default("0").notNull(),
   estoqueMinimo: decimal("estoqueMinimo", { precision: 12, scale: 3 }).default("1000").notNull(),
   ativo: int("ativo").default(1).notNull(),
@@ -82,8 +82,10 @@ export type InsertLote = typeof lotes.$inferInsert;
 // Tabela de Vendas
 export const vendas = mysqlTable("vendas", {
   id: int("id").autoincrement().primaryKey(),
-  uuidAcs: varchar("uuidAcs", { length: 64 }).unique(),
-  tanqueId: int("tanqueId").notNull(),
+  codigoAcs: varchar("codigoAcs", { length: 64 }).unique(),
+  postoId: int("postoId").notNull(),
+  tanqueId: int("tanqueId"),
+  produtoId: int("produtoId"),
   dataVenda: date("dataVenda").notNull(),
   quantidade: decimal("quantidade", { precision: 12, scale: 3 }).notNull(),
   valorUnitario: decimal("valorUnitario", { precision: 12, scale: 4 }).notNull(),
