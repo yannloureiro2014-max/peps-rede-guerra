@@ -25,3 +25,7 @@
 - [x] Cadastro dos 6 postos da Rede Guerra
 - [x] Cadastro dos tanques por posto
 - [x] Cadastro dos produtos (combustíveis)
+
+## Bugs
+
+- [x] Corrigir erro React "removeChild" na renderização dos gráficos
