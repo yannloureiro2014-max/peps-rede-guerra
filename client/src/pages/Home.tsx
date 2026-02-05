@@ -32,8 +32,8 @@ function VendasPorPostoChart({ data }: { data: Array<{ nome: string; litros: num
 
   return (
     <div className="space-y-3">
-      {data.map((item, index) => (
-        <div key={item.nome} className="space-y-1">
+      {data.map((item, itemIndex) => (
+        <div key={`posto-chart-${item.nome}`} className="space-y-1">
           <div className="flex justify-between text-sm">
             <span className="font-medium truncate max-w-[150px]">{item.nome}</span>
             <span className="text-muted-foreground">{formatNumber(item.litros)} L</span>
@@ -43,7 +43,7 @@ function VendasPorPostoChart({ data }: { data: Array<{ nome: string; litros: num
               className="h-full rounded-full transition-all duration-500"
               style={{ 
                 width: `${(item.litros / maxLitros) * 100}%`,
-                backgroundColor: COLORS[index % COLORS.length]
+                backgroundColor: COLORS[itemIndex % COLORS.length]
               }}
             />
           </div>

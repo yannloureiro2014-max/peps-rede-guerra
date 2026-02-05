@@ -102,8 +102,8 @@ export default function Relatorios() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {vendasPorPosto?.map((item, idx) => (
-                      <TableRow key={idx}>
+                    {vendasPorPosto?.map((item) => (
+                      <TableRow key={`posto-${item.postoNome}`}>
                         <TableCell className="font-medium">{item.postoNome}</TableCell>
                         <TableCell className="text-right">{formatNumber(item.totalLitros)} L</TableCell>
                         <TableCell className="text-right font-semibold">{formatCurrency(item.totalValor)}</TableCell>
@@ -160,8 +160,8 @@ export default function Relatorios() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {vendasPorCombustivel?.map((item, idx) => (
-                      <TableRow key={idx}>
+                    {vendasPorCombustivel?.map((item) => (
+                      <TableRow key={`combustivel-${item.produtoDescricao}`}>
                         <TableCell className="font-medium">{item.produtoDescricao}</TableCell>
                         <TableCell className="text-right">{formatNumber(item.totalLitros)} L</TableCell>
                         <TableCell className="text-right font-semibold">{formatCurrency(item.totalValor)}</TableCell>

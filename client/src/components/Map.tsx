@@ -146,7 +146,23 @@ export function MapView({
   });
 
   useEffect(() => {
-    init();
+    let isMounted = true;
+    
+    const initMap = async () => {
+      if (isMounted) {
+        await init();
+      }
+    };
+    
+    initMap();
+    
+    return () => {
+      isMounted = false;
+      // Cleanup map instance
+      if (map.current) {
+        map.current = null;
+      }
+    };
   }, [init]);
 
   return (

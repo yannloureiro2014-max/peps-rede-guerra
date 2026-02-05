@@ -94,14 +94,19 @@ export default function InicializacaoMensal() {
       return;
     }
     
-    const config: LoteConfig[] = lotesFiltrados.map((lote, index) => ({
+    // Ordenar lotes por data de entrada para definir ordem PEPS inicial
+    const lotesOrdenados = [...lotesFiltrados].sort((a, b) => 
+      new Date(a.dataEntrada).getTime() - new Date(b.dataEntrada).getTime()
+    );
+    
+    const config: LoteConfig[] = lotesOrdenados.map((lote, idx) => ({
       loteId: lote.id,
       numeroNf: lote.numeroNf || `Lote ${lote.id}`,
       dataEntrada: lote.dataEntrada,
       quantidadeOriginal: lote.quantidadeOriginal || "0",
       quantidadeDisponivel: lote.quantidadeDisponivel || "0",
       saldoInicial: lote.quantidadeDisponivel || "0",
-      ordemConsumo: index + 1
+      ordemConsumo: idx + 1 // Ordem baseada na data de entrada
     }));
     
     setLotesConfig(config);

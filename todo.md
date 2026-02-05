@@ -124,3 +124,10 @@
 - [ ] Inicialização mensal única
 - [ ] Permissões por role
 - [ ] Auditoria de ações críticas
+
+## Correção Erro React "removeChild" - URGENTE
+
+- [x] Corrigir DRE.tsx - keys duplicadas em .map() e renderização condicional (Fragment + keys únicas)
+- [x] Corrigir demais componentes com .map() usando index como key (Relatorios.tsx, Home.tsx, InicializacaoMensal.tsx)
+- [x] Adicionar cleanup em useEffect com async (Map.tsx - isMounted pattern)
+- [x] Testar navegação entre páginas e filtros - SEM ERROS NO CONSOLE
