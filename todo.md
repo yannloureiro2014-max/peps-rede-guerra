@@ -141,3 +141,36 @@
 - [x] Criar componente RecalcularCMV.tsx no frontend
 - [x] Adicionar rota /recalcular-cmv e link no menu (admin_geral only)
 - [x] Testar cenários de recálculo retroativo - Página funcionando, 11.832 vendas pendentes identificadas
+
+## Correção Sistema Inicialização Mensal - CRÍTICO
+
+### Backend - server/db.ts
+- [x] Adicionar função getInicializacaoById
+- [x] Adicionar função updateInicializacaoMensal (com recálculo CMV)
+- [x] Adicionar função deleteInicializacaoMensal
+- [x] Corrigir dataInicializacao para primeiro dia do mês de referência
+
+### Backend - server/routers.ts
+- [x] Adicionar endpoint getById
+- [x] Adicionar endpoint update (com recálculo CMV)
+- [x] Adicionar endpoint delete
+
+### Frontend - InicializacaoMensal.tsx
+- [x] Filtrar lotes: apenas dataEntrada <= mês de referência
+- [x] Mostrar quantidadeDisponivel ao invés de quantidadeOriginal
+- [x] Adicionar coluna "Saldo Atual Banco" (somente leitura)
+- [x] Adicionar coluna "Saldo Inicial Mês" (editável)
+- [x] Adicionar botão "Zerar Lote" em cada linha
+- [x] Mostrar TOTAL no rodapé da tabela
+- [x] Adicionar campo "Medição Física do Dia 01" para referência
+- [x] Comparar total vs medição física, mostrar diferença
+- [x] Adicionar botões Editar/Excluir no histórico
+- [x] Modal de visualização de detalhes
+
+### Validações
+- [x] Ordem PEPS sem duplicatas
+- [x] Saldo inicial <= quantidade original
+- [x] Saldo inicial >= 0
+- [x] Data de inicialização = primeiro dia do mês
+- [x] Aviso de recálculo CMV ao editar
+- [x] Confirmação ao excluir

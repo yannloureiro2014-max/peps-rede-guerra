@@ -596,6 +596,87 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return db.verificarInicializacaoExistente(input.mesReferencia, input.postoId, input.produtoId);
       }),
+    getById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return db.getInicializacaoById(input.id);
+      }),
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        postoId: z.number(),
+        produtoId: z.number(),
+        lotesConfigurados: z.array(z.object({
+          loteId: z.number(),
+          saldoInicial: z.string(),
+          ordemConsumo: z.number()
+        })),
+        observacoes: z.string().optional()
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user?.role !== "admin_geral") {
+          throw new Error("Acesso negado. Apenas administradores gerais podem editar inicializações.");
+        }
+        
+        // Atualizar inicialização
+        const existente = await db.updateInicializacaoMensal(input.id, input.lotesConfigurados, input.observacoes);
+        
+        // Recálculo retroativo de CMV após edição
+        try {
+          const dataInicioMes = new Date(existente.mesReferencia + "-01");
+          console.log(`[EDITAR INICIALIZACAO] Iniciando recálculo retroativo de CMV para ${existente.mesReferencia}...`);
+          const recalcResult = await db.recalcularCMVRetroativo(input.postoId, input.produtoId, dataInicioMes);
+          console.log(`[EDITAR INICIALIZACAO] Recálculo concluído: ${recalcResult.recalculadas} vendas recalculadas, ${recalcResult.erros} erros`);
+          return { 
+            success: true, 
+            recalculo: { 
+              vendasRecalculadas: recalcResult.recalculadas, 
+              erros: recalcResult.erros 
+            } 
+          };
+        } catch (error) {
+          console.error("[EDITAR INICIALIZACAO] Erro ao recalcular CMV:", error);
+          return { success: true, recalculo: { erro: String(error) } };
+        }
+      }),
+    delete: protectedProcedure
+      .input(z.object({ 
+        id: z.number(),
+        postoId: z.number(),
+        produtoId: z.number()
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user?.role !== "admin_geral") {
+          throw new Error("Acesso negado. Apenas administradores gerais podem excluir inicializações.");
+        }
+        
+        // Buscar inicialização antes de excluir para obter mesReferencia
+        const existente = await db.getInicializacaoById(input.id);
+        if (!existente) {
+          throw new Error("Inicialização não encontrada");
+        }
+        
+        // Excluir inicialização (reseta lotes para quantidade original)
+        await db.deleteInicializacaoMensal(input.id);
+        
+        // Recálculo retroativo de CMV após exclusão
+        try {
+          const dataInicioMes = new Date(existente.mesReferencia + "-01");
+          console.log(`[EXCLUIR INICIALIZACAO] Iniciando recálculo retroativo de CMV para ${existente.mesReferencia}...`);
+          const recalcResult = await db.recalcularCMVRetroativo(input.postoId, input.produtoId, dataInicioMes);
+          console.log(`[EXCLUIR INICIALIZACAO] Recálculo concluído: ${recalcResult.recalculadas} vendas recalculadas, ${recalcResult.erros} erros`);
+          return { 
+            success: true, 
+            recalculo: { 
+              vendasRecalculadas: recalcResult.recalculadas, 
+              erros: recalcResult.erros 
+            } 
+          };
+        } catch (error) {
+          console.error("[EXCLUIR INICIALIZACAO] Erro ao recalcular CMV:", error);
+          return { success: true, recalculo: { erro: String(error) } };
+        }
+      }),
   }),
 
   // ==================== DRE COM PEPS DO BACKEND ====================

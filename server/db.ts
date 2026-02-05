@@ -759,6 +759,10 @@ export async function criarInicializacaoMensal(data: {
   
   const lotesJson = JSON.stringify(data.lotesConfigurados);
   
+  // Calcular data de inicialização como primeiro dia do mês de referência
+  // mesReferencia está no formato "YYYY-MM"
+  const dataInicializacao = new Date(data.mesReferencia + "-01T00:00:00");
+  
   // Inserir registro de inicialização
   await db.insert(inicializacaoMensalLotes).values({
     mesReferencia: data.mesReferencia,
@@ -767,7 +771,7 @@ export async function criarInicializacaoMensal(data: {
     usuarioAdminId: data.usuarioAdminId,
     lotesConfigurados: lotesJson,
     observacoes: data.observacoes,
-    dataInicializacao: new Date()
+    dataInicializacao: dataInicializacao
   });
   
   // Atualizar saldos e ordem de consumo dos lotes
@@ -823,6 +827,103 @@ export async function verificarInicializacaoExistente(mesReferencia: string, pos
     .limit(1);
   
   return result.length > 0;
+}
+
+export async function getInicializacaoById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const result = await db.select({
+    id: inicializacaoMensalLotes.id,
+    mesReferencia: inicializacaoMensalLotes.mesReferencia,
+    postoId: inicializacaoMensalLotes.postoId,
+    produtoId: inicializacaoMensalLotes.produtoId,
+    dataInicializacao: inicializacaoMensalLotes.dataInicializacao,
+    usuarioAdminId: inicializacaoMensalLotes.usuarioAdminId,
+    lotesConfigurados: inicializacaoMensalLotes.lotesConfigurados,
+    observacoes: inicializacaoMensalLotes.observacoes,
+    createdAt: inicializacaoMensalLotes.createdAt,
+    postoNome: postos.nome,
+    produtoDescricao: produtos.descricao
+  })
+  .from(inicializacaoMensalLotes)
+  .leftJoin(postos, eq(inicializacaoMensalLotes.postoId, postos.id))
+  .leftJoin(produtos, eq(inicializacaoMensalLotes.produtoId, produtos.id))
+  .where(eq(inicializacaoMensalLotes.id, id))
+  .limit(1);
+  
+  return result[0] || null;
+}
+
+export async function updateInicializacaoMensal(
+  id: number, 
+  lotesConfigurados: Array<{ loteId: number; saldoInicial: string; ordemConsumo: number }>,
+  observacoes?: string
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // Buscar inicialização existente para obter mesReferencia
+  const existente = await getInicializacaoById(id);
+  if (!existente) throw new Error("Inicialização não encontrada");
+  
+  // Calcular data de inicialização como primeiro dia do mês de referência
+  const dataInicializacao = new Date(existente.mesReferencia + "-01T00:00:00");
+  
+  // Atualizar registro de inicialização
+  await db.update(inicializacaoMensalLotes).set({
+    lotesConfigurados: JSON.stringify(lotesConfigurados),
+    dataInicializacao: dataInicializacao,
+    observacoes: observacoes || existente.observacoes
+  }).where(eq(inicializacaoMensalLotes.id, id));
+  
+  // Atualizar saldos e ordem de consumo dos lotes
+  for (const loteConfig of lotesConfigurados) {
+    await db.update(lotes).set({
+      quantidadeDisponivel: loteConfig.saldoInicial,
+      ordemConsumo: loteConfig.ordemConsumo
+    }).where(eq(lotes.id, loteConfig.loteId));
+  }
+  
+  console.log(`[InicializacaoMensal] Atualizada inicialização ${id} com ${lotesConfigurados.length} lotes`);
+  
+  return existente;
+}
+
+export async function deleteInicializacaoMensal(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // Buscar inicialização para obter os lotes configurados
+  const existente = await getInicializacaoById(id);
+  if (!existente) throw new Error("Inicialização não encontrada");
+  
+  // Parsear lotes configurados
+  let lotesConfigurados: Array<{ loteId: number }> = [];
+  try {
+    lotesConfigurados = JSON.parse(existente.lotesConfigurados || "[]");
+  } catch (e) {
+    console.error("Erro ao parsear lotesConfigurados:", e);
+  }
+  
+  // Resetar os lotes para quantidade original
+  for (const loteConfig of lotesConfigurados) {
+    const lote = await db.select().from(lotes).where(eq(lotes.id, loteConfig.loteId)).limit(1);
+    if (lote[0]) {
+      await db.update(lotes).set({
+        quantidadeDisponivel: lote[0].quantidadeOriginal,
+        ordemConsumo: 0,
+        status: "ativo"
+      }).where(eq(lotes.id, loteConfig.loteId));
+    }
+  }
+  
+  // Excluir registro de inicialização
+  await db.delete(inicializacaoMensalLotes).where(eq(inicializacaoMensalLotes.id, id));
+  
+  console.log(`[InicializacaoMensal] Excluída inicialização ${id}, ${lotesConfigurados.length} lotes resetados`);
+  
+  return existente;
 }
 
 // ==================== CÁLCULO PEPS NO BACKEND ====================
