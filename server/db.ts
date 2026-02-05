@@ -44,7 +44,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   if (user.loginMethod !== undefined) { values.loginMethod = user.loginMethod; updateSet.loginMethod = user.loginMethod; }
   if (user.lastSignedIn !== undefined) { values.lastSignedIn = user.lastSignedIn; updateSet.lastSignedIn = user.lastSignedIn; }
   if (user.role !== undefined) { values.role = user.role; updateSet.role = user.role; }
-  else if (user.openId === ENV.ownerOpenId) { values.role = 'admin'; updateSet.role = 'admin'; }
+  else if (user.openId === ENV.ownerOpenId) { values.role = 'admin_geral'; updateSet.role = 'admin_geral'; }
 
   if (!values.lastSignedIn) values.lastSignedIn = new Date();
   if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
@@ -658,4 +658,378 @@ export async function getDashboardStats() {
     totalPostos: postosCount[0]?.count || 0,
     totalTanques: tanquesCount[0]?.count || 0
   };
+}
+
+
+// ==================== GESTÃO DE USUÁRIOS ====================
+export async function getUsuarios() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: users.id,
+    openId: users.openId,
+    name: users.name,
+    email: users.email,
+    role: users.role,
+    postoId: users.postoId,
+    postoNome: postos.nome,
+    createdAt: users.createdAt,
+    lastSignedIn: users.lastSignedIn
+  })
+  .from(users)
+  .leftJoin(postos, eq(users.postoId, postos.id))
+  .orderBy(users.createdAt);
+}
+
+export async function getUsuarioById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  return result[0] || null;
+}
+
+export async function createUsuario(data: { 
+  email: string; 
+  name: string; 
+  role: string; 
+  postoId?: number | null 
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const openId = data.email; // Usar email como openId temporário
+  await db.insert(users).values({
+    openId,
+    email: data.email,
+    name: data.name,
+    role: data.role as any,
+    postoId: data.postoId || null,
+    loginMethod: "email"
+  });
+}
+
+export async function updateUsuario(id: number, data: { 
+  name?: string; 
+  role?: string; 
+  postoId?: number | null 
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const updateData: Record<string, any> = {};
+  if (data.name !== undefined) updateData.name = data.name;
+  if (data.role !== undefined) updateData.role = data.role;
+  if (data.postoId !== undefined) updateData.postoId = data.postoId;
+  
+  await db.update(users).set(updateData).where(eq(users.id, id));
+}
+
+export async function deleteUsuario(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(users).where(eq(users.id, id));
+}
+
+// ==================== INICIALIZAÇÃO MENSAL DE LOTES ====================
+import { inicializacaoMensalLotes, InsertInicializacaoMensalLote } from "../drizzle/schema";
+
+export async function criarInicializacaoMensal(data: {
+  mesReferencia: string;
+  postoId: number;
+  produtoId: number;
+  usuarioAdminId: number;
+  lotesConfigurados: Array<{ loteId: number; saldoInicial: string; ordemConsumo: number }>;
+  observacoes?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const lotesJson = JSON.stringify(data.lotesConfigurados);
+  
+  // Inserir registro de inicialização
+  await db.insert(inicializacaoMensalLotes).values({
+    mesReferencia: data.mesReferencia,
+    postoId: data.postoId,
+    produtoId: data.produtoId,
+    usuarioAdminId: data.usuarioAdminId,
+    lotesConfigurados: lotesJson,
+    observacoes: data.observacoes,
+    dataInicializacao: new Date()
+  });
+  
+  // Atualizar saldos e ordem de consumo dos lotes
+  for (const loteConfig of data.lotesConfigurados) {
+    await db.update(lotes).set({
+      quantidadeDisponivel: loteConfig.saldoInicial,
+      ordemConsumo: loteConfig.ordemConsumo
+    }).where(eq(lotes.id, loteConfig.loteId));
+  }
+  
+  console.log(`[InicializacaoMensal] Mês ${data.mesReferencia} inicializado para posto ${data.postoId}, produto ${data.produtoId} com ${data.lotesConfigurados.length} lotes`);
+}
+
+export async function getInicializacoesMensais(postoId?: number, produtoId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const conditions = [];
+  if (postoId) conditions.push(eq(inicializacaoMensalLotes.postoId, postoId));
+  if (produtoId) conditions.push(eq(inicializacaoMensalLotes.produtoId, produtoId));
+  
+  return db.select({
+    id: inicializacaoMensalLotes.id,
+    mesReferencia: inicializacaoMensalLotes.mesReferencia,
+    postoId: inicializacaoMensalLotes.postoId,
+    produtoId: inicializacaoMensalLotes.produtoId,
+    dataInicializacao: inicializacaoMensalLotes.dataInicializacao,
+    usuarioAdminId: inicializacaoMensalLotes.usuarioAdminId,
+    lotesConfigurados: inicializacaoMensalLotes.lotesConfigurados,
+    observacoes: inicializacaoMensalLotes.observacoes,
+    createdAt: inicializacaoMensalLotes.createdAt,
+    postoNome: postos.nome,
+    produtoDescricao: produtos.descricao
+  })
+  .from(inicializacaoMensalLotes)
+  .leftJoin(postos, eq(inicializacaoMensalLotes.postoId, postos.id))
+  .leftJoin(produtos, eq(inicializacaoMensalLotes.produtoId, produtos.id))
+  .where(conditions.length > 0 ? and(...conditions) : undefined)
+  .orderBy(desc(inicializacaoMensalLotes.dataInicializacao));
+}
+
+export async function verificarInicializacaoExistente(mesReferencia: string, postoId: number, produtoId: number) {
+  const db = await getDb();
+  if (!db) return false;
+  
+  const result = await db.select()
+    .from(inicializacaoMensalLotes)
+    .where(and(
+      eq(inicializacaoMensalLotes.mesReferencia, mesReferencia),
+      eq(inicializacaoMensalLotes.postoId, postoId),
+      eq(inicializacaoMensalLotes.produtoId, produtoId)
+    ))
+    .limit(1);
+  
+  return result.length > 0;
+}
+
+// ==================== CÁLCULO PEPS NO BACKEND ====================
+export async function calcularCMVPEPS(vendaId: number): Promise<{ cmvTotal: number; cmvUnitario: number; quantidadeRestante: number; lotesConsumidos: any[] }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // Buscar a venda
+  const vendaResult = await db.select().from(vendas).where(eq(vendas.id, vendaId)).limit(1);
+  if (!vendaResult[0]) throw new Error(`Venda ${vendaId} não encontrada`);
+  
+  const vendaData = vendaResult[0];
+  const quantidadeVendida = parseFloat(vendaData.quantidade || "0");
+  
+  if (quantidadeVendida <= 0) {
+    return { cmvTotal: 0, cmvUnitario: 0, quantidadeRestante: 0, lotesConsumidos: [] };
+  }
+  
+  let quantidadeRestante = quantidadeVendida;
+  let cmvTotal = 0;
+  const lotesConsumidos: any[] = [];
+  
+  // Buscar lotes disponíveis do mesmo posto/produto, ordenados por ordemConsumo e dataEntrada (PEPS)
+  const lotesDisponiveis = await db.select()
+    .from(lotes)
+    .where(and(
+      eq(lotes.postoId, vendaData.postoId),
+      eq(lotes.produtoId, vendaData.produtoId || 0),
+      eq(lotes.status, "ativo"),
+      sql`CAST(${lotes.quantidadeDisponivel} AS DECIMAL(12,3)) > 0`
+    ))
+    .orderBy(lotes.ordemConsumo, lotes.dataEntrada);
+  
+  // Consumir lotes na ordem PEPS
+  for (const lote of lotesDisponiveis) {
+    if (quantidadeRestante <= 0) break;
+    
+    const saldoLote = parseFloat(lote.quantidadeDisponivel || "0");
+    if (saldoLote <= 0) continue;
+    
+    const quantidadeConsumida = Math.min(quantidadeRestante, saldoLote);
+    const custoUnitario = parseFloat(lote.custoUnitario || "0");
+    const custoTotal = quantidadeConsumida * custoUnitario;
+    
+    // Registrar consumo na tabela consumoLotes
+    await db.insert(consumoLotes).values({
+      vendaId: vendaData.id,
+      loteId: lote.id,
+      quantidadeConsumida: quantidadeConsumida.toFixed(3),
+      custoUnitario: custoUnitario.toFixed(4),
+      custoTotal: custoTotal.toFixed(2)
+    });
+    
+    // Atualizar saldo do lote
+    const novoSaldo = saldoLote - quantidadeConsumida;
+    const novoStatus = novoSaldo <= 0.001 ? "consumido" : "ativo";
+    
+    await db.update(lotes).set({
+      quantidadeDisponivel: novoSaldo.toFixed(3),
+      status: novoStatus as any
+    }).where(eq(lotes.id, lote.id));
+    
+    cmvTotal += custoTotal;
+    quantidadeRestante -= quantidadeConsumida;
+    
+    lotesConsumidos.push({
+      loteId: lote.id,
+      numeroNf: lote.numeroNf,
+      dataEntrada: lote.dataEntrada,
+      custoUnitario,
+      quantidadeConsumida,
+      custoTotal,
+      saldoAnterior: saldoLote,
+      saldoAtual: novoSaldo
+    });
+  }
+  
+  // Calcular CMV unitário
+  const cmvUnitario = quantidadeVendida > 0 ? cmvTotal / quantidadeVendida : 0;
+  
+  // Atualizar venda com CMV calculado
+  const statusCmv = quantidadeRestante > 0.001 ? "erro" : "calculado";
+  await db.update(vendas).set({
+    cmvCalculado: cmvTotal.toFixed(2),
+    cmvUnitario: cmvUnitario.toFixed(4),
+    statusCmv: statusCmv as any
+  }).where(eq(vendas.id, vendaData.id));
+  
+  // Se não conseguiu consumir toda a quantidade, gerar alerta
+  if (quantidadeRestante > 0.001) {
+    await db.insert(alertas).values({
+      tipo: "lotes_insuficientes",
+      postoId: vendaData.postoId,
+      titulo: `Lotes Insuficientes - Venda ${vendaId}`,
+      mensagem: `Não há lotes suficientes para cobrir a venda de ${quantidadeVendida.toFixed(3)} L. Faltam ${quantidadeRestante.toFixed(3)} L.`,
+      dados: JSON.stringify({ vendaId, quantidadeVendida, quantidadeRestante, lotesConsumidos }),
+      status: "pendente"
+    });
+    console.warn(`[PEPS] Venda ${vendaId}: Lotes insuficientes. Faltam ${quantidadeRestante.toFixed(3)} L`);
+  }
+  
+  console.log(`[PEPS] Venda ${vendaId}: CMV calculado = R$ ${cmvTotal.toFixed(2)} (${lotesConsumidos.length} lotes consumidos)`);
+  
+  return { cmvTotal, cmvUnitario, quantidadeRestante, lotesConsumidos };
+}
+
+export async function getMemoriaCalculoCMV(vendaIds: number[]) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  if (vendaIds.length === 0) return [];
+  
+  return db.select({
+    id: consumoLotes.id,
+    vendaId: consumoLotes.vendaId,
+    loteId: consumoLotes.loteId,
+    quantidadeConsumida: consumoLotes.quantidadeConsumida,
+    custoUnitario: consumoLotes.custoUnitario,
+    custoTotal: consumoLotes.custoTotal,
+    createdAt: consumoLotes.createdAt,
+    numeroNf: lotes.numeroNf,
+    dataEntrada: lotes.dataEntrada,
+    ordemConsumo: lotes.ordemConsumo
+  })
+  .from(consumoLotes)
+  .leftJoin(lotes, eq(consumoLotes.loteId, lotes.id))
+  .where(sql`${consumoLotes.vendaId} IN (${sql.raw(vendaIds.join(","))})`)
+  .orderBy(consumoLotes.vendaId, lotes.ordemConsumo);
+}
+
+// ==================== DRE COM PEPS DO BACKEND ====================
+export async function calcularDRE(filtros: { 
+  postoId?: number; 
+  produtoId?: number; 
+  dataInicio: string; 
+  dataFim: string 
+}) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  // Buscar vendas do período com CMV já calculado
+  const conditions = [];
+  
+  const dataIni = new Date(filtros.dataInicio);
+  dataIni.setHours(0, 0, 0, 0);
+  conditions.push(gte(vendas.dataVenda, dataIni));
+  
+  const dataFi = new Date(filtros.dataFim);
+  dataFi.setHours(23, 59, 59, 999);
+  conditions.push(lte(vendas.dataVenda, dataFi));
+  
+  if (filtros.postoId) conditions.push(eq(vendas.postoId, filtros.postoId));
+  if (filtros.produtoId) conditions.push(eq(vendas.produtoId, filtros.produtoId));
+  
+  const vendasData = await db.select({
+    id: vendas.id,
+    postoId: vendas.postoId,
+    produtoId: vendas.produtoId,
+    dataVenda: vendas.dataVenda,
+    quantidade: vendas.quantidade,
+    valorTotal: vendas.valorTotal,
+    cmvCalculado: vendas.cmvCalculado,
+    statusCmv: vendas.statusCmv,
+    produtoDescricao: produtos.descricao,
+    postoNome: postos.nome
+  })
+  .from(vendas)
+  .leftJoin(produtos, eq(vendas.produtoId, produtos.id))
+  .leftJoin(postos, eq(vendas.postoId, postos.id))
+  .where(and(...conditions))
+  .orderBy(vendas.dataVenda);
+  
+  // Buscar memória de cálculo para as vendas
+  const vendaIds = vendasData.map(v => v.id);
+  const memoriaCalculo = vendaIds.length > 0 ? await getMemoriaCalculoCMV(vendaIds) : [];
+  
+  // Agrupar por produto
+  const drePorProduto: Record<number, {
+    produtoId: number;
+    produtoNome: string;
+    quantidadeVendida: number;
+    receitaBruta: number;
+    cmv: number;
+    lucroBruto: number;
+    margemBruta: number;
+    lotesConsumidos: any[];
+  }> = {};
+  
+  for (const venda of vendasData) {
+    const produtoId = venda.produtoId || 0;
+    
+    if (!drePorProduto[produtoId]) {
+      drePorProduto[produtoId] = {
+        produtoId,
+        produtoNome: venda.produtoDescricao || `Produto ${produtoId}`,
+        quantidadeVendida: 0,
+        receitaBruta: 0,
+        cmv: 0,
+        lucroBruto: 0,
+        margemBruta: 0,
+        lotesConsumidos: []
+      };
+    }
+    
+    drePorProduto[produtoId].quantidadeVendida += parseFloat(venda.quantidade || "0");
+    drePorProduto[produtoId].receitaBruta += parseFloat(venda.valorTotal || "0");
+    drePorProduto[produtoId].cmv += parseFloat(venda.cmvCalculado || "0");
+  }
+  
+  // Calcular lucro e margem, adicionar lotes consumidos
+  for (const produtoId in drePorProduto) {
+    const dre = drePorProduto[produtoId];
+    dre.lucroBruto = dre.receitaBruta - dre.cmv;
+    dre.margemBruta = dre.receitaBruta > 0 ? (dre.lucroBruto / dre.receitaBruta) * 100 : 0;
+    
+    // Filtrar lotes consumidos deste produto
+    const vendasDoProduto = vendasData.filter(v => v.produtoId === parseInt(produtoId));
+    const vendaIdsDoProduto = vendasDoProduto.map(v => v.id);
+    dre.lotesConsumidos = memoriaCalculo.filter(m => vendaIdsDoProduto.includes(m.vendaId));
+  }
+  
+  return Object.values(drePorProduto).sort((a, b) => b.receitaBruta - a.receitaBruta);
 }

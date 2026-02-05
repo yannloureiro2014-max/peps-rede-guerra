@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, date, datetime } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, date, datetime, uniqueIndex } from "drizzle-orm/mysql-core";
 
 // Tabela de usuários (autenticação)
 export const users = mysqlTable("users", {
@@ -7,7 +7,8 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin", "operator", "viewer"]).default("user").notNull(),
+  role: mysqlEnum("role", ["user", "admin_geral", "visualizacao"]).default("user").notNull(),
+  postoId: int("postoId"), // FK para postos - permite vincular usuário visualização a posto específico
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -164,7 +165,7 @@ export type InsertMedicao = typeof medicoes.$inferInsert;
 // Tabela de Alertas
 export const alertas = mysqlTable("alertas", {
   id: int("id").autoincrement().primaryKey(),
-  tipo: mysqlEnum("tipo", ["estoque_baixo", "diferenca_medicao", "cmv_pendente", "sincronizacao", "medicao_faltante"]).notNull(),
+  tipo: mysqlEnum("tipo", ["estoque_baixo", "diferenca_medicao", "cmv_pendente", "sincronizacao", "medicao_faltante", "lote_antigo", "lotes_insuficientes"]).notNull(),
   postoId: int("postoId"),
   tanqueId: int("tanqueId"),
   titulo: varchar("titulo", { length: 200 }).notNull(),
@@ -226,3 +227,26 @@ export const syncLogs = mysqlTable("syncLogs", {
 
 export type SyncLog = typeof syncLogs.$inferSelect;
 export type InsertSyncLog = typeof syncLogs.$inferInsert;
+
+// Tabela de Inicialização Mensal de Lotes (controle de saldos iniciais PEPS)
+export const inicializacaoMensalLotes = mysqlTable("inicializacaoMensalLotes", {
+  id: int("id").autoincrement().primaryKey(),
+  mesReferencia: varchar("mesReferencia", { length: 7 }).notNull(), // Formato: YYYY-MM
+  postoId: int("postoId").notNull(),
+  produtoId: int("produtoId").notNull(),
+  dataInicializacao: timestamp("dataInicializacao").notNull(),
+  usuarioAdminId: int("usuarioAdminId").notNull(),
+  lotesConfigurados: text("lotesConfigurados"), // JSON com array de lotes e saldos
+  observacoes: text("observacoes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  // Unique constraint: apenas uma inicialização por mês/posto/produto
+  mesPostoProdutoUnique: uniqueIndex("mes_posto_produto_unique").on(
+    table.mesReferencia,
+    table.postoId,
+    table.produtoId
+  ),
+}));
+
+export type InicializacaoMensalLote = typeof inicializacaoMensalLotes.$inferSelect;
+export type InsertInicializacaoMensalLote = typeof inicializacaoMensalLotes.$inferInsert;

@@ -13,13 +13,23 @@ import {
   Building2,
   Menu,
   X,
-  Calculator
+  Calculator,
+  Users,
+  Calendar,
+  Shield
 } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "./ui/button";
 
-const menuItems = [
+interface MenuItem {
+  icon: any;
+  label: string;
+  path: string;
+  adminOnly?: boolean;
+}
+
+const menuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: Fuel, label: "Estoque", path: "/estoque" },
   { icon: ShoppingCart, label: "Compras", path: "/compras" },
@@ -29,6 +39,8 @@ const menuItems = [
   { icon: FileText, label: "Relatórios", path: "/relatorios" },
   { icon: Bell, label: "Alertas", path: "/alertas" },
   { icon: Building2, label: "Postos", path: "/postos" },
+  { icon: Calendar, label: "Inicialização Mensal", path: "/inicializacao-mensal", adminOnly: true },
+  { icon: Users, label: "Usuários", path: "/usuarios", adminOnly: true },
   { icon: Settings, label: "Configurações", path: "/configuracoes" },
 ];
 
@@ -108,23 +120,30 @@ export default function DashboardLayout({
 
         {/* Menu */}
         <nav className="flex-1 py-4 overflow-y-auto">
-          {menuItems.map((item) => {
-            const isActive = location === item.path;
-            return (
-              <button
-                key={item.path}
-                onClick={() => setLocation(item.path)}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-                  isActive 
-                    ? 'bg-primary/10 text-primary border-r-2 border-primary' 
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <item.icon className={`h-5 w-5 ${isActive ? 'text-primary' : ''}`} />
-                {sidebarOpen && <span className="font-medium">{item.label}</span>}
-              </button>
-            );
-          })}
+          {menuItems
+            .filter(item => !item.adminOnly || user?.role === 'admin_geral')
+            .map((item) => {
+              const isActive = location === item.path;
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => setLocation(item.path)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                    isActive 
+                      ? 'bg-primary/10 text-primary border-r-2 border-primary' 
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <item.icon className={`h-5 w-5 ${isActive ? 'text-primary' : ''}`} />
+                  {sidebarOpen && (
+                    <span className="font-medium flex items-center gap-2">
+                      {item.label}
+                      {item.adminOnly && <Shield className="h-3 w-3 text-purple-500" />}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
         </nav>
 
         {/* Footer */}
@@ -188,26 +207,31 @@ export default function DashboardLayout({
               </button>
             </div>
             <nav className="py-4">
-              {menuItems.map((item) => {
-                const isActive = location === item.path;
-                return (
-                  <button
-                    key={item.path}
-                    onClick={() => {
-                      setLocation(item.path);
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-                      isActive 
-                        ? 'bg-primary/10 text-primary' 
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <item.icon className={`h-5 w-5 ${isActive ? 'text-primary' : ''}`} />
-                    <span className="font-medium">{item.label}</span>
-                  </button>
-                );
-              })}
+              {menuItems
+                .filter(item => !item.adminOnly || user?.role === 'admin_geral')
+                .map((item) => {
+                  const isActive = location === item.path;
+                  return (
+                    <button
+                      key={item.path}
+                      onClick={() => {
+                        setLocation(item.path);
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                        isActive 
+                          ? 'bg-primary/10 text-primary' 
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <item.icon className={`h-5 w-5 ${isActive ? 'text-primary' : ''}`} />
+                      <span className="font-medium flex items-center gap-2">
+                        {item.label}
+                        {item.adminOnly && <Shield className="h-3 w-3 text-purple-500" />}
+                      </span>
+                    </button>
+                  );
+                })}
             </nav>
             <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-200">
               <div className="flex items-center gap-3 mb-3">

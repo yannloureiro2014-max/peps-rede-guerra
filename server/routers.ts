@@ -449,6 +449,161 @@ export const appRouter = router({
         return verificarMedicoesFaltantes(input?.dias || 30);
       }),
   }),
+
+  // ==================== GESTÃO DE USUÁRIOS ====================
+  usuarios: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user?.role !== "admin_geral") {
+        throw new Error("Acesso negado. Apenas administradores gerais podem gerenciar usuários.");
+      }
+      return db.getUsuarios();
+    }),
+    getById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user?.role !== "admin_geral") {
+          throw new Error("Acesso negado");
+        }
+        return db.getUsuarioById(input.id);
+      }),
+    create: protectedProcedure
+      .input(z.object({
+        email: z.string().email(),
+        name: z.string(),
+        role: z.enum(["user", "admin_geral", "visualizacao"]),
+        postoId: z.number().optional()
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user?.role !== "admin_geral") {
+          throw new Error("Acesso negado");
+        }
+        const usuarios = await db.getUsuarios();
+        const emailExiste = usuarios.some(u => u.email === input.email);
+        if (emailExiste) {
+          throw new Error("Email já cadastrado no sistema");
+        }
+        await db.createUsuario(input);
+        return { success: true };
+      }),
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        role: z.enum(["user", "admin_geral", "visualizacao"]).optional(),
+        postoId: z.number().nullable().optional()
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user?.role !== "admin_geral") {
+          throw new Error("Acesso negado");
+        }
+        const { id, ...dados } = input;
+        await db.updateUsuario(id, dados);
+        return { success: true };
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user?.role !== "admin_geral") {
+          throw new Error("Acesso negado");
+        }
+        if (ctx.user?.id === input.id) {
+          throw new Error("Você não pode excluir seu próprio usuário");
+        }
+        const usuarios = await db.getUsuarios();
+        const admins = usuarios.filter(u => u.role === "admin_geral");
+        if (admins.length === 1 && admins[0].id === input.id) {
+          throw new Error("Não é possível excluir o último administrador geral");
+        }
+        await db.deleteUsuario(input.id);
+        return { success: true };
+      }),
+  }),
+
+  // ==================== INICIALIZAÇÃO MENSAL DE LOTES ====================
+  inicializacaoMensal: router({
+    inicializar: protectedProcedure
+      .input(z.object({
+        mesReferencia: z.string().regex(/^\d{4}-\d{2}$/, "Formato deve ser YYYY-MM"),
+        postoId: z.number(),
+        produtoId: z.number(),
+        lotesConfigurados: z.array(z.object({
+          loteId: z.number(),
+          saldoInicial: z.string(),
+          ordemConsumo: z.number()
+        })),
+        observacoes: z.string().optional()
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user?.role !== "admin_geral") {
+          throw new Error("Acesso negado. Apenas administradores gerais podem inicializar meses.");
+        }
+        
+        // Verificar se já existe inicialização para este mês/posto/produto
+        const jaExiste = await db.verificarInicializacaoExistente(
+          input.mesReferencia, 
+          input.postoId, 
+          input.produtoId
+        );
+        if (jaExiste) {
+          throw new Error("Este mês/posto/produto já foi inicializado. Para ajustar saldos, edite a inicialização existente.");
+        }
+        
+        // Verificar ordens de consumo duplicadas
+        const ordens = input.lotesConfigurados.map(l => l.ordemConsumo);
+        const ordensUnicas = new Set(ordens);
+        if (ordens.length !== ordensUnicas.size) {
+          throw new Error("Ordens de consumo PEPS não podem ser duplicadas");
+        }
+        
+        await db.criarInicializacaoMensal({
+          ...input,
+          usuarioAdminId: ctx.user.id
+        });
+        
+        return { success: true };
+      }),
+    listar: protectedProcedure
+      .input(z.object({
+        postoId: z.number().optional(),
+        produtoId: z.number().optional()
+      }).optional())
+      .query(async ({ input }) => {
+        return db.getInicializacoesMensais(input?.postoId, input?.produtoId);
+      }),
+    verificarExistente: protectedProcedure
+      .input(z.object({
+        mesReferencia: z.string(),
+        postoId: z.number(),
+        produtoId: z.number()
+      }))
+      .query(async ({ input }) => {
+        return db.verificarInicializacaoExistente(input.mesReferencia, input.postoId, input.produtoId);
+      }),
+  }),
+
+  // ==================== DRE COM PEPS DO BACKEND ====================
+  dre: router({
+    calcular: publicProcedure
+      .input(z.object({
+        postoId: z.number().optional(),
+        produtoId: z.number().optional(),
+        dataInicio: z.string(),
+        dataFim: z.string()
+      }))
+      .query(async ({ input }) => {
+        return db.calcularDRE(input);
+      }),
+    calcularCMVVenda: protectedProcedure
+      .input(z.object({ vendaId: z.number() }))
+      .mutation(async ({ input }) => {
+        return db.calcularCMVPEPS(input.vendaId);
+      }),
+    memoriaCalculo: publicProcedure
+      .input(z.object({ vendaIds: z.array(z.number()) }))
+      .query(async ({ input }) => {
+        return db.getMemoriaCalculoCMV(input.vendaIds);
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

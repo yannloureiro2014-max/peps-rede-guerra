@@ -4,12 +4,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { DollarSign, TrendingUp, TrendingDown, Percent, Package, Calculator } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Percent, Package, Calculator, Server, RefreshCw } from "lucide-react";
 import { useState, useMemo } from "react";
 
 function formatNumber(value: number): string {
-  return new Intl.NumberFormat('pt-BR').format(value);
+  return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 3 }).format(value);
 }
 
 function formatCurrency(value: number): string {
@@ -19,27 +20,6 @@ function formatCurrency(value: number): string {
 function formatDate(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
   return d.toLocaleDateString('pt-BR');
-}
-
-interface LoteConsumo {
-  loteId: number;
-  nf: string;
-  dataCompra: Date;
-  custoUnitario: number;
-  quantidadeConsumida: number;
-  custoTotal: number;
-  ordem: number;
-}
-
-interface DREPorProduto {
-  produtoId: number;
-  produtoNome: string;
-  quantidadeVendida: number;
-  receitaBruta: number;
-  cmv: number;
-  lucroBruto: number;
-  margemBruta: number;
-  lotesConsumidos: LoteConsumo[];
 }
 
 export default function DRE() {
@@ -58,115 +38,17 @@ export default function DRE() {
   const periodoInicio = tipoFiltro === "dia" ? dataEspecifica : dataInicio;
   const periodoFim = tipoFiltro === "dia" ? dataEspecifica : dataFim;
 
-  const { data: produtos } = trpc.produtos.list.useQuery();
-
-  const { data: vendas } = trpc.vendas.list.useQuery({
+  // Usar cálculo do backend
+  const { data: dreData, isLoading, refetch } = trpc.dre.calcular.useQuery({
     postoId: postoFiltro !== "todos" ? parseInt(postoFiltro) : undefined,
     dataInicio: periodoInicio,
     dataFim: periodoFim,
   });
 
-  const { data: lotes } = trpc.lotes.list.useQuery({
-    postoId: postoFiltro !== "todos" ? parseInt(postoFiltro) : undefined,
-  });
-
-  // Criar mapa de produto por descrição
-  const produtosPorDescricao = useMemo(() => {
-    const mapa = new Map<string, number>();
-    produtos?.forEach(p => {
-      if (p.descricao) mapa.set(p.descricao, p.id);
-    });
-    return mapa;
-  }, [produtos]);
-
-  // Calcular DRE com método PEPS
-  const drePorProduto = useMemo(() => {
-    if (!vendas || !lotes || !produtos) return [];
-
-    const resultado: DREPorProduto[] = [];
-
-    // Agrupar vendas por produto
-    // Agrupar vendas por produto (usando descrição já que não temos produtoId direto)
-    const vendasPorProduto = new Map<number, typeof vendas>();
-    vendas.forEach(venda => {
-      const produtoId = produtosPorDescricao.get(venda.produtoDescricao || '') || 0;
-      if (!vendasPorProduto.has(produtoId)) {
-        vendasPorProduto.set(produtoId, []);
-      }
-      vendasPorProduto.get(produtoId)!.push(venda);
-    });
-
-    // Para cada produto, calcular DRE com PEPS
-    vendasPorProduto.forEach((vendasDoProduto, produtoId) => {
-      const produto = produtos.find(p => p.id === produtoId);
-      if (!produto) return;
-
-      // Lotes do produto ordenados por data (PEPS - primeiro que entra, primeiro que sai)
-      const lotesDisponiveis = lotes
-        .filter(l => l.produtoId === produtoId)
-        .map(l => ({
-          ...l,
-          quantidadeRestante: parseFloat(l.quantidadeDisponivel || '0'),
-          custoUnitario: parseFloat(l.custoUnitario || '0'),
-        }))
-        .sort((a, b) => new Date(a.dataEntrada).getTime() - new Date(b.dataEntrada).getTime());
-
-      // Calcular receita bruta
-      const quantidadeVendida = vendasDoProduto.reduce(
-        (sum, v) => sum + parseFloat(v.quantidade || '0'), 0
-      );
-      const receitaBruta = vendasDoProduto.reduce(
-        (sum, v) => sum + parseFloat(v.valorTotal || '0'), 0
-      );
-
-      // Calcular CMV pelo método PEPS
-      let cmv = 0;
-      let quantidadeRestante = quantidadeVendida;
-      const lotesConsumidos: LoteConsumo[] = [];
-      let ordem = 1;
-
-      for (const lote of lotesDisponiveis) {
-        if (quantidadeRestante <= 0) break;
-        if (lote.quantidadeRestante <= 0) continue;
-
-        const quantidadeConsumida = Math.min(quantidadeRestante, lote.quantidadeRestante);
-        const custoTotal = quantidadeConsumida * lote.custoUnitario;
-        
-        cmv += custoTotal;
-        quantidadeRestante -= quantidadeConsumida;
-
-        lotesConsumidos.push({
-          loteId: lote.id,
-          nf: lote.numeroNf || `Lote ${lote.id}`,
-          dataCompra: new Date(lote.dataEntrada),
-          custoUnitario: lote.custoUnitario,
-          quantidadeConsumida,
-          custoTotal,
-          ordem: ordem++,
-        });
-      }
-
-      const lucroBruto = receitaBruta - cmv;
-      const margemBruta = receitaBruta > 0 ? (lucroBruto / receitaBruta) * 100 : 0;
-
-      resultado.push({
-        produtoId,
-        produtoNome: produto.descricao || `Produto ${produtoId}`,
-        quantidadeVendida,
-        receitaBruta,
-        cmv,
-        lucroBruto,
-        margemBruta,
-        lotesConsumidos,
-      });
-    });
-
-    return resultado.sort((a, b) => b.receitaBruta - a.receitaBruta);
-  }, [vendas, lotes, produtos]);
-
   // Totais gerais
   const totais = useMemo(() => {
-    return drePorProduto.reduce(
+    if (!dreData) return { quantidadeVendida: 0, receitaBruta: 0, cmv: 0, lucroBruto: 0 };
+    return dreData.reduce(
       (acc, item) => ({
         quantidadeVendida: acc.quantidadeVendida + item.quantidadeVendida,
         receitaBruta: acc.receitaBruta + item.receitaBruta,
@@ -175,7 +57,7 @@ export default function DRE() {
       }),
       { quantidadeVendida: 0, receitaBruta: 0, cmv: 0, lucroBruto: 0 }
     );
-  }, [drePorProduto]);
+  }, [dreData]);
 
   const margemTotal = totais.receitaBruta > 0 
     ? (totais.lucroBruto / totais.receitaBruta) * 100 
@@ -193,9 +75,18 @@ export default function DRE() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">DRE - Demonstrativo de Resultados</h1>
-          <p className="text-muted-foreground">Análise de receitas, custos e margens com cálculo PEPS</p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">DRE - Demonstrativo de Resultados</h1>
+            <p className="text-muted-foreground flex items-center gap-2">
+              <Server className="h-4 w-4" />
+              Cálculo PEPS processado no servidor com memória de cálculo persistida
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Atualizar
+          </Button>
         </div>
 
         {/* Filtros */}
@@ -284,7 +175,7 @@ export default function DRE() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{formatNumber(totais.quantidadeVendida)} L</p>
+              <p className="text-2xl font-bold">{formatNumber(totais.quantidadeVendida)}</p>
             </CardContent>
           </Card>
 
@@ -296,7 +187,7 @@ export default function DRE() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-blue-600">{formatCurrency(totais.receitaBruta)}</p>
+              <p className="text-2xl font-bold text-green-600">{formatCurrency(totais.receitaBruta)}</p>
             </CardContent>
           </Card>
 
@@ -347,102 +238,99 @@ export default function DRE() {
             <CardTitle className="flex items-center gap-2">
               <Calculator className="h-5 w-5" />
               DRE por Combustível
+              {isLoading && <Badge variant="outline">Carregando...</Badge>}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {drePorProduto.length === 0 ? (
+            {!dreData || dreData.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
-                Nenhuma venda encontrada no período selecionado
+                {isLoading ? "Calculando DRE..." : "Nenhuma venda encontrada no período selecionado"}
               </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/50">
-                      <th className="text-left p-3 font-semibold">Combustível</th>
-                      <th className="text-right p-3 font-semibold">Qtd (L)</th>
-                      <th className="text-right p-3 font-semibold">Receita Bruta</th>
-                      <th className="text-right p-3 font-semibold">CMV (PEPS)</th>
-                      <th className="text-right p-3 font-semibold">Lucro Bruto</th>
-                      <th className="text-right p-3 font-semibold">Margem</th>
-                      <th className="text-center p-3 font-semibold">Memória</th>
+                      <th className="text-left p-3 font-medium">Combustível</th>
+                      <th className="text-right p-3 font-medium">Litros</th>
+                      <th className="text-right p-3 font-medium">Receita Bruta</th>
+                      <th className="text-right p-3 font-medium">CMV (PEPS)</th>
+                      <th className="text-right p-3 font-medium">Lucro Bruto</th>
+                      <th className="text-right p-3 font-medium">Margem</th>
+                      <th className="text-center p-3 font-medium">Memória</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {drePorProduto.map((item) => (
+                    {dreData.map((item) => (
                       <>
-                        <tr key={item.produtoId} className="border-b hover:bg-muted/30">
+                        <tr key={item.produtoId} className="border-b hover:bg-muted/50">
                           <td className="p-3 font-medium">{item.produtoNome}</td>
                           <td className="p-3 text-right">{formatNumber(item.quantidadeVendida)}</td>
-                          <td className="p-3 text-right text-blue-600">{formatCurrency(item.receitaBruta)}</td>
+                          <td className="p-3 text-right text-green-600">{formatCurrency(item.receitaBruta)}</td>
                           <td className="p-3 text-right text-red-600">{formatCurrency(item.cmv)}</td>
-                          <td className={`p-3 text-right font-semibold ${item.lucroBruto >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          <td className={`p-3 text-right font-medium ${item.lucroBruto >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             {formatCurrency(item.lucroBruto)}
                           </td>
                           <td className={`p-3 text-right ${item.margemBruta >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             {item.margemBruta.toFixed(2)}%
                           </td>
                           <td className="p-3 text-center">
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="sm"
-                              onClick={() => setMostrarMemoria(
-                                mostrarMemoria === item.produtoId ? null : item.produtoId
-                              )}
+                              onClick={() => setMostrarMemoria(mostrarMemoria === item.produtoId ? null : item.produtoId)}
                             >
-                              {mostrarMemoria === item.produtoId ? 'Ocultar' : 'Ver Lotes'}
+                              <Calculator className="h-4 w-4" />
                             </Button>
                           </td>
                         </tr>
-                        {/* Memória de Cálculo */}
-                        {mostrarMemoria === item.produtoId && item.lotesConsumidos.length > 0 && (
+                        {/* Memória de Cálculo PEPS */}
+                        {mostrarMemoria === item.produtoId && item.lotesConsumidos && item.lotesConsumidos.length > 0 && (
                           <tr>
                             <td colSpan={7} className="p-0">
-                              <div className="bg-blue-50 p-4 border-l-4 border-blue-500">
-                                <h4 className="font-semibold text-blue-800 mb-3">
+                              <div className="bg-muted/30 p-4 border-t">
+                                <h4 className="font-medium mb-3 flex items-center gap-2">
+                                  <Server className="h-4 w-4" />
                                   Memória de Cálculo PEPS - {item.produtoNome}
+                                  <Badge variant="outline" className="ml-2">Persistido no Banco</Badge>
                                 </h4>
                                 <table className="w-full text-xs">
                                   <thead>
-                                    <tr className="border-b border-blue-200">
+                                    <tr className="border-b">
                                       <th className="text-left p-2">Ordem</th>
-                                      <th className="text-left p-2">NF/Lote</th>
-                                      <th className="text-left p-2">Data Compra</th>
+                                      <th className="text-left p-2">NF-e</th>
+                                      <th className="text-left p-2">Data Entrada</th>
                                       <th className="text-right p-2">Custo Unit.</th>
                                       <th className="text-right p-2">Qtd Consumida</th>
                                       <th className="text-right p-2">Custo Total</th>
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {item.lotesConsumidos.map((lote) => (
-                                      <tr key={lote.loteId} className="border-b border-blue-100">
-                                        <td className="p-2">{lote.ordem}º</td>
-                                        <td className="p-2 font-medium">{lote.nf}</td>
-                                        <td className="p-2">{formatDate(lote.dataCompra)}</td>
-                                        <td className="p-2 text-right">{formatCurrency(lote.custoUnitario)}</td>
-                                        <td className="p-2 text-right">{formatNumber(lote.quantidadeConsumida)} L</td>
-                                        <td className="p-2 text-right font-semibold">{formatCurrency(lote.custoTotal)}</td>
+                                    {item.lotesConsumidos.map((lote: any, idx: number) => (
+                                      <tr key={`${lote.vendaId}-${lote.loteId}-${idx}`} className="border-b">
+                                        <td className="p-2">
+                                          <Badge variant="outline">{lote.ordemConsumo || idx + 1}º</Badge>
+                                        </td>
+                                        <td className="p-2 font-mono">{lote.numeroNf || `Lote ${lote.loteId}`}</td>
+                                        <td className="p-2">{formatDate(lote.dataEntrada)}</td>
+                                        <td className="p-2 text-right">{formatCurrency(parseFloat(lote.custoUnitario || "0"))}</td>
+                                        <td className="p-2 text-right">{formatNumber(parseFloat(lote.quantidadeConsumida || "0"))} L</td>
+                                        <td className="p-2 text-right font-medium">{formatCurrency(parseFloat(lote.custoTotal || "0"))}</td>
                                       </tr>
                                     ))}
-                                    <tr className="bg-blue-100 font-bold">
-                                      <td colSpan={4} className="p-2 text-right">Total CMV:</td>
-                                      <td className="p-2 text-right">{formatNumber(item.quantidadeVendida)} L</td>
-                                      <td className="p-2 text-right">{formatCurrency(item.cmv)}</td>
-                                    </tr>
                                   </tbody>
+                                  <tfoot>
+                                    <tr className="bg-muted/50 font-medium">
+                                      <td colSpan={4} className="p-2 text-right">Total CMV:</td>
+                                      <td className="p-2 text-right">
+                                        {formatNumber(item.lotesConsumidos.reduce((sum: number, l: any) => sum + parseFloat(l.quantidadeConsumida || "0"), 0))} L
+                                      </td>
+                                      <td className="p-2 text-right text-red-600">
+                                        {formatCurrency(item.lotesConsumidos.reduce((sum: number, l: any) => sum + parseFloat(l.custoTotal || "0"), 0))}
+                                      </td>
+                                    </tr>
+                                  </tfoot>
                                 </table>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                        {mostrarMemoria === item.produtoId && item.lotesConsumidos.length === 0 && (
-                          <tr>
-                            <td colSpan={7} className="p-0">
-                              <div className="bg-yellow-50 p-4 border-l-4 border-yellow-500">
-                                <p className="text-yellow-800">
-                                  Nenhum lote de compra encontrado para este combustível. 
-                                  Cadastre as notas fiscais de compra para calcular o CMV corretamente.
-                                </p>
                               </div>
                             </td>
                           </tr>
@@ -454,7 +342,7 @@ export default function DRE() {
                     <tr className="bg-muted font-bold">
                       <td className="p-3">TOTAL</td>
                       <td className="p-3 text-right">{formatNumber(totais.quantidadeVendida)}</td>
-                      <td className="p-3 text-right text-blue-600">{formatCurrency(totais.receitaBruta)}</td>
+                      <td className="p-3 text-right text-green-600">{formatCurrency(totais.receitaBruta)}</td>
                       <td className="p-3 text-right text-red-600">{formatCurrency(totais.cmv)}</td>
                       <td className={`p-3 text-right ${totais.lucroBruto >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {formatCurrency(totais.lucroBruto)}
@@ -472,14 +360,31 @@ export default function DRE() {
         </Card>
 
         {/* Explicação do Método PEPS */}
-        <Card className="bg-gray-50">
-          <CardContent className="py-4">
-            <h4 className="font-semibold mb-2">Método PEPS (Primeiro que Entra, Primeiro que Sai)</h4>
-            <p className="text-sm text-muted-foreground">
-              O CMV é calculado consumindo primeiro os lotes mais antigos. Isso significa que o custo das mercadorias 
-              vendidas reflete o preço de compra dos combustíveis que entraram primeiro no estoque. 
-              Clique em "Ver Lotes" para visualizar a memória de cálculo detalhada de cada combustível.
-            </p>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Sobre o Método PEPS (FIFO)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <p>
+                <strong>PEPS (Primeiro que Entra, Primeiro que Sai)</strong> é o método de custeio 
+                que considera que os primeiros lotes comprados são os primeiros a serem vendidos.
+              </p>
+              <p>
+                <strong>Cálculo no Backend:</strong> O CMV é calculado automaticamente no servidor 
+                quando as vendas são sincronizadas do ACS. Cada venda tem seu CMV persistido no banco 
+                de dados, garantindo consistência e auditabilidade.
+              </p>
+              <p>
+                <strong>Memória de Cálculo:</strong> Clique no ícone de calculadora para ver 
+                exatamente quais lotes foram consumidos para cada combustível, com a ordem PEPS 
+                e os custos detalhados.
+              </p>
+              <p>
+                <strong>Inicialização Mensal:</strong> Administradores podem definir saldos iniciais 
+                e ordem de consumo dos lotes no início de cada mês através do menu "Inicialização Mensal".
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>

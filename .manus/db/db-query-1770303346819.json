@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS inicializacaoMensalLotes (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  mesReferencia VARCHAR(7) NOT NULL,\n  postoId INT NOT NULL,\n  produtoId INT NOT NULL,\n  dataInicializacao TIMESTAMP NOT NULL,\n  usuarioAdminId INT NOT NULL,\n  lotesConfigurados TEXT,\n  observacoes TEXT,\n  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  UNIQUE KEY mes_posto_produto_unique (mesReferencia, postoId, produtoId)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute CREATE TABLE IF NOT EXISTS inicializacaoMensalLotes (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  mesReferencia VARCHAR(7) NOT NULL,\n  postoId INT NOT NULL,\n  produtoId INT NOT NULL,\n  dataInicializacao TIMESTAMP NOT NULL,\n  usuarioAdminId INT NOT NULL,\n  lotesConfigurados TEXT,\n  observacoes TEXT,\n  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  UNIQUE KEY mes_posto_produto_unique (mesReferencia, postoId, produtoId)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 243
+}

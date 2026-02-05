@@ -77,3 +77,50 @@
 - [x] Cálculo PEPS com memória de cálculo detalhada (quais lotes consumidos)
 - [x] Exibir receita bruta, CMV, lucro bruto e margem
 - [x] Mostrar ordem de consumo dos lotes
+
+## Melhorias Sistema PEPS - Fase 2
+
+### Schema do Banco de Dados
+- [x] Adicionar campo postoId na tabela users (FK para postos)
+- [x] Criar tabela inicializacaoMensalLotes
+- [x] Alterar enum role para ["user", "admin_geral", "visualizacao"]
+- [x] Gerar e executar migrations
+
+### Backend - Funções db.ts
+- [x] Funções de gestão de usuários (CRUD)
+- [x] Funções de inicialização mensal de lotes
+- [x] Função calcularCMVPEPS (cálculo no backend com persistência)
+- [x] Função getMemoriaCalculoCMV
+- [x] Função calcularDRE (DRE com PEPS do backend)
+
+### Backend - Routers tRPC
+- [x] Router usuarios (list, getById, create, update, delete)
+- [x] Router inicializacaoMensal (inicializar, listar, verificarExistente)
+- [x] Router dre (calcular, calcularCMVVenda, memoriaCalculo)
+
+### ETL - Cálculo Automático
+- [x] Modificar sincronizarVendasACS para calcular CMV após inserir venda
+
+### Frontend - Novos Componentes
+- [x] Criar GestaoUsuarios.tsx (CRUD de usuários)
+- [x] Criar InicializacaoMensal.tsx (definir saldos iniciais de lotes)
+
+### Frontend - Modificações
+- [x] Modificar DRE.tsx para usar cálculo do backend
+- [x] Adicionar rotas /usuarios e /inicializacao-mensal
+- [x] Adicionar links no menu com controle de permissões (admin_geral only)
+
+### Validações e Regras
+- [x] Cronologia PEPS (ordem de consumo) - implementado via ordemConsumo
+- [x] Saldo nunca negativo - implementado no calcularCMVPEPS
+- [x] Alerta quando lotes insuficientes
+
+### Testes Realizados
+- [x] Dashboard carregando corretamente
+- [x] Gestão de Usuários funcionando
+- [x] Inicialização Mensal funcionando
+- [x] DRE usando cálculo do backend
+- [ ] CMV das vendas existentes precisa ser recalculado
+- [ ] Inicialização mensal única
+- [ ] Permissões por role
+- [ ] Auditoria de ações críticas

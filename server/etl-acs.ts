@@ -332,7 +332,8 @@ export async function sincronizarVendasACS(diasAtras: number = 30) {
         .limit(1);
 
       if (existente.length === 0) {
-        await db.insert(vendas).values({
+        // Inserir a venda
+        const insertResult = await db.insert(vendas).values({
           postoId: posto.id,
           tanqueId: tanque?.id || null,
           produtoId: produto?.id || null,
@@ -341,12 +342,27 @@ export async function sincronizarVendasACS(diasAtras: number = 30) {
           quantidade: row.litros?.toString() || "0",
           valorUnitario: row.preco?.toString() || "0",
           valorTotal: row.total?.toString() || "0",
+          statusCmv: "pendente",
         });
         inseridos++;
+        
+        // Calcular CMV automaticamente após inserir a venda
+        if (insertResult[0]?.insertId) {
+          try {
+            const { calcularCMVPEPS } = await import("./db");
+            await calcularCMVPEPS(insertResult[0].insertId);
+          } catch (cmvError) {
+            console.error(`[ETL] Erro ao calcular CMV para venda ${insertResult[0].insertId}:`, cmvError);
+            // Marcar venda com erro de CMV
+            await db.update(vendas)
+              .set({ statusCmv: "erro" })
+              .where(eq(vendas.id, insertResult[0].insertId));
+          }
+        }
       }
     }
 
-    console.log(`[ETL] Vendas: ${inseridos} inseridas, ${ignorados} ignoradas`);
+    console.log(`[ETL] Vendas: ${inseridos} inseridas (com CMV calculado), ${ignorados} ignoradas`);
 
     // Registrar log de sincronização
     await db.insert(syncLogs).values({
