@@ -15,6 +15,7 @@ import Configuracoes from "./pages/Configuracoes";
 import DRE from "./pages/DRE";
 import GestaoUsuarios from "./pages/GestaoUsuarios";
 import InicializacaoMensal from "./pages/InicializacaoMensal";
+import RecalcularCMV from "./pages/RecalcularCMV";
 
 function Router() {
   return (
@@ -31,6 +32,7 @@ function Router() {
       <Route path={"/dre"} component={DRE} />
       <Route path={"/usuarios"} component={GestaoUsuarios} />
       <Route path={"/inicializacao-mensal"} component={InicializacaoMensal} />
+      <Route path={"/recalcular-cmv"} component={RecalcularCMV} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>

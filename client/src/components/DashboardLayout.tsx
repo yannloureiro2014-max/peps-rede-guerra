@@ -16,7 +16,8 @@ import {
   Calculator,
   Users,
   Calendar,
-  Shield
+  Shield,
+  RefreshCw
 } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -40,6 +41,7 @@ const menuItems: MenuItem[] = [
   { icon: Bell, label: "Alertas", path: "/alertas" },
   { icon: Building2, label: "Postos", path: "/postos" },
   { icon: Calendar, label: "Inicialização Mensal", path: "/inicializacao-mensal", adminOnly: true },
+  { icon: RefreshCw, label: "Recalcular CMV", path: "/recalcular-cmv", adminOnly: true },
   { icon: Users, label: "Usuários", path: "/usuarios", adminOnly: true },
   { icon: Settings, label: "Configurações", path: "/configuracoes" },
 ];

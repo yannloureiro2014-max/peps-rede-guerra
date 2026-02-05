@@ -131,3 +131,13 @@
 - [x] Corrigir demais componentes com .map() usando index como key (Relatorios.tsx, Home.tsx, InicializacaoMensal.tsx)
 - [x] Adicionar cleanup em useEffect com async (Map.tsx - isMounted pattern)
 - [x] Testar navegação entre páginas e filtros - SEM ERROS NO CONSOLE
+
+## Recálculo Retroativo de CMV - CRÍTICO
+
+- [x] Criar função recalcularCMVRetroativo em server/db.ts
+- [x] Modificar createLote para recalcular CMV após inserção de lote
+- [x] Modificar router inicializacaoMensal para recalcular CMV
+- [x] Adicionar router cmv com procedures de recálculo manual
+- [x] Criar componente RecalcularCMV.tsx no frontend
+- [x] Adicionar rota /recalcular-cmv e link no menu (admin_geral only)
+- [x] Testar cenários de recálculo retroativo - Página funcionando, 11.832 vendas pendentes identificadas

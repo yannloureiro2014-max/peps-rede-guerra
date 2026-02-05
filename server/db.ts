@@ -232,6 +232,19 @@ export async function createLote(data: InsertLote, usuarioId?: number, usuarioNo
   // Registrar no histórico
   if (result[0]?.insertId) {
     await registrarHistorico("lotes", result[0].insertId, "insert", null, data, usuarioId, usuarioNome);
+    
+    // RECALCULAR CMV RETROATIVO: Quando um lote é cadastrado, recalcular
+    // o CMV de todas as vendas pendentes a partir da data de entrada do lote
+    if (data.postoId && data.produtoId && data.dataEntrada) {
+      try {
+        const dataEntrada = new Date(data.dataEntrada);
+        console.log(`[CREATE LOTE] Iniciando recálculo retroativo de CMV para lote ${result[0].insertId}...`);
+        const recalcResult = await recalcularCMVRetroativo(data.postoId, data.produtoId, dataEntrada);
+        console.log(`[CREATE LOTE] Recálculo concluído: ${recalcResult.recalculadas} vendas recalculadas, ${recalcResult.erros} erros`);
+      } catch (error) {
+        console.error("[CREATE LOTE] Erro ao recalcular CMV retroativo:", error);
+      }
+    }
   }
 }
 
@@ -1032,4 +1045,195 @@ export async function calcularDRE(filtros: {
   }
   
   return Object.values(drePorProduto).sort((a, b) => b.receitaBruta - a.receitaBruta);
+}
+
+
+// ==================== RECÁLCULO RETROATIVO DE CMV ====================
+
+/**
+ * Recalcula o CMV de todas as vendas pendentes de um posto/produto a partir de uma data.
+ * Esta função é chamada automaticamente quando um lote é cadastrado para garantir
+ * que vendas anteriores consumam os lotes na ordem cronológica correta (PEPS).
+ */
+export async function recalcularCMVRetroativo(
+  postoId: number, 
+  produtoId: number, 
+  dataInicio: Date
+): Promise<{ recalculadas: number; erros: number; detalhes: any[] }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  console.log(`[RECALC CMV] Iniciando recálculo retroativo para posto ${postoId}, produto ${produtoId}, a partir de ${dataInicio.toISOString()}`);
+  
+  // 1. Primeiro, resetar os lotes do posto/produto para recalcular do zero
+  // Buscar todos os lotes ativos do posto/produto
+  const lotesDoPostoProduto = await db.select()
+    .from(lotes)
+    .where(and(
+      eq(lotes.postoId, postoId),
+      eq(lotes.produtoId, produtoId),
+      sql`${lotes.status} IN ('ativo', 'consumido')`
+    ))
+    .orderBy(lotes.ordemConsumo, lotes.dataEntrada);
+  
+  // Resetar quantidadeDisponivel para quantidadeOriginal
+  for (const lote of lotesDoPostoProduto) {
+    await db.update(lotes).set({
+      quantidadeDisponivel: lote.quantidadeOriginal,
+      status: "ativo"
+    }).where(eq(lotes.id, lote.id));
+    console.log(`[RECALC CMV] Lote ${lote.id} (NF ${lote.numeroNf}) resetado: ${lote.quantidadeOriginal} L`);
+  }
+  
+  // 2. Buscar TODAS as vendas do posto/produto a partir da data de início
+  // (não apenas pendentes, pois precisamos recalcular tudo na ordem correta)
+  const vendasParaRecalcular = await db.select()
+    .from(vendas)
+    .where(and(
+      eq(vendas.postoId, postoId),
+      eq(vendas.produtoId, produtoId),
+      gte(vendas.dataVenda, dataInicio)
+    ))
+    .orderBy(vendas.dataVenda, vendas.id);
+  
+  console.log(`[RECALC CMV] Encontradas ${vendasParaRecalcular.length} vendas para recalcular`);
+  
+  let recalculadas = 0;
+  let erros = 0;
+  const detalhes: any[] = [];
+  
+  // 3. Processar cada venda em ordem cronológica
+  for (const venda of vendasParaRecalcular) {
+    try {
+      // Limpar consumos antigos desta venda
+      await db.delete(consumoLotes).where(eq(consumoLotes.vendaId, venda.id));
+      
+      // Recalcular CMV
+      const resultado = await calcularCMVPEPS(venda.id);
+      recalculadas++;
+      
+      detalhes.push({
+        vendaId: venda.id,
+        dataVenda: venda.dataVenda,
+        quantidade: venda.quantidade,
+        cmvCalculado: resultado.cmvTotal,
+        lotesConsumidos: resultado.lotesConsumidos.length,
+        status: resultado.quantidadeRestante > 0.001 ? "erro" : "sucesso"
+      });
+      
+      console.log(`[RECALC CMV] Venda ${venda.id} (${venda.dataVenda}) recalculada: CMV = R$ ${resultado.cmvTotal.toFixed(2)}`);
+    } catch (error) {
+      erros++;
+      console.error(`[RECALC CMV] Erro ao recalcular venda ${venda.id}:`, error);
+      
+      // Marcar venda com erro
+      await db.update(vendas).set({ 
+        statusCmv: "erro",
+        cmvCalculado: "0",
+        cmvUnitario: "0"
+      }).where(eq(vendas.id, venda.id));
+      
+      detalhes.push({
+        vendaId: venda.id,
+        dataVenda: venda.dataVenda,
+        quantidade: venda.quantidade,
+        status: "erro",
+        erro: String(error)
+      });
+    }
+  }
+  
+  // 4. Registrar no histórico
+  await registrarHistorico(
+    "recalculo_cmv",
+    postoId,
+    "update",
+    null,
+    { 
+      postoId, 
+      produtoId, 
+      dataInicio: dataInicio.toISOString(), 
+      vendasRecalculadas: recalculadas, 
+      erros 
+    },
+    undefined,
+    "Sistema"
+  );
+  
+  console.log(`[RECALC CMV] Finalizado: ${recalculadas} recalculadas, ${erros} erros`);
+  
+  return { recalculadas, erros, detalhes };
+}
+
+/**
+ * Recalcula o CMV de todas as vendas pendentes no sistema, agrupadas por posto/produto.
+ * Útil para processar em lote vendas que não tinham lotes disponíveis no momento da sincronização.
+ */
+export async function recalcularTodasVendasPendentes(): Promise<{ 
+  totalRecalculadas: number; 
+  totalErros: number;
+  grupos: number;
+  detalhes: any[] 
+}> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  console.log(`[RECALC CMV] Iniciando recálculo de todas as vendas pendentes...`);
+  
+  // Buscar vendas pendentes agrupadas por posto/produto
+  const vendasPendentes = await db.select({
+    postoId: vendas.postoId,
+    produtoId: vendas.produtoId,
+    dataVenda: sql<Date>`MIN(${vendas.dataVenda})`,
+    total: sql<number>`COUNT(*)`
+  })
+  .from(vendas)
+  .where(eq(vendas.statusCmv, "pendente"))
+  .groupBy(vendas.postoId, vendas.produtoId)
+  .orderBy(sql`MIN(${vendas.dataVenda})`);
+  
+  console.log(`[RECALC CMV] Encontrados ${vendasPendentes.length} grupos de vendas pendentes`);
+  
+  let totalRecalculadas = 0;
+  let totalErros = 0;
+  const detalhes: any[] = [];
+  
+  for (const grupo of vendasPendentes) {
+    try {
+      const resultado = await recalcularCMVRetroativo(
+        grupo.postoId,
+        grupo.produtoId || 0,
+        new Date(grupo.dataVenda)
+      );
+      
+      totalRecalculadas += resultado.recalculadas;
+      totalErros += resultado.erros;
+      
+      detalhes.push({
+        postoId: grupo.postoId,
+        produtoId: grupo.produtoId,
+        dataInicio: grupo.dataVenda,
+        vendasRecalculadas: resultado.recalculadas,
+        erros: resultado.erros
+      });
+    } catch (error) {
+      console.error(`[RECALC CMV] Erro ao processar grupo posto=${grupo.postoId} produto=${grupo.produtoId}:`, error);
+      totalErros++;
+      detalhes.push({
+        postoId: grupo.postoId,
+        produtoId: grupo.produtoId,
+        status: "erro",
+        erro: String(error)
+      });
+    }
+  }
+  
+  console.log(`[RECALC CMV] Recálculo total finalizado: ${totalRecalculadas} vendas, ${totalErros} erros, ${vendasPendentes.length} grupos`);
+  
+  return { 
+    totalRecalculadas, 
+    totalErros, 
+    grupos: vendasPendentes.length,
+    detalhes 
+  };
 }

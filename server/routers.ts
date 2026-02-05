@@ -560,7 +560,24 @@ export const appRouter = router({
           usuarioAdminId: ctx.user.id
         });
         
-        return { success: true };
+        // RECÁLCULO RETROATIVO: Após inicializar os saldos dos lotes,
+        // recalcular o CMV de todas as vendas do mês para garantir consistência
+        try {
+          const dataInicioMes = new Date(input.mesReferencia + "-01");
+          console.log(`[INICIALIZAR MES] Iniciando recálculo retroativo de CMV para ${input.mesReferencia}...`);
+          const recalcResult = await db.recalcularCMVRetroativo(input.postoId, input.produtoId, dataInicioMes);
+          console.log(`[INICIALIZAR MES] Recálculo concluído: ${recalcResult.recalculadas} vendas recalculadas, ${recalcResult.erros} erros`);
+          return { 
+            success: true, 
+            recalculo: { 
+              vendasRecalculadas: recalcResult.recalculadas, 
+              erros: recalcResult.erros 
+            } 
+          };
+        } catch (error) {
+          console.error("[INICIALIZAR MES] Erro ao recalcular CMV:", error);
+          return { success: true, recalculo: { erro: String(error) } };
+        }
       }),
     listar: protectedProcedure
       .input(z.object({
@@ -602,6 +619,83 @@ export const appRouter = router({
       .input(z.object({ vendaIds: z.array(z.number()) }))
       .query(async ({ input }) => {
         return db.getMemoriaCalculoCMV(input.vendaIds);
+      }),
+  }),
+
+  // ==================== RECÁLCULO DE CMV ====================
+  cmv: router({
+    /**
+     * Recalcula o CMV de todas as vendas de um posto/produto a partir de uma data.
+     * Usado quando lotes são cadastrados retroativamente ou quando há inconsistências.
+     */
+    recalcularRetroativo: protectedProcedure
+      .input(z.object({
+        postoId: z.number(),
+        produtoId: z.number(),
+        dataInicio: z.string()
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user?.role !== "admin_geral") {
+          throw new Error("Acesso negado. Apenas administradores gerais podem recalcular CMV.");
+        }
+        
+        const dataInicio = new Date(input.dataInicio);
+        console.log(`[CMV ROUTER] Recálculo retroativo solicitado por ${ctx.user.name} para posto ${input.postoId}, produto ${input.produtoId}`);
+        
+        const resultado = await db.recalcularCMVRetroativo(input.postoId, input.produtoId, dataInicio);
+        return resultado;
+      }),
+    
+    /**
+     * Recalcula o CMV de TODAS as vendas pendentes no sistema.
+     * Processa em lote, agrupando por posto/produto.
+     */
+    recalcularPendentes: protectedProcedure
+      .mutation(async ({ ctx }) => {
+        if (ctx.user?.role !== "admin_geral") {
+          throw new Error("Acesso negado. Apenas administradores gerais podem recalcular CMV.");
+        }
+        
+        console.log(`[CMV ROUTER] Recálculo de todas vendas pendentes solicitado por ${ctx.user.name}`);
+        
+        const resultado = await db.recalcularTodasVendasPendentes();
+        return resultado;
+      }),
+    
+    /**
+     * Retorna estatísticas de vendas pendentes de cálculo de CMV.
+     */
+    estatisticasPendentes: publicProcedure
+      .query(async () => {
+        const dbInstance = await db.getDb();
+        if (!dbInstance) return { total: 0, porPosto: [] };
+        
+        const { vendas, postos, produtos } = await import("../drizzle/schema");
+        const { eq, sql, count } = await import("drizzle-orm");
+        
+        // Total de vendas pendentes
+        const totalResult = await dbInstance.select({ total: count() })
+          .from(vendas)
+          .where(eq(vendas.statusCmv, "pendente"));
+        
+        // Agrupado por posto/produto
+        const porPosto = await dbInstance.select({
+          postoId: vendas.postoId,
+          postoNome: postos.nome,
+          produtoId: vendas.produtoId,
+          produtoDescricao: produtos.descricao,
+          total: count()
+        })
+        .from(vendas)
+        .leftJoin(postos, eq(vendas.postoId, postos.id))
+        .leftJoin(produtos, eq(vendas.produtoId, produtos.id))
+        .where(eq(vendas.statusCmv, "pendente"))
+        .groupBy(vendas.postoId, vendas.produtoId, postos.nome, produtos.descricao);
+        
+        return {
+          total: totalResult[0]?.total || 0,
+          porPosto
+        };
       }),
   }),
 });
