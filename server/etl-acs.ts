@@ -387,23 +387,20 @@ export async function sincronizarMedicoesACS(diasAtras: number = 90) {
     dataInicio.setDate(dataInicio.getDate() - diasAtras);
     const dataInicioStr = dataInicio.toISOString().split("T")[0];
 
-    // Buscar medições do LMC no ACS
-    // A tabela lmc_tanques contém as medições diárias de cada tanque
+    // Buscar medições da tabela aberturas do ACS
+    // A tabela aberturas contém as medições físicas diárias de cada tanque (abertura do dia)
     const result = await acsClient.query(`
       SELECT 
-        l.cod_empresa,
-        l.cod_tanque,
-        l.data_lmc,
-        l.estoque_abertura,
-        l.estoque_fechamento,
-        l.volume_medido,
-        l.diferenca,
-        l.hora_medicao,
-        l.temperatura,
-        l.observacao
-      FROM lmc_tanques l
-      WHERE l.data_lmc >= $1
-      ORDER BY l.data_lmc DESC, l.cod_empresa, l.cod_tanque
+        a.cod_empresa,
+        a.cod_tanque,
+        a.data as data_lmc,
+        a.volume as volume_medido,
+        t.saldo as estoque_sistema,
+        t.capacidade
+      FROM aberturas a
+      LEFT JOIN tanques t ON a.cod_empresa = t.cod_empresa AND a.cod_tanque = t.codigo
+      WHERE a.data >= $1
+      ORDER BY a.data DESC, a.cod_empresa, a.cod_tanque
     `, [dataInicioStr]);
 
     // Buscar postos e tanques do PEPS
@@ -437,8 +434,8 @@ export async function sincronizarMedicoesACS(diasAtras: number = 90) {
       const codigoMedicaoAcs = `${codEmpresa}-${codTanque}-${dataLmc.toISOString().split('T')[0]}`;
 
       // Calcular diferença e tipo
-      const volumeMedido = parseFloat(row.volume_medido || row.estoque_fechamento || "0");
-      const estoqueEscritural = parseFloat(row.estoque_abertura || "0");
+      const volumeMedido = parseFloat(row.volume_medido || "0");
+      const estoqueEscritural = parseFloat(row.estoque_sistema || "0");
       const diferenca = volumeMedido - estoqueEscritural;
       const percentualDiferenca = estoqueEscritural > 0 ? (diferenca / estoqueEscritural) * 100 : 0;
       
@@ -457,14 +454,14 @@ export async function sincronizarMedicoesACS(diasAtras: number = 90) {
           tanqueId: tanque.id,
           postoId: posto.id,
           dataMedicao: new Date(dataLmc),
-          horaMedicao: row.hora_medicao?.trim() || null,
+          horaMedicao: null,
           volumeMedido: volumeMedido.toFixed(3),
-          temperatura: row.temperatura?.toString() || null,
+          temperatura: null,
           estoqueEscritural: estoqueEscritural.toFixed(3),
           diferenca: diferenca.toFixed(3),
           percentualDiferenca: percentualDiferenca.toFixed(4),
           tipoDiferenca,
-          observacoes: row.observacao?.trim() || null,
+          observacoes: null,
           origem: "acs",
         });
         inseridos++;
@@ -478,7 +475,7 @@ export async function sincronizarMedicoesACS(diasAtras: number = 90) {
               diferenca: diferenca.toFixed(3),
               percentualDiferenca: percentualDiferenca.toFixed(4),
               tipoDiferenca,
-              observacoes: row.observacao?.trim() || existente[0].observacoes,
+              observacoes: existente[0].observacoes,
             })
             .where(eq(medicoes.id, existente[0].id));
           atualizados++;

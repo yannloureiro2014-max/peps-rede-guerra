@@ -265,8 +265,16 @@ export async function getVendas(filtros: { postoId?: number; produtoId?: number;
   if (!db) return [];
   
   const conditions = [];
-  if (filtros.dataInicio) conditions.push(gte(vendas.dataVenda, new Date(filtros.dataInicio)));
-  if (filtros.dataFim) conditions.push(lte(vendas.dataVenda, new Date(filtros.dataFim)));
+  if (filtros.dataInicio) {
+    const dataIni = new Date(filtros.dataInicio);
+    dataIni.setHours(0, 0, 0, 0);
+    conditions.push(gte(vendas.dataVenda, dataIni));
+  }
+  if (filtros.dataFim) {
+    const dataFi = new Date(filtros.dataFim);
+    dataFi.setHours(23, 59, 59, 999);
+    conditions.push(lte(vendas.dataVenda, dataFi));
+  }
   if (filtros.postoId) conditions.push(eq(postos.id, filtros.postoId));
   if (filtros.produtoId) conditions.push(eq(produtos.id, filtros.produtoId));
   

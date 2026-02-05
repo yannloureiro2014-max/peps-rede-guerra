@@ -12,7 +12,8 @@ import {
   Settings,
   Building2,
   Menu,
-  X
+  X,
+  Calculator
 } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -24,6 +25,7 @@ const menuItems = [
   { icon: ShoppingCart, label: "Compras", path: "/compras" },
   { icon: Ruler, label: "Medições", path: "/medicoes" },
   { icon: BarChart3, label: "Vendas", path: "/vendas" },
+  { icon: Calculator, label: "DRE", path: "/dre" },
   { icon: FileText, label: "Relatórios", path: "/relatorios" },
   { icon: Bell, label: "Alertas", path: "/alertas" },
   { icon: Building2, label: "Postos", path: "/postos" },

@@ -63,3 +63,17 @@
 - [x] Formato de data dd/mm/aaaa em todas as telas
 - [x] Valores de vendas sincronizados corretamente do ACS
 - [x] Preço unitário corrigido para usar custo_comenc (custo de compra)
+
+## Dashboard de Estoque - Correções Prioritárias
+
+- [x] Corrigir estoque para usar medição física como base (não valores acima da capacidade)
+- [x] Sincronizar medições da tabela "aberturas" do ACS (1.961 medições importadas)
+- [x] Estoque deve diminuir automaticamente conforme vendas do dia
+- [x] Medições editáveis manualmente após sincronização
+
+## Módulo DRE (Demonstrativo de Resultados) - PRIORITÁRIO
+
+- [x] Criar página DRE com filtros por dia/período/posto
+- [x] Cálculo PEPS com memória de cálculo detalhada (quais lotes consumidos)
+- [x] Exibir receita bruta, CMV, lucro bruto e margem
+- [x] Mostrar ordem de consumo dos lotes

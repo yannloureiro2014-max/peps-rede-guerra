@@ -12,6 +12,7 @@ import Relatorios from "./pages/Relatorios";
 import Alertas from "./pages/Alertas";
 import Postos from "./pages/Postos";
 import Configuracoes from "./pages/Configuracoes";
+import DRE from "./pages/DRE";
 
 function Router() {
   return (
@@ -25,6 +26,7 @@ function Router() {
       <Route path={"/alertas"} component={Alertas} />
       <Route path={"/postos"} component={Postos} />
       <Route path={"/configuracoes"} component={Configuracoes} />
+      <Route path={"/dre"} component={DRE} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>
