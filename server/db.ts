@@ -333,11 +333,12 @@ export async function createVenda(data: InsertVenda) {
   await db.insert(vendas).values(data).onDuplicateKeyUpdate({ set: { id: data.id } });
 }
 
-export async function getVendasResumo(dias: number = 30, dataInicio?: string, dataFim?: string) {
+export async function getVendasResumo(dias: number = 30, dataInicio?: string, dataFim?: string, postoId?: number) {
   const db = await getDb();
   if (!db) return { totalLitros: "0", totalValor: "0", totalRegistros: 0 };
   
   const conditions = [eq(postos.ativo, 1), eq(vendas.afericao, 0)];
+  if (postoId) conditions.push(eq(vendas.postoId, postoId));
   if (dataInicio && dataFim) {
     conditions.push(gte(vendas.dataVenda, new Date(dataInicio + 'T00:00:00.000Z')));
     conditions.push(lte(vendas.dataVenda, new Date(dataFim + 'T23:59:59.999Z')));
@@ -363,11 +364,12 @@ export async function getVendasResumo(dias: number = 30, dataInicio?: string, da
   };
 }
 
-export async function getVendasPorPosto(dias: number = 30, dataInicio?: string, dataFim?: string) {
+export async function getVendasPorPosto(dias: number = 30, dataInicio?: string, dataFim?: string, postoId?: number) {
   const db = await getDb();
   if (!db) return [];
   
   const conditions = [eq(postos.ativo, 1), eq(vendas.afericao, 0)];
+  if (postoId) conditions.push(eq(vendas.postoId, postoId));
   if (dataInicio && dataFim) {
     conditions.push(gte(vendas.dataVenda, new Date(dataInicio + 'T00:00:00.000Z')));
     conditions.push(lte(vendas.dataVenda, new Date(dataFim + 'T23:59:59.999Z')));
@@ -390,11 +392,12 @@ export async function getVendasPorPosto(dias: number = 30, dataInicio?: string, 
   .orderBy(desc(sum(vendas.quantidade)));
 }
 
-export async function getVendasPorCombustivel(dias: number = 30, dataInicio?: string, dataFim?: string) {
+export async function getVendasPorCombustivel(dias: number = 30, dataInicio?: string, dataFim?: string, postoId?: number) {
   const db = await getDb();
   if (!db) return [];
   
   const conditions = [eq(postos.ativo, 1), eq(vendas.afericao, 0)];
+  if (postoId) conditions.push(eq(vendas.postoId, postoId));
   if (dataInicio && dataFim) {
     conditions.push(gte(vendas.dataVenda, new Date(dataInicio + 'T00:00:00.000Z')));
     conditions.push(lte(vendas.dataVenda, new Date(dataFim + 'T23:59:59.999Z')));
@@ -419,7 +422,7 @@ export async function getVendasPorCombustivel(dias: number = 30, dataInicio?: st
 }
 
 // Lucro bruto por posto (receita - CMV)
-export async function getLucroBrutoPorPosto(dataInicio: string, dataFim: string) {
+export async function getLucroBrutoPorPosto(dataInicio: string, dataFim: string, postoId?: number) {
   const db = await getDb();
   if (!db) return [];
   
@@ -429,6 +432,7 @@ export async function getLucroBrutoPorPosto(dataInicio: string, dataFim: string)
     gte(vendas.dataVenda, new Date(dataInicio + 'T00:00:00.000Z')),
     lte(vendas.dataVenda, new Date(dataFim + 'T23:59:59.999Z'))
   ];
+  if (postoId) conditions.push(eq(vendas.postoId, postoId));
   
   const result = await db.select({
     postoNome: postos.nome,
@@ -451,7 +455,7 @@ export async function getLucroBrutoPorPosto(dataInicio: string, dataFim: string)
 }
 
 // Lucro bruto por combustível
-export async function getLucroBrutoPorCombustivel(dataInicio: string, dataFim: string) {
+export async function getLucroBrutoPorCombustivel(dataInicio: string, dataFim: string, postoId?: number) {
   const db = await getDb();
   if (!db) return [];
   
@@ -461,6 +465,7 @@ export async function getLucroBrutoPorCombustivel(dataInicio: string, dataFim: s
     gte(vendas.dataVenda, new Date(dataInicio + 'T00:00:00.000Z')),
     lte(vendas.dataVenda, new Date(dataFim + 'T23:59:59.999Z'))
   ];
+  if (postoId) conditions.push(eq(vendas.postoId, postoId));
   
   const result = await db.select({
     produtoDescricao: produtos.descricao,
@@ -763,12 +768,12 @@ export async function getUltimaSincronizacao() {
 }
 
 // ==================== DASHBOARD STATS ====================
-export async function getDashboardStats(dataInicio?: string, dataFim?: string) {
+export async function getDashboardStats(dataInicio?: string, dataFim?: string, postoId?: number) {
   const db = await getDb();
   if (!db) return null;
   
   const [vendasResumo, postosCount, tanquesCount] = await Promise.all([
-    getVendasResumo(30, dataInicio, dataFim),
+    getVendasResumo(30, dataInicio, dataFim, postoId),
     db.select({ count: sql<number>`COUNT(*)` }).from(postos).where(eq(postos.ativo, 1)),
     db.select({ count: sql<number>`COUNT(*)` }).from(tanques)
       .innerJoin(postos, eq(tanques.postoId, postos.id))

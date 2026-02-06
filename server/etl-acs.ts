@@ -271,16 +271,29 @@ export async function sincronizarVendasACS(diasAtras: number = 90) {
   }
 
   try {
-    console.log(`[ETL] Sincronizando vendas dos últimos ${diasAtras} dias (corte: ${DATA_CORTE})...`);
+    // Sincronização incremental: buscar a partir da última venda sincronizada
+    const ultimaVenda = await db.select({ maxData: sql<string>`MAX(dataVenda)` }).from(vendas);
+    const ultimaDataStr = ultimaVenda[0]?.maxData;
+    
+    let dataInicioFinal: string;
+    if (ultimaDataStr) {
+      // Buscar a partir de 2 dias antes da última venda (margem de segurança)
+      const ultimaData = new Date(ultimaDataStr);
+      ultimaData.setDate(ultimaData.getDate() - 2);
+      const incrementalDate = ultimaData.toISOString().split("T")[0];
+      // Usar a data mais recente entre incremental e DATA_CORTE
+      dataInicioFinal = incrementalDate > DATA_CORTE ? incrementalDate : DATA_CORTE;
+    } else {
+      // Primeira sincronização: usar diasAtras ou DATA_CORTE
+      const dataInicioStr = new Date();
+      dataInicioStr.setDate(dataInicioStr.getDate() - diasAtras);
+      const dataInicioCalc = dataInicioStr.toISOString().split("T")[0];
+      dataInicioFinal = dataInicioCalc > DATA_CORTE ? dataInicioCalc : DATA_CORTE;
+    }
+    
+    console.log(`[ETL] Sincronizando vendas (incremental desde: ${dataInicioFinal})...`);
 
-    let dataInicioStr = new Date();
-    dataInicioStr.setDate(dataInicioStr.getDate() - diasAtras);
-    // Garantir que nunca busque antes da data de corte
-    const dataInicioCalc = dataInicioStr.toISOString().split("T")[0];
-    const dataInicioFinal = dataInicioCalc > DATA_CORTE ? dataInicioCalc : DATA_CORTE;
-    console.log(`[ETL] Data início vendas: ${dataInicioFinal}`);
-
-    // Buscar abastecimentos do ACS
+    // Buscar abastecimentos do ACS - limite menor para performance
     const result = await acsClient.query(`
       SELECT 
         a.cod_empresa,
@@ -297,21 +310,43 @@ export async function sincronizarVendasACS(diasAtras: number = 90) {
       WHERE a.dt_abast >= $1
         AND a.baixado = 'S'
       ORDER BY a.dt_abast ASC
-      LIMIT 100000
+      LIMIT 50000
     `, [dataInicioFinal]);
+
+    console.log(`[ETL] Recebidos ${result.rows.length} registros do ACS`);
 
     // Buscar postos ATIVOS, tanques e produtos do PEPS
     const postosDb = await db.select().from(postos).where(eq(postos.ativo, 1));
     const tanquesDb = await db.select().from(tanques);
     const produtosDb = await db.select().from(produtos);
 
+    // Buscar todos os codigoAcs existentes no período para evitar SELECT individual
+    const existentes = await db.select({ codigoAcs: vendas.codigoAcs })
+      .from(vendas)
+      .where(sql`dataVenda >= ${dataInicioFinal}`);
+    const existentesSet = new Set(existentes.map(e => e.codigoAcs));
+    console.log(`[ETL] ${existentesSet.size} vendas já existentes no período`);
+
     let inseridos = 0;
     let ignorados = 0;
+    let processados = 0;
 
     for (const row of result.rows) {
+      processados++;
+      // Log de progresso a cada 1000 registros
+      if (processados % 1000 === 0) {
+        console.log(`[ETL] Progresso: ${processados}/${result.rows.length} (${inseridos} inseridos)`);
+      }
+
       const codEmpresa = row.cod_empresa?.trim();
       const codTanque = row.cod_tanque?.trim();
       const codAbast = row.cod_abastecimento?.trim();
+
+      // Verificar duplicata usando Set em memória (muito mais rápido)
+      const codigoVendaAcs = `${codEmpresa}-${codAbast}`;
+      if (existentesSet.has(codigoVendaAcs)) {
+        continue; // Já existe, pular
+      }
 
       // Encontrar posto (apenas ativos)
       const posto = postosDb.find(p => p.codigoAcs === codEmpresa);
@@ -332,56 +367,34 @@ export async function sincronizarVendasACS(diasAtras: number = 90) {
         produto = produtosDb.find(p => p.descricao?.includes(descPadrao?.split(" ")[0] || ""));
       }
 
-      // Verificar se já existe (por código único)
-      const codigoVendaAcs = `${codEmpresa}-${codAbast}`;
-      const existente = await db.select().from(vendas)
-        .where(eq(vendas.codigoAcs, codigoVendaAcs))
-        .limit(1);
-
-      if (existente.length === 0) {
-        // Inserir a venda (com try/catch para ignorar duplicatas)
-        const isAfericao = row.afericao?.trim() === 'S' ? 1 : 0;
-        try {
-          const insertResult = await db.insert(vendas).values({
-            postoId: posto.id,
-            tanqueId: tanque?.id || null,
-            produtoId: produto?.id || null,
-            codigoAcs: codigoVendaAcs,
-            dataVenda: new Date(row.dt_abast),
-            quantidade: row.litros?.toString() || "0",
-            valorUnitario: row.preco?.toString() || "0",
-            valorTotal: row.total?.toString() || "0",
-            afericao: isAfericao,
-            statusCmv: isAfericao ? "calculado" : "pendente",
-          });
-          inseridos++;
-          
-          // Calcular CMV automaticamente após inserir a venda (pular aferições)
-          if (insertResult[0]?.insertId && !isAfericao) {
-            try {
-              const { calcularCMVPEPS } = await import("./db");
-              await calcularCMVPEPS(insertResult[0].insertId);
-            } catch (cmvError) {
-              console.error(`[ETL] Erro ao calcular CMV para venda ${insertResult[0].insertId}:`, cmvError);
-              // Marcar venda com erro de CMV
-              await db.update(vendas)
-                .set({ statusCmv: "erro" })
-                .where(eq(vendas.id, insertResult[0].insertId));
-            }
-          }
-        } catch (insertError: any) {
-          // Ignorar erros de duplicata (ER_DUP_ENTRY) e continuar
-          if (insertError?.cause?.code === 'ER_DUP_ENTRY' || String(insertError).includes('Duplicate entry')) {
-            ignorados++;
-          } else {
-            console.error(`[ETL] Erro ao inserir venda ${codigoVendaAcs}:`, insertError);
-            ignorados++;
-          }
+      const isAfericao = row.afericao?.trim() === 'S' ? 1 : 0;
+      try {
+        await db.insert(vendas).values({
+          postoId: posto.id,
+          tanqueId: tanque?.id || null,
+          produtoId: produto?.id || null,
+          codigoAcs: codigoVendaAcs,
+          dataVenda: new Date(row.dt_abast),
+          quantidade: row.litros?.toString() || "0",
+          valorUnitario: row.preco?.toString() || "0",
+          valorTotal: row.total?.toString() || "0",
+          afericao: isAfericao,
+          statusCmv: isAfericao ? "calculado" : "pendente",
+        });
+        inseridos++;
+        existentesSet.add(codigoVendaAcs); // Adicionar ao set para evitar duplicata no mesmo batch
+      } catch (insertError: any) {
+        if (insertError?.cause?.code === 'ER_DUP_ENTRY' || String(insertError).includes('Duplicate entry')) {
+          // Duplicata - ignorar silenciosamente
+        } else {
+          console.error(`[ETL] Erro ao inserir venda ${codigoVendaAcs}:`, insertError);
         }
+        ignorados++;
       }
     }
 
-    console.log(`[ETL] Vendas: ${inseridos} inseridas (com CMV calculado), ${ignorados} ignoradas`);
+    console.log(`[ETL] Vendas: ${inseridos} inseridas, ${ignorados} ignoradas, ${processados} processados`);
+    console.log(`[ETL] Nota: CMV não é calculado durante sync. Use 'Recalcular CMV' após a sincronização.`);
 
     // Registrar log de sincronização
     await db.insert(syncLogs).values({
@@ -391,7 +404,7 @@ export async function sincronizarVendasACS(diasAtras: number = 90) {
       registrosProcessados: result.rows.length,
       registrosInseridos: inseridos,
       status: "sucesso",
-      mensagem: `Sincronizadas ${inseridos} vendas dos últimos ${diasAtras} dias`,
+      mensagem: `Sincronizadas ${inseridos} vendas (incremental desde ${dataInicioFinal})`,
     });
 
     return { success: true, inseridos, ignorados, total: result.rows.length };

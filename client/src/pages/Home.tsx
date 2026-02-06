@@ -1,6 +1,7 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
 import { Fuel, DollarSign, Building2, Gauge, TrendingUp, TrendingDown, Calendar } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -29,9 +30,8 @@ function getDateStr(date: Date): string {
 }
 
 // Gráfico de barras horizontais usando CSS puro
-function BarChart({ data, valueKey, formatFn, colorOffset = 0 }: { 
+function BarChart({ data, formatFn, colorOffset = 0 }: { 
   data: Array<{ nome: string; valor: number }>; 
-  valueKey?: string;
   formatFn: (v: number) => string;
   colorOffset?: number;
 }) {
@@ -144,8 +144,16 @@ export default function Home() {
     const d = new Date(); d.setDate(d.getDate() - 29); return getDateStr(d);
   });
   const [dataFim, setDataFim] = useState(() => getDateStr(new Date()));
+  const [postoId, setPostoId] = useState<number | undefined>(undefined);
 
-  const dateParams = useMemo(() => ({ dataInicio, dataFim }), [dataInicio, dataFim]);
+  // Buscar lista de postos para o filtro
+  const { data: postosLista } = trpc.postos.list.useQuery();
+
+  const dateParams = useMemo(() => ({ 
+    dataInicio, 
+    dataFim, 
+    postoId 
+  }), [dataInicio, dataFim, postoId]);
 
   const { data: stats, isLoading: loadingStats } = trpc.dashboard.stats.useQuery(dateParams);
   const { data: vendasPorPosto, isLoading: loadingPosto } = trpc.vendas.porPosto.useQuery(dateParams);
@@ -199,6 +207,12 @@ export default function Home() {
 
   const margemBruta = totalReceita > 0 ? (totalLucroBruto / totalReceita) * 100 : 0;
 
+  const postoSelecionadoNome = useMemo(() => {
+    if (!postoId || !postosLista) return "Todos os Postos";
+    const p = postosLista.find(p => p.id === postoId);
+    return p?.nome || "Todos os Postos";
+  }, [postoId, postosLista]);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -215,11 +229,32 @@ export default function Home() {
           )}
         </div>
 
-        {/* Filtros de Data */}
+        {/* Filtros de Data e Posto */}
         <Card>
           <CardContent className="pt-4 pb-4">
             <div className="flex flex-col gap-4">
               <div className="flex flex-col md:flex-row md:items-end gap-4">
+                {/* Filtro de Posto */}
+                <div className="flex-1">
+                  <label className="text-sm font-medium text-muted-foreground mb-1 block">
+                    <Building2 className="h-3.5 w-3.5 inline mr-1" />
+                    Posto
+                  </label>
+                  <Select
+                    value={postoId ? String(postoId) : "all"}
+                    onValueChange={(val) => setPostoId(val === "all" ? undefined : Number(val))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Todos os Postos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">REDE SUPER PETROLEO</SelectItem>
+                      {postosLista?.filter(p => p.ativo).map(p => (
+                        <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="flex-1">
                   <label className="text-sm font-medium text-muted-foreground mb-1 block">
                     <Calendar className="h-3.5 w-3.5 inline mr-1" />
@@ -265,6 +300,7 @@ export default function Home() {
               </div>
               <div className="text-sm text-muted-foreground">
                 Período: {formatDateBR(dataInicio)} a {formatDateBR(dataFim)}
+                {postoId && <span className="ml-2 font-medium text-foreground">| {postoSelecionadoNome}</span>}
               </div>
             </div>
           </CardContent>

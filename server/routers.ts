@@ -228,24 +228,24 @@ export const appRouter = router({
         return db.getVendasResumo(input.dias || 30, input.dataInicio, input.dataFim);
       }),
     porPosto: publicProcedure
-      .input(z.object({ dias: z.number().optional(), dataInicio: z.string().optional(), dataFim: z.string().optional() }))
+      .input(z.object({ dias: z.number().optional(), dataInicio: z.string().optional(), dataFim: z.string().optional(), postoId: z.number().optional() }))
       .query(async ({ input }) => {
-        return db.getVendasPorPosto(input.dias || 30, input.dataInicio, input.dataFim);
+        return db.getVendasPorPosto(input.dias || 30, input.dataInicio, input.dataFim, input.postoId);
       }),
     porCombustivel: publicProcedure
-      .input(z.object({ dias: z.number().optional(), dataInicio: z.string().optional(), dataFim: z.string().optional() }))
+      .input(z.object({ dias: z.number().optional(), dataInicio: z.string().optional(), dataFim: z.string().optional(), postoId: z.number().optional() }))
       .query(async ({ input }) => {
-        return db.getVendasPorCombustivel(input.dias || 30, input.dataInicio, input.dataFim);
+        return db.getVendasPorCombustivel(input.dias || 30, input.dataInicio, input.dataFim, input.postoId);
       }),
     lucroBrutoPorPosto: publicProcedure
-      .input(z.object({ dataInicio: z.string(), dataFim: z.string() }))
+      .input(z.object({ dataInicio: z.string(), dataFim: z.string(), postoId: z.number().optional() }))
       .query(async ({ input }) => {
-        return db.getLucroBrutoPorPosto(input.dataInicio, input.dataFim);
+        return db.getLucroBrutoPorPosto(input.dataInicio, input.dataFim, input.postoId);
       }),
     lucroBrutoPorCombustivel: publicProcedure
-      .input(z.object({ dataInicio: z.string(), dataFim: z.string() }))
+      .input(z.object({ dataInicio: z.string(), dataFim: z.string(), postoId: z.number().optional() }))
       .query(async ({ input }) => {
-        return db.getLucroBrutoPorCombustivel(input.dataInicio, input.dataFim);
+        return db.getLucroBrutoPorCombustivel(input.dataInicio, input.dataFim, input.postoId);
       }),
   }),
 
@@ -427,9 +427,9 @@ export const appRouter = router({
   // ==================== DASHBOARD ====================
   dashboard: router({
     stats: publicProcedure
-      .input(z.object({ dataInicio: z.string().optional(), dataFim: z.string().optional() }).optional())
+      .input(z.object({ dataInicio: z.string().optional(), dataFim: z.string().optional(), postoId: z.number().optional() }).optional())
       .query(async ({ input }) => {
-        return db.getDashboardStats(input?.dataInicio, input?.dataFim);
+        return db.getDashboardStats(input?.dataInicio, input?.dataFim, input?.postoId);
       }),
     ultimaSincronizacao: publicProcedure.query(async () => {
       return db.getUltimaSincronizacao();

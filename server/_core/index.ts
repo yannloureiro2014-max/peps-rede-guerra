@@ -7,6 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { sincronizarTudo } from "../etl-acs";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -59,6 +60,33 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+    
+    // Sincronização automática a cada 60 minutos
+    const SYNC_INTERVAL_MS = 60 * 60 * 1000; // 60 minutos
+    let syncRunning = false;
+    
+    async function autoSync() {
+      if (syncRunning) {
+        console.log("[AUTO-SYNC] Sincronização anterior ainda em andamento, pulando...");
+        return;
+      }
+      syncRunning = true;
+      try {
+        console.log("[AUTO-SYNC] Iniciando sincronização automática...");
+        const result = await sincronizarTudo(7); // últimos 7 dias para sync incremental
+        console.log(`[AUTO-SYNC] Concluída: ${result.success ? 'SUCESSO' : 'COM ERROS'}`);
+      } catch (error) {
+        console.error("[AUTO-SYNC] Erro na sincronização automática:", error);
+      } finally {
+        syncRunning = false;
+      }
+    }
+    
+    // Primeira sincronização 2 minutos após iniciar o servidor
+    setTimeout(autoSync, 2 * 60 * 1000);
+    // Depois a cada 60 minutos
+    setInterval(autoSync, SYNC_INTERVAL_MS);
+    console.log(`[AUTO-SYNC] Sincronização automática configurada: a cada ${SYNC_INTERVAL_MS / 60000} minutos`);
   });
 }
 

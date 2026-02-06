@@ -293,3 +293,18 @@
 - [x] Adicionar gráfico de barras de lucro bruto por posto (similar ao de vendas)
 - [x] Adicionar gráfico pizza de lucro bruto por combustível
 - [x] Criar endpoint backend para calcular lucro bruto por posto e combustível (getLucroBrutoPorPosto, getLucroBrutoPorCombustivel)
+
+## Bug: Erro ao sincronizar manualmente - Reportado pelo Usuário
+
+- [x] Investigar e corrigir erro na sincronização manual - ETL refatorado com Set de duplicatas e try/catch no INSERT
+
+## Feature: Filtro por posto no Dashboard
+
+- [x] Adicionar select de posto no Dashboard para filtrar vendas e lucro bruto por posto específico
+- [x] Atualizar queries do backend para aceitar postoId como parâmetro
+
+## Feature: Sincronização automática a cada 60 minutos
+
+- [x] Implementar sincronização automática a cada 60 minutos no servidor (server/_core/index.ts)
+- [x] Flag syncRunning impede execução concorrente
+- [x] Primeira sync 2 min após boot, depois a cada 60 min (7 dias incremental)
