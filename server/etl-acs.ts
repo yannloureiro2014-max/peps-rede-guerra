@@ -259,7 +259,7 @@ export async function sincronizarTanquesACS() {
   }
 }
 
-export async function sincronizarVendasACS(diasAtras: number = 30) {
+export async function sincronizarVendasACS(diasAtras: number = 90) {
   const db = await getDb();
   if (!db) {
     return { success: false, error: "Database PEPS not available" };
@@ -296,8 +296,8 @@ export async function sincronizarVendasACS(diasAtras: number = 30) {
       FROM abastecimentos a
       WHERE a.dt_abast >= $1
         AND a.baixado = 'S'
-      ORDER BY a.dt_abast DESC
-      LIMIT 10000
+      ORDER BY a.dt_abast ASC
+      LIMIT 100000
     `, [dataInicioFinal]);
 
     // Buscar postos ATIVOS, tanques e produtos do PEPS
@@ -799,7 +799,7 @@ export async function verificarMedicoesFaltantes(diasVerificar: number = 30) {
 }
 
 // Função de sincronização completa atualizada
-export async function sincronizarTudo(diasVendas: number = 60) {
+export async function sincronizarTudo(diasVendas: number = 90) {
   console.log("[ETL] Iniciando sincronização completa com ACS...");
   
   const resultados = {

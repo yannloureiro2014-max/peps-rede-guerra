@@ -429,7 +429,7 @@ export const appRouter = router({
     sincronizarTudo: protectedProcedure
       .input(z.object({ diasVendas: z.number().optional() }).optional())
       .mutation(async ({ input }) => {
-        return sincronizarTudo(input?.diasVendas || 60);
+        return sincronizarTudo(input?.diasVendas || 90);
       }),
     sincronizarPostos: protectedProcedure.mutation(async () => {
       return sincronizarPostosACS();
@@ -443,7 +443,7 @@ export const appRouter = router({
     sincronizarVendas: protectedProcedure
       .input(z.object({ dias: z.number().optional() }).optional())
       .mutation(async ({ input }) => {
-        return sincronizarVendasACS(input?.dias || 30);
+        return sincronizarVendasACS(input?.dias || 90);
       }),
     sincronizarMedicoes: protectedProcedure
       .input(z.object({ dias: z.number().optional() }).optional())

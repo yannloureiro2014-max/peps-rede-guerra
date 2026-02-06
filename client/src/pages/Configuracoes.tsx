@@ -79,7 +79,7 @@ export default function Configuracoes() {
   };
 
   const handleSincronizar = () => {
-    sincronizarTudo.mutate({ diasVendas: 60 });
+    sincronizarTudo.mutate({ diasVendas: 90 });
   };
 
   return (
@@ -225,7 +225,7 @@ export default function Configuracoes() {
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
                   <strong>Sincronização:</strong> Importa postos, produtos, tanques e vendas 
-                  diretamente do banco de dados ACS. Vendas dos últimos 60 dias serão carregadas.
+                  diretamente do banco de dados ACS. Vendas dos últimos 90 dias serão carregadas.
                 </p>
               </div>
             </CardContent>

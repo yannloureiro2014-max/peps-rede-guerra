@@ -1,0 +1,22 @@
+{
+  "query": "SELECT DATE_FORMAT(dataVenda, '%Y-%m') as mes, COUNT(*) as total_vendas, MIN(dataVenda) as primeira, MAX(dataVenda) as ultima FROM vendas GROUP BY DATE_FORMAT(dataVenda, '%Y-%m') ORDER BY mes;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT DATE_FORMAT(dataVenda, '%Y-%m') as mes, COUNT(*) as total_vendas, MIN(dataVenda) as primeira, MAX(dataVenda) as ultima FROM vendas GROUP BY DATE_FORMAT(dataVenda, '%Y-%m') ORDER BY mes;",
+  "rows": [
+    {
+      "mes": "2026-01",
+      "total_vendas": "3154",
+      "primeira": "2026-01-30",
+      "ultima": "2026-01-31"
+    },
+    {
+      "mes": "2026-02",
+      "total_vendas": "9836",
+      "primeira": "2026-02-01",
+      "ultima": "2026-02-06"
+    }
+  ],
+  "messages": [],
+  "stdout": "mes\ttotal_vendas\tprimeira\tultima\n2026-01\t3154\t2026-01-30\t2026-01-31\n2026-02\t9836\t2026-02-01\t2026-02-06\n",
+  "stderr": "",
+  "execution_time_ms": 86
+}

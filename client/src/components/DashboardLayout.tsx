@@ -76,7 +76,7 @@ export default function DashboardLayout({
               <Fuel className="h-8 w-8 text-primary" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-center">
-              PEPS - Rede Guerra
+              Rede Super Petroleo
             </h1>
             <p className="text-sm text-muted-foreground text-center">
               Sistema de Gestão de Estoque e CMV para Postos de Combustíveis
@@ -115,7 +115,7 @@ export default function DashboardLayout({
           {sidebarOpen && (
             <div className="flex items-center gap-2">
               <Fuel className="h-5 w-5 text-primary" />
-              <span className="font-bold text-primary">PEPS</span>
+              <span className="font-bold text-primary">RSP</span>
             </div>
           )}
         </div>
@@ -183,7 +183,7 @@ export default function DashboardLayout({
         </button>
         <div className="flex items-center gap-2">
           <Fuel className="h-5 w-5 text-primary" />
-          <span className="font-bold text-primary">PEPS</span>
+          <span className="font-bold text-primary">RSP</span>
         </div>
         <div className="w-9" /> {/* Spacer */}
       </div>
@@ -199,7 +199,7 @@ export default function DashboardLayout({
             <div className="h-14 flex items-center justify-between px-4 border-b border-slate-200">
               <div className="flex items-center gap-2">
                 <Fuel className="h-5 w-5 text-primary" />
-                <span className="font-bold text-primary">PEPS</span>
+                <span className="font-bold text-primary">RSP</span>
               </div>
               <button
                 onClick={() => setMobileMenuOpen(false)}

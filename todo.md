@@ -265,3 +265,13 @@
 ## Bug: Erro ao alterar usuário - Reportado pelo Usuário
 
 - [x] Investigar e corrigir erro "An unexpected error occurred" ao tentar alterar usuário na Gestão de Usuários - causa: SelectItem com value="" (vazio) crashava o shadcn/ui Select; corrigido para value="none"
+
+## Bug: Vendas faltantes de 01/12/2025 a 29/01/2026 - Reportado pelo Usuário
+
+- [x] Investigar por que vendas de 01/12/2025 a 29/01/2026 não aparecem - causa: diasAtras padrão=30 só buscava 30 dias, LIMIT 10000 cortava registros, ORDER DESC descartava os mais antigos
+- [x] Investigar vendas parcialmente faltantes do dia 30/01/2026 - mesma causa: LIMIT cortava
+- [x] Corrigir: diasAtras padrão=90, LIMIT=100000, ORDER ASC (mais antigos primeiro para PEPS)
+
+## Alteração de Nome: PEPS → REDE SUPER PETROLEO
+
+- [x] Alterar nome do sistema de "PEPS" para "REDE SUPER PETROLEO" em todo o frontend - título HTML, sidebar (RSP), login page, mobile header
