@@ -324,7 +324,7 @@ export async function getVendas(filtros: { postoId?: number; produtoId?: number;
   .leftJoin(produtos, eq(tanques.produtoId, produtos.id))
   .where(and(...conditions))
   .orderBy(desc(vendas.dataVenda))
-  .limit(1000);
+  .limit(10000);
 }
 
 export async function createVenda(data: InsertVenda) {

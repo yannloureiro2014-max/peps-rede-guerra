@@ -251,3 +251,9 @@
 - [x] Manter rastreabilidade para auditoria - aferições visíveis na aba separada
 - [x] Excluir aferições do recálculo retroativo de CMV - recalcularCMVRetroativo() filtra afericao=0
 - [x] Dashboard já exclui aferições (getVendasResumo, getVendasPorPosto, getVendasPorCombustivel)
+
+## Bug: Soma de vendas não bate ao selecionar período de datas
+
+- [x] Investigar getVendas() e getVendasResumo() - causa raiz: .limit(1000) cortava resultados quando período tinha >1000 registros
+- [x] Corrigir filtro de data - aumentado limit para 10000 para cobrir períodos maiores
+- [x] Validar com SQL direto e testes vitest - 03/02+04/02 = 1127 vendas, soma bate corretamente

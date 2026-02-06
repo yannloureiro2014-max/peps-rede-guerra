@@ -1,0 +1,13 @@
+{
+  "query": "SELECT COUNT(*) as total FROM vendas v INNER JOIN tanques t ON v.tanqueId = t.id INNER JOIN postos p ON t.postoId = p.id WHERE p.nome LIKE '%SUPER PETROLEO%' AND dataVenda >= '2026-02-03 00:00:00' AND dataVenda <= '2026-02-04 23:59:59.999';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT COUNT(*) as total FROM vendas v INNER JOIN tanques t ON v.tanqueId = t.id INNER JOIN postos p ON t.postoId = p.id WHERE p.nome LIKE '%SUPER PETROLEO%' AND dataVenda >= '2026-02-03 00:00:00' AND dataVenda <= '2026-02-04 23:59:59.999';",
+  "rows": [
+    {
+      "total": "1130"
+    }
+  ],
+  "messages": [],
+  "stdout": "total\n1130\n",
+  "stderr": "",
+  "execution_time_ms": 62
+}

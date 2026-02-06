@@ -1,0 +1,31 @@
+{
+  "query": "SELECT DATE(dataVenda) as dia, afericao, COUNT(*) as total, ROUND(SUM(CAST(quantidade AS DECIMAL(12,3))), 3) as litros, ROUND(SUM(CAST(valorTotal AS DECIMAL(12,2))), 2) as valor FROM vendas v INNER JOIN tanques t ON v.tanqueId = t.id INNER JOIN postos p ON t.postoId = p.id WHERE p.nome LIKE '%SUPER PETROLEO%' AND dataVenda >= '2026-02-03 00:00:00' AND dataVenda <= '2026-02-04 23:59:59' GROUP BY dia, afericao ORDER BY dia, afericao;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT DATE(dataVenda) as dia, afericao, COUNT(*) as total, ROUND(SUM(CAST(quantidade AS DECIMAL(12,3))), 3) as litros, ROUND(SUM(CAST(valorTotal AS DECIMAL(12,2))), 2) as valor FROM vendas v INNER JOIN tanques t ON v.tanqueId = t.id INNER JOIN postos p ON t.postoId = p.id WHERE p.nome LIKE '%SUPER PETROLEO%' AND dataVenda >= '2026-02-03 00:00:00' AND dataVenda <= '2026-02-04 23:59:59' GROUP BY dia, afericao ORDER BY dia, afericao;",
+  "rows": [
+    {
+      "dia": "2026-02-03",
+      "afericao": "0",
+      "total": "572",
+      "litros": "5957.066",
+      "valor": "34942.40"
+    },
+    {
+      "dia": "2026-02-03",
+      "afericao": "1",
+      "total": "3",
+      "litros": "1040.000",
+      "valor": "6125.60"
+    },
+    {
+      "dia": "2026-02-04",
+      "afericao": "0",
+      "total": "555",
+      "litros": "4277.852",
+      "valor": "25463.10"
+    }
+  ],
+  "messages": [],
+  "stdout": "dia\tafericao\ttotal\tlitros\tvalor\n2026-02-03\t0\t572\t5957.066\t34942.40\n2026-02-03\t1\t3\t1040.000\t6125.60\n2026-02-04\t0\t555\t4277.852\t25463.10\n",
+  "stderr": "",
+  "execution_time_ms": 143
+}
