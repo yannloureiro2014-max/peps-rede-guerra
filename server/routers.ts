@@ -223,19 +223,29 @@ export const appRouter = router({
         return db.getVendas(input);
       }),
     resumo: publicProcedure
-      .input(z.object({ dias: z.number().optional() }))
+      .input(z.object({ dias: z.number().optional(), dataInicio: z.string().optional(), dataFim: z.string().optional() }))
       .query(async ({ input }) => {
-        return db.getVendasResumo(input.dias || 30);
+        return db.getVendasResumo(input.dias || 30, input.dataInicio, input.dataFim);
       }),
     porPosto: publicProcedure
-      .input(z.object({ dias: z.number().optional() }))
+      .input(z.object({ dias: z.number().optional(), dataInicio: z.string().optional(), dataFim: z.string().optional() }))
       .query(async ({ input }) => {
-        return db.getVendasPorPosto(input.dias || 30);
+        return db.getVendasPorPosto(input.dias || 30, input.dataInicio, input.dataFim);
       }),
     porCombustivel: publicProcedure
-      .input(z.object({ dias: z.number().optional() }))
+      .input(z.object({ dias: z.number().optional(), dataInicio: z.string().optional(), dataFim: z.string().optional() }))
       .query(async ({ input }) => {
-        return db.getVendasPorCombustivel(input.dias || 30);
+        return db.getVendasPorCombustivel(input.dias || 30, input.dataInicio, input.dataFim);
+      }),
+    lucroBrutoPorPosto: publicProcedure
+      .input(z.object({ dataInicio: z.string(), dataFim: z.string() }))
+      .query(async ({ input }) => {
+        return db.getLucroBrutoPorPosto(input.dataInicio, input.dataFim);
+      }),
+    lucroBrutoPorCombustivel: publicProcedure
+      .input(z.object({ dataInicio: z.string(), dataFim: z.string() }))
+      .query(async ({ input }) => {
+        return db.getLucroBrutoPorCombustivel(input.dataInicio, input.dataFim);
       }),
   }),
 
@@ -416,9 +426,11 @@ export const appRouter = router({
 
   // ==================== DASHBOARD ====================
   dashboard: router({
-    stats: publicProcedure.query(async () => {
-      return db.getDashboardStats();
-    }),
+    stats: publicProcedure
+      .input(z.object({ dataInicio: z.string().optional(), dataFim: z.string().optional() }).optional())
+      .query(async ({ input }) => {
+        return db.getDashboardStats(input?.dataInicio, input?.dataFim);
+      }),
     ultimaSincronizacao: publicProcedure.query(async () => {
       return db.getUltimaSincronizacao();
     }),

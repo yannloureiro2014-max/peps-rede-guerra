@@ -1,10 +1,11 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { Fuel, DollarSign, Building2, Gauge, TrendingUp, TrendingDown } from "lucide-react";
-import { useMemo } from "react";
+import { Fuel, DollarSign, Building2, Gauge, TrendingUp, TrendingDown, Calendar } from "lucide-react";
+import { useMemo, useState } from "react";
 
-const COLORS = ['#2563eb', '#16a34a', '#eab308', '#ea580c', '#dc2626', '#8b5cf6', '#06b6d4'];
+const COLORS = ['#2563eb', '#16a34a', '#eab308', '#ea580c', '#dc2626', '#8b5cf6', '#06b6d4', '#f43f5e', '#14b8a6', '#a855f7'];
 
 function formatNumber(value: string | number | null | undefined): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;
@@ -18,32 +19,47 @@ function formatCurrency(value: string | number | null | undefined): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
 }
 
+function formatDateBR(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function getDateStr(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
 // Gráfico de barras horizontais usando CSS puro
-function VendasPorPostoChart({ data }: { data: Array<{ nome: string; litros: number; valor: number }> }) {
+function BarChart({ data, valueKey, formatFn, colorOffset = 0 }: { 
+  data: Array<{ nome: string; valor: number }>; 
+  valueKey?: string;
+  formatFn: (v: number) => string;
+  colorOffset?: number;
+}) {
   if (!data || data.length === 0) {
     return (
-      <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+      <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
         Sem dados disponíveis
       </div>
     );
   }
 
-  const maxLitros = Math.max(...data.map(d => d.litros));
+  const maxVal = Math.max(...data.map(d => Math.abs(d.valor)));
 
   return (
-    <div className="space-y-3">
-      {data.map((item, itemIndex) => (
-        <div key={`posto-chart-${item.nome}`} className="space-y-1">
+    <div className="space-y-2.5">
+      {data.map((item, idx) => (
+        <div key={`bar-${item.nome}-${idx}`} className="space-y-0.5">
           <div className="flex justify-between text-sm">
-            <span className="font-medium truncate max-w-[150px]">{item.nome}</span>
-            <span className="text-muted-foreground">{formatNumber(item.litros)} L</span>
+            <span className="font-medium truncate max-w-[180px]">{item.nome}</span>
+            <span className="text-muted-foreground font-mono text-xs">{formatFn(item.valor)}</span>
           </div>
-          <div className="h-6 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-5 bg-gray-100 rounded-full overflow-hidden">
             <div 
               className="h-full rounded-full transition-all duration-500"
               style={{ 
-                width: `${(item.litros / maxLitros) * 100}%`,
-                backgroundColor: COLORS[itemIndex % COLORS.length]
+                width: `${maxVal > 0 ? (Math.abs(item.valor) / maxVal) * 100 : 0}%`,
+                backgroundColor: item.valor < 0 ? '#ef4444' : COLORS[(idx + colorOffset) % COLORS.length],
+                minWidth: item.valor !== 0 ? '4px' : '0'
               }}
             />
           </div>
@@ -54,30 +70,29 @@ function VendasPorPostoChart({ data }: { data: Array<{ nome: string; litros: num
 }
 
 // Gráfico de pizza usando CSS puro (conic-gradient)
-function DistribuicaoCombustivelChart({ data }: { data: Array<{ nome: string; litros: number }> }) {
+function PieChart({ data, formatFn }: { data: Array<{ nome: string; valor: number }>; formatFn: (v: number) => string }) {
   if (!data || data.length === 0) {
     return (
-      <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+      <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
         Sem dados disponíveis
       </div>
     );
   }
 
-  const total = data.reduce((acc, item) => acc + item.litros, 0);
+  const total = data.reduce((acc, item) => acc + Math.abs(item.valor), 0);
   
-  // Calcular gradiente cônico
   let currentAngle = 0;
   const gradientParts: string[] = [];
-  const legendItems: Array<{ nome: string; percent: number; color: string }> = [];
+  const legendItems: Array<{ nome: string; percent: number; color: string; valor: number }> = [];
   
   data.forEach((item, index) => {
-    const percent = (item.litros / total) * 100;
+    const percent = total > 0 ? (Math.abs(item.valor) / total) * 100 : 0;
     const color = COLORS[index % COLORS.length];
     const startAngle = currentAngle;
-    currentAngle += percent * 3.6; // 360 graus / 100%
+    currentAngle += percent * 3.6;
     
     gradientParts.push(`${color} ${startAngle}deg ${currentAngle}deg`);
-    legendItems.push({ nome: item.nome, percent, color });
+    legendItems.push({ nome: item.nome, percent, color, valor: item.valor });
   });
 
   const gradient = `conic-gradient(${gradientParts.join(', ')})`;
@@ -85,18 +100,19 @@ function DistribuicaoCombustivelChart({ data }: { data: Array<{ nome: string; li
   return (
     <div className="flex flex-col items-center gap-4">
       <div 
-        className="w-48 h-48 rounded-full shadow-inner"
+        className="w-44 h-44 rounded-full shadow-inner"
         style={{ background: gradient }}
       />
-      <div className="grid grid-cols-2 gap-2 w-full">
+      <div className="grid grid-cols-1 gap-1.5 w-full">
         {legendItems.map((item) => (
           <div key={item.nome} className="flex items-center gap-2 text-xs">
             <div 
               className="w-3 h-3 rounded-full flex-shrink-0"
               style={{ backgroundColor: item.color }}
             />
-            <span className="truncate">{item.nome}</span>
-            <span className="text-muted-foreground ml-auto">{item.percent.toFixed(0)}%</span>
+            <span className="truncate flex-1">{item.nome}</span>
+            <span className="text-muted-foreground font-mono">{formatFn(item.valor)}</span>
+            <span className="text-muted-foreground w-10 text-right">{item.percent.toFixed(0)}%</span>
           </div>
         ))}
       </div>
@@ -104,29 +120,84 @@ function DistribuicaoCombustivelChart({ data }: { data: Array<{ nome: string; li
   );
 }
 
+// Atalhos de período
+const ATALHOS = [
+  { label: 'Hoje', getDates: () => { const d = new Date(); return { inicio: getDateStr(d), fim: getDateStr(d) }; } },
+  { label: 'Ontem', getDates: () => { const d = new Date(); d.setDate(d.getDate() - 1); return { inicio: getDateStr(d), fim: getDateStr(d) }; } },
+  { label: '7 dias', getDates: () => { const f = new Date(); const i = new Date(); i.setDate(i.getDate() - 6); return { inicio: getDateStr(i), fim: getDateStr(f) }; } },
+  { label: '15 dias', getDates: () => { const f = new Date(); const i = new Date(); i.setDate(i.getDate() - 14); return { inicio: getDateStr(i), fim: getDateStr(f) }; } },
+  { label: '30 dias', getDates: () => { const f = new Date(); const i = new Date(); i.setDate(i.getDate() - 29); return { inicio: getDateStr(i), fim: getDateStr(f) }; } },
+  { label: '60 dias', getDates: () => { const f = new Date(); const i = new Date(); i.setDate(i.getDate() - 59); return { inicio: getDateStr(i), fim: getDateStr(f) }; } },
+  { label: 'Mês Atual', getDates: () => { const d = new Date(); return { inicio: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`, fim: getDateStr(d) }; } },
+  { label: 'Mês Anterior', getDates: () => { 
+    const d = new Date(); 
+    d.setMonth(d.getMonth() - 1);
+    const inicio = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+    const lastDay = new Date(d.getFullYear(), d.getMonth()+1, 0);
+    return { inicio, fim: getDateStr(lastDay) }; 
+  }},
+];
+
 export default function Home() {
-  const { data: stats, isLoading: loadingStats } = trpc.dashboard.stats.useQuery();
-  const { data: vendasPorPosto, isLoading: loadingPosto } = trpc.vendas.porPosto.useQuery({ dias: 30 });
-  const { data: vendasPorCombustivel, isLoading: loadingComb } = trpc.vendas.porCombustivel.useQuery({ dias: 30 });
+  // Filtros de data - padrão: últimos 30 dias
+  const [dataInicio, setDataInicio] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 29); return getDateStr(d);
+  });
+  const [dataFim, setDataFim] = useState(() => getDateStr(new Date()));
+
+  const dateParams = useMemo(() => ({ dataInicio, dataFim }), [dataInicio, dataFim]);
+
+  const { data: stats, isLoading: loadingStats } = trpc.dashboard.stats.useQuery(dateParams);
+  const { data: vendasPorPosto, isLoading: loadingPosto } = trpc.vendas.porPosto.useQuery(dateParams);
+  const { data: vendasPorCombustivel, isLoading: loadingComb } = trpc.vendas.porCombustivel.useQuery(dateParams);
+  const { data: lucroPorPosto, isLoading: loadingLucroPosto } = trpc.vendas.lucroBrutoPorPosto.useQuery(dateParams);
+  const { data: lucroPorCombustivel, isLoading: loadingLucroComb } = trpc.vendas.lucroBrutoPorCombustivel.useQuery(dateParams);
   const { data: ultimaSync } = trpc.dashboard.ultimaSincronizacao.useQuery();
   const { data: alertas } = trpc.alertas.pendentes.useQuery();
 
-  const chartDataPosto = useMemo(() => {
+  const chartVendasPosto = useMemo(() => {
     if (!vendasPorPosto) return [];
     return vendasPorPosto.map(item => ({
       nome: item.postoNome?.replace('POSTO ', '').replace('REDE ', '') || 'N/A',
-      litros: parseFloat(item.totalLitros || '0'),
-      valor: parseFloat(item.totalValor || '0'),
-    })).sort((a, b) => b.litros - a.litros);
+      valor: parseFloat(item.totalLitros || '0'),
+    })).sort((a, b) => b.valor - a.valor);
   }, [vendasPorPosto]);
 
-  const chartDataCombustivel = useMemo(() => {
+  const chartVendasCombustivel = useMemo(() => {
     if (!vendasPorCombustivel) return [];
     return vendasPorCombustivel.map(item => ({
       nome: item.produtoDescricao?.replace('OLEO ', '').replace(' HIDRATADO', '').replace(' COMUM', '') || 'N/A',
-      litros: parseFloat(item.totalLitros || '0'),
-    })).sort((a, b) => b.litros - a.litros);
+      valor: parseFloat(item.totalLitros || '0'),
+    })).sort((a, b) => b.valor - a.valor);
   }, [vendasPorCombustivel]);
+
+  const chartLucroPosto = useMemo(() => {
+    if (!lucroPorPosto) return [];
+    return lucroPorPosto.map(item => ({
+      nome: item.postoNome?.replace('POSTO ', '').replace('REDE ', '') || 'N/A',
+      valor: parseFloat(item.lucroBruto || '0'),
+    })).sort((a, b) => b.valor - a.valor);
+  }, [lucroPorPosto]);
+
+  const chartLucroCombustivel = useMemo(() => {
+    if (!lucroPorCombustivel) return [];
+    return lucroPorCombustivel.map(item => ({
+      nome: item.produtoDescricao?.replace('OLEO ', '').replace(' HIDRATADO', '').replace(' COMUM', '') || 'N/A',
+      valor: parseFloat(item.lucroBruto || '0'),
+    })).sort((a, b) => b.valor - a.valor);
+  }, [lucroPorCombustivel]);
+
+  const totalLucroBruto = useMemo(() => {
+    if (!lucroPorPosto) return 0;
+    return lucroPorPosto.reduce((acc, item) => acc + parseFloat(item.lucroBruto || '0'), 0);
+  }, [lucroPorPosto]);
+
+  const totalReceita = useMemo(() => {
+    if (!lucroPorPosto) return 0;
+    return lucroPorPosto.reduce((acc, item) => acc + parseFloat(item.totalValor || '0'), 0);
+  }, [lucroPorPosto]);
+
+  const margemBruta = totalReceita > 0 ? (totalLucroBruto / totalReceita) * 100 : 0;
 
   return (
     <DashboardLayout>
@@ -144,12 +215,67 @@ export default function Home() {
           )}
         </div>
 
+        {/* Filtros de Data */}
+        <Card>
+          <CardContent className="pt-4 pb-4">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col md:flex-row md:items-end gap-4">
+                <div className="flex-1">
+                  <label className="text-sm font-medium text-muted-foreground mb-1 block">
+                    <Calendar className="h-3.5 w-3.5 inline mr-1" />
+                    Data Inicial
+                  </label>
+                  <input
+                    type="date"
+                    value={dataInicio}
+                    onChange={(e) => setDataInicio(e.target.value)}
+                    className="w-full border rounded-md px-3 py-2 text-sm bg-background"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="text-sm font-medium text-muted-foreground mb-1 block">
+                    <Calendar className="h-3.5 w-3.5 inline mr-1" />
+                    Data Final
+                  </label>
+                  <input
+                    type="date"
+                    value={dataFim}
+                    onChange={(e) => setDataFim(e.target.value)}
+                    className="w-full border rounded-md px-3 py-2 text-sm bg-background"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className="text-sm text-muted-foreground self-center mr-1">Atalhos:</span>
+                {ATALHOS.map(a => (
+                  <Button
+                    key={a.label}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-7"
+                    onClick={() => {
+                      const { inicio, fim } = a.getDates();
+                      setDataInicio(inicio);
+                      setDataFim(fim);
+                    }}
+                  >
+                    {a.label}
+                  </Button>
+                ))}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Período: {formatDateBR(dataInicio)} a {formatDateBR(dataFim)}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Litros Vendidos (30d)
+                Litros Vendidos
               </CardTitle>
               <Fuel className="h-4 w-4 text-blue-600" />
             </CardHeader>
@@ -166,7 +292,7 @@ export default function Home() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Faturamento (30d)
+                Faturamento
               </CardTitle>
               <DollarSign className="h-4 w-4 text-green-600" />
             </CardHeader>
@@ -174,9 +300,22 @@ export default function Home() {
               <div className="text-2xl font-bold">
                 {loadingStats ? '...' : formatCurrency(stats?.totalValor)}
               </div>
-              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                <TrendingUp className="h-3 w-3 text-green-500" />
-                Últimos 30 dias
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Lucro Bruto
+              </CardTitle>
+              <TrendingUp className="h-4 w-4 text-emerald-600" />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${totalLucroBruto >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {loadingLucroPosto ? '...' : formatCurrency(totalLucroBruto)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Margem: {margemBruta.toFixed(1)}%
               </p>
             </CardContent>
           </Card>
@@ -193,7 +332,7 @@ export default function Home() {
                 {loadingStats ? '...' : stats?.totalPostos || 0}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Rede Guerra
+                Rede Super Petroleo
               </p>
             </CardContent>
           </Card>
@@ -237,36 +376,65 @@ export default function Home() {
           </Card>
         )}
 
-        {/* Charts */}
+        {/* Vendas Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Vendas por Posto */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Vendas por Posto (30 dias)</CardTitle>
+              <CardTitle className="text-base">Vendas por Posto (Litros)</CardTitle>
             </CardHeader>
             <CardContent>
               {loadingPosto ? (
-                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                  Carregando...
-                </div>
+                <div className="h-[200px] flex items-center justify-center text-muted-foreground">Carregando...</div>
               ) : (
-                <VendasPorPostoChart data={chartDataPosto} />
+                <BarChart data={chartVendasPosto} formatFn={(v) => formatNumber(v) + ' L'} />
               )}
             </CardContent>
           </Card>
 
-          {/* Vendas por Combustível */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Distribuição por Combustível</CardTitle>
+              <CardTitle className="text-base">Distribuição por Combustível (Litros)</CardTitle>
             </CardHeader>
             <CardContent>
               {loadingComb ? (
-                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                  Carregando...
-                </div>
+                <div className="h-[200px] flex items-center justify-center text-muted-foreground">Carregando...</div>
               ) : (
-                <DistribuicaoCombustivelChart data={chartDataCombustivel} />
+                <PieChart data={chartVendasCombustivel} formatFn={(v) => formatNumber(v) + ' L'} />
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Lucro Bruto Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                Lucro Bruto por Posto
+                <span className="text-xs font-normal text-muted-foreground">(Receita - CMV)</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingLucroPosto ? (
+                <div className="h-[200px] flex items-center justify-center text-muted-foreground">Carregando...</div>
+              ) : (
+                <BarChart data={chartLucroPosto} formatFn={formatCurrency} colorOffset={3} />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                Lucro Bruto por Combustível
+                <span className="text-xs font-normal text-muted-foreground">(Receita - CMV)</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingLucroComb ? (
+                <div className="h-[200px] flex items-center justify-center text-muted-foreground">Carregando...</div>
+              ) : (
+                <PieChart data={chartLucroCombustivel} formatFn={formatCurrency} />
               )}
             </CardContent>
           </Card>

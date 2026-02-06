@@ -339,33 +339,43 @@ export async function sincronizarVendasACS(diasAtras: number = 90) {
         .limit(1);
 
       if (existente.length === 0) {
-        // Inserir a venda
+        // Inserir a venda (com try/catch para ignorar duplicatas)
         const isAfericao = row.afericao?.trim() === 'S' ? 1 : 0;
-        const insertResult = await db.insert(vendas).values({
-          postoId: posto.id,
-          tanqueId: tanque?.id || null,
-          produtoId: produto?.id || null,
-          codigoAcs: codigoVendaAcs,
-          dataVenda: new Date(row.dt_abast),
-          quantidade: row.litros?.toString() || "0",
-          valorUnitario: row.preco?.toString() || "0",
-          valorTotal: row.total?.toString() || "0",
-          afericao: isAfericao,
-          statusCmv: isAfericao ? "calculado" : "pendente",
-        });
-        inseridos++;
-        
-        // Calcular CMV automaticamente após inserir a venda (pular aferições)
-        if (insertResult[0]?.insertId && !isAfericao) {
-          try {
-            const { calcularCMVPEPS } = await import("./db");
-            await calcularCMVPEPS(insertResult[0].insertId);
-          } catch (cmvError) {
-            console.error(`[ETL] Erro ao calcular CMV para venda ${insertResult[0].insertId}:`, cmvError);
-            // Marcar venda com erro de CMV
-            await db.update(vendas)
-              .set({ statusCmv: "erro" })
-              .where(eq(vendas.id, insertResult[0].insertId));
+        try {
+          const insertResult = await db.insert(vendas).values({
+            postoId: posto.id,
+            tanqueId: tanque?.id || null,
+            produtoId: produto?.id || null,
+            codigoAcs: codigoVendaAcs,
+            dataVenda: new Date(row.dt_abast),
+            quantidade: row.litros?.toString() || "0",
+            valorUnitario: row.preco?.toString() || "0",
+            valorTotal: row.total?.toString() || "0",
+            afericao: isAfericao,
+            statusCmv: isAfericao ? "calculado" : "pendente",
+          });
+          inseridos++;
+          
+          // Calcular CMV automaticamente após inserir a venda (pular aferições)
+          if (insertResult[0]?.insertId && !isAfericao) {
+            try {
+              const { calcularCMVPEPS } = await import("./db");
+              await calcularCMVPEPS(insertResult[0].insertId);
+            } catch (cmvError) {
+              console.error(`[ETL] Erro ao calcular CMV para venda ${insertResult[0].insertId}:`, cmvError);
+              // Marcar venda com erro de CMV
+              await db.update(vendas)
+                .set({ statusCmv: "erro" })
+                .where(eq(vendas.id, insertResult[0].insertId));
+            }
+          }
+        } catch (insertError: any) {
+          // Ignorar erros de duplicata (ER_DUP_ENTRY) e continuar
+          if (insertError?.cause?.code === 'ER_DUP_ENTRY' || String(insertError).includes('Duplicate entry')) {
+            ignorados++;
+          } else {
+            console.error(`[ETL] Erro ao inserir venda ${codigoVendaAcs}:`, insertError);
+            ignorados++;
           }
         }
       }

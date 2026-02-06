@@ -333,12 +333,19 @@ export async function createVenda(data: InsertVenda) {
   await db.insert(vendas).values(data).onDuplicateKeyUpdate({ set: { id: data.id } });
 }
 
-export async function getVendasResumo(dias: number = 30) {
+export async function getVendasResumo(dias: number = 30, dataInicio?: string, dataFim?: string) {
   const db = await getDb();
   if (!db) return { totalLitros: "0", totalValor: "0", totalRegistros: 0 };
   
-  const dataLimite = new Date();
-  dataLimite.setDate(dataLimite.getDate() - dias);
+  const conditions = [eq(postos.ativo, 1), eq(vendas.afericao, 0)];
+  if (dataInicio && dataFim) {
+    conditions.push(gte(vendas.dataVenda, new Date(dataInicio + 'T00:00:00.000Z')));
+    conditions.push(lte(vendas.dataVenda, new Date(dataFim + 'T23:59:59.999Z')));
+  } else {
+    const dataLimite = new Date();
+    dataLimite.setDate(dataLimite.getDate() - dias);
+    conditions.push(gte(vendas.dataVenda, dataLimite));
+  }
   
   const result = await db.select({
     totalLitros: sum(vendas.quantidade),
@@ -347,7 +354,7 @@ export async function getVendasResumo(dias: number = 30) {
   })
   .from(vendas)
   .innerJoin(postos, eq(vendas.postoId, postos.id))
-  .where(and(gte(vendas.dataVenda, dataLimite), eq(postos.ativo, 1), eq(vendas.afericao, 0)));
+  .where(and(...conditions));
   
   return {
     totalLitros: result[0]?.totalLitros || "0",
@@ -356,12 +363,19 @@ export async function getVendasResumo(dias: number = 30) {
   };
 }
 
-export async function getVendasPorPosto(dias: number = 30) {
+export async function getVendasPorPosto(dias: number = 30, dataInicio?: string, dataFim?: string) {
   const db = await getDb();
   if (!db) return [];
   
-  const dataLimite = new Date();
-  dataLimite.setDate(dataLimite.getDate() - dias);
+  const conditions = [eq(postos.ativo, 1), eq(vendas.afericao, 0)];
+  if (dataInicio && dataFim) {
+    conditions.push(gte(vendas.dataVenda, new Date(dataInicio + 'T00:00:00.000Z')));
+    conditions.push(lte(vendas.dataVenda, new Date(dataFim + 'T23:59:59.999Z')));
+  } else {
+    const dataLimite = new Date();
+    dataLimite.setDate(dataLimite.getDate() - dias);
+    conditions.push(gte(vendas.dataVenda, dataLimite));
+  }
   
   return db.select({
     postoNome: postos.nome,
@@ -371,17 +385,24 @@ export async function getVendasPorPosto(dias: number = 30) {
   .from(vendas)
   .leftJoin(tanques, eq(vendas.tanqueId, tanques.id))
   .leftJoin(postos, eq(tanques.postoId, postos.id))
-  .where(and(gte(vendas.dataVenda, dataLimite), eq(postos.ativo, 1), eq(vendas.afericao, 0)))
+  .where(and(...conditions))
   .groupBy(postos.nome)
   .orderBy(desc(sum(vendas.quantidade)));
 }
 
-export async function getVendasPorCombustivel(dias: number = 30) {
+export async function getVendasPorCombustivel(dias: number = 30, dataInicio?: string, dataFim?: string) {
   const db = await getDb();
   if (!db) return [];
   
-  const dataLimite = new Date();
-  dataLimite.setDate(dataLimite.getDate() - dias);
+  const conditions = [eq(postos.ativo, 1), eq(vendas.afericao, 0)];
+  if (dataInicio && dataFim) {
+    conditions.push(gte(vendas.dataVenda, new Date(dataInicio + 'T00:00:00.000Z')));
+    conditions.push(lte(vendas.dataVenda, new Date(dataFim + 'T23:59:59.999Z')));
+  } else {
+    const dataLimite = new Date();
+    dataLimite.setDate(dataLimite.getDate() - dias);
+    conditions.push(gte(vendas.dataVenda, dataLimite));
+  }
   
   return db.select({
     produtoDescricao: produtos.descricao,
@@ -392,9 +413,74 @@ export async function getVendasPorCombustivel(dias: number = 30) {
   .leftJoin(tanques, eq(vendas.tanqueId, tanques.id))
   .leftJoin(postos, eq(vendas.postoId, postos.id))
   .leftJoin(produtos, eq(tanques.produtoId, produtos.id))
-  .where(and(gte(vendas.dataVenda, dataLimite), eq(postos.ativo, 1), eq(vendas.afericao, 0)))
+  .where(and(...conditions))
   .groupBy(produtos.descricao)
   .orderBy(desc(sum(vendas.quantidade)));
+}
+
+// Lucro bruto por posto (receita - CMV)
+export async function getLucroBrutoPorPosto(dataInicio: string, dataFim: string) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const conditions = [
+    eq(postos.ativo, 1), 
+    eq(vendas.afericao, 0),
+    gte(vendas.dataVenda, new Date(dataInicio + 'T00:00:00.000Z')),
+    lte(vendas.dataVenda, new Date(dataFim + 'T23:59:59.999Z'))
+  ];
+  
+  const result = await db.select({
+    postoNome: postos.nome,
+    totalValor: sum(vendas.valorTotal),
+    totalCmv: sum(vendas.cmvCalculado),
+  })
+  .from(vendas)
+  .leftJoin(tanques, eq(vendas.tanqueId, tanques.id))
+  .leftJoin(postos, eq(tanques.postoId, postos.id))
+  .where(and(...conditions))
+  .groupBy(postos.nome)
+  .orderBy(desc(sql`SUM(${vendas.valorTotal}) - SUM(${vendas.cmvCalculado})`));
+  
+  return result.map(r => ({
+    postoNome: r.postoNome,
+    totalValor: r.totalValor || "0",
+    totalCmv: r.totalCmv || "0",
+    lucroBruto: (parseFloat(r.totalValor || "0") - parseFloat(r.totalCmv || "0")).toFixed(2),
+  }));
+}
+
+// Lucro bruto por combustível
+export async function getLucroBrutoPorCombustivel(dataInicio: string, dataFim: string) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const conditions = [
+    eq(postos.ativo, 1), 
+    eq(vendas.afericao, 0),
+    gte(vendas.dataVenda, new Date(dataInicio + 'T00:00:00.000Z')),
+    lte(vendas.dataVenda, new Date(dataFim + 'T23:59:59.999Z'))
+  ];
+  
+  const result = await db.select({
+    produtoDescricao: produtos.descricao,
+    totalValor: sum(vendas.valorTotal),
+    totalCmv: sum(vendas.cmvCalculado),
+  })
+  .from(vendas)
+  .leftJoin(tanques, eq(vendas.tanqueId, tanques.id))
+  .leftJoin(postos, eq(vendas.postoId, postos.id))
+  .leftJoin(produtos, eq(tanques.produtoId, produtos.id))
+  .where(and(...conditions))
+  .groupBy(produtos.descricao)
+  .orderBy(desc(sql`SUM(${vendas.valorTotal}) - SUM(${vendas.cmvCalculado})`));
+  
+  return result.map(r => ({
+    produtoDescricao: r.produtoDescricao,
+    totalValor: r.totalValor || "0",
+    totalCmv: r.totalCmv || "0",
+    lucroBruto: (parseFloat(r.totalValor || "0") - parseFloat(r.totalCmv || "0")).toFixed(2),
+  }));
 }
 
 // ==================== MEDIÇÕES (CRUD COMPLETO) ====================
@@ -677,12 +763,12 @@ export async function getUltimaSincronizacao() {
 }
 
 // ==================== DASHBOARD STATS ====================
-export async function getDashboardStats() {
+export async function getDashboardStats(dataInicio?: string, dataFim?: string) {
   const db = await getDb();
   if (!db) return null;
   
   const [vendasResumo, postosCount, tanquesCount] = await Promise.all([
-    getVendasResumo(30),
+    getVendasResumo(30, dataInicio, dataFim),
     db.select({ count: sql<number>`COUNT(*)` }).from(postos).where(eq(postos.ativo, 1)),
     db.select({ count: sql<number>`COUNT(*)` }).from(tanques)
       .innerJoin(postos, eq(tanques.postoId, postos.id))

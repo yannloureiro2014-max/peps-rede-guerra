@@ -275,3 +275,21 @@
 ## Alteração de Nome: PEPS → REDE SUPER PETROLEO
 
 - [x] Alterar nome do sistema de "PEPS" para "REDE SUPER PETROLEO" em todo o frontend - título HTML, sidebar (RSP), login page, mobile header
+
+## Bug: Vendas de 01/12/2025 a 29/01/2026 ainda não aparecem após correção do ETL
+
+- [x] Investigar se a sincronização foi executada após a correção do ETL - não foi, banco só tinha dados a partir de 30/01
+- [x] Forçar importação das vendas faltantes desde 01/12/2025 - script force-sync.ts em execução, dez/2025 já importando
+- [x] Corrigir ETL para ignorar duplicatas (try/catch no INSERT) e continuar importação
+
+## Feature: Filtros de data no Dashboard
+
+- [x] Adicionar seletores de data (Data Inicial, Data Final) no Dashboard
+- [x] Adicionar atalhos de período (Hoje, 7 dias, 30 dias, etc.)
+- [x] Atualizar todas as queries do Dashboard para usar o filtro de data
+
+## Feature: Lucro bruto por posto no Dashboard
+
+- [x] Adicionar gráfico de barras de lucro bruto por posto (similar ao de vendas)
+- [x] Adicionar gráfico pizza de lucro bruto por combustível
+- [x] Criar endpoint backend para calcular lucro bruto por posto e combustível (getLucroBrutoPorPosto, getLucroBrutoPorCombustivel)
