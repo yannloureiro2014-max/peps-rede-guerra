@@ -21,7 +21,7 @@ function formatCurrency(value: string | number | null | undefined): string {
 }
 
 function formatDateBR(date: Date | string): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
+  const d = typeof date === 'string' ? new Date(date + 'T12:00:00') : date;
   return d.toLocaleDateString('pt-BR');
 }
 
@@ -29,35 +29,30 @@ function getDateString(date: Date): string {
   return date.toISOString().split('T')[0];
 }
 
+function getFirstDayOfMonth(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
+function getLastDayOfMonth(date: Date): string {
+  const last = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  return getDateString(last);
+}
+
 export default function Vendas() {
+  const hoje = useMemo(() => new Date(), []);
   const [postoFiltro, setPostoFiltro] = useState<string>("todos");
   const [produtoFiltro, setProdutoFiltro] = useState<string>("todos");
-  const [tipoFiltroData, setTipoFiltroData] = useState<string>("periodo");
-  const [periodoFiltro, setPeriodoFiltro] = useState<string>("30");
-  const [dataEspecifica, setDataEspecifica] = useState<string>(getDateString(new Date()));
+  
+  // Filtros de data inicial e final separados
+  const [dataInicio, setDataInicio] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return getDateString(d);
+  });
+  const [dataFim, setDataFim] = useState<string>(() => getDateString(new Date()));
 
   const { data: postos } = trpc.postos.list.useQuery();
   const { data: produtos } = trpc.produtos.list.useQuery();
-
-  // Calcular datas baseado no tipo de filtro
-  const { dataInicio, dataFim } = useMemo(() => {
-    if (tipoFiltroData === "especifica") {
-      // Filtro por data específica
-      return {
-        dataInicio: dataEspecifica,
-        dataFim: dataEspecifica
-      };
-    } else {
-      // Filtro por período
-      const fim = new Date();
-      const inicio = new Date();
-      inicio.setDate(inicio.getDate() - parseInt(periodoFiltro));
-      return {
-        dataInicio: getDateString(inicio),
-        dataFim: getDateString(fim)
-      };
-    }
-  }, [tipoFiltroData, periodoFiltro, dataEspecifica]);
 
   const { data: vendas, isLoading } = trpc.vendas.list.useQuery({
     postoId: postoFiltro !== "todos" ? parseInt(postoFiltro) : undefined,
@@ -76,24 +71,38 @@ export default function Vendas() {
     }), { litros: 0, valor: 0, registros: 0 });
   }, [vendas]);
 
-  // Atalhos de data
-  const setDataHoje = () => {
-    setTipoFiltroData("especifica");
-    setDataEspecifica(getDateString(new Date()));
+  // Atalhos de período
+  const setAtalho = (dias: number) => {
+    const fim = new Date();
+    const inicio = new Date();
+    inicio.setDate(inicio.getDate() - dias);
+    setDataInicio(getDateString(inicio));
+    setDataFim(getDateString(fim));
   };
 
-  const setDataOntem = () => {
-    setTipoFiltroData("especifica");
+  const setMesAtual = () => {
+    setDataInicio(getFirstDayOfMonth(hoje));
+    setDataFim(getDateString(hoje));
+  };
+
+  const setMesAnterior = () => {
+    const mesAnterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+    setDataInicio(getFirstDayOfMonth(mesAnterior));
+    setDataFim(getLastDayOfMonth(mesAnterior));
+  };
+
+  const setHoje = () => {
+    const h = getDateString(new Date());
+    setDataInicio(h);
+    setDataFim(h);
+  };
+
+  const setOntem = () => {
     const ontem = new Date();
     ontem.setDate(ontem.getDate() - 1);
-    setDataEspecifica(getDateString(ontem));
-  };
-
-  const setDataAnteontem = () => {
-    setTipoFiltroData("especifica");
-    const anteontem = new Date();
-    anteontem.setDate(anteontem.getDate() - 2);
-    setDataEspecifica(getDateString(anteontem));
+    const d = getDateString(ontem);
+    setDataInicio(d);
+    setDataFim(d);
   };
 
   // Exportar CSV
@@ -138,6 +147,7 @@ export default function Vendas() {
         <Card>
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Posto */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Posto</label>
                 <Select value={postoFiltro} onValueChange={setPostoFiltro}>
@@ -155,6 +165,7 @@ export default function Vendas() {
                 </Select>
               </div>
 
+              {/* Combustível */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Combustível</label>
                 <Select value={produtoFiltro} onValueChange={setProdutoFiltro}>
@@ -172,75 +183,80 @@ export default function Vendas() {
                 </Select>
               </div>
 
+              {/* Data Inicial */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Tipo de Filtro</label>
-                <Select value={tipoFiltroData} onValueChange={setTipoFiltroData}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="periodo">Por Período</SelectItem>
-                    <SelectItem value="especifica">Data Específica</SelectItem>
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium">Data Inicial</label>
+                <Input
+                  type="date"
+                  value={dataInicio}
+                  onChange={(e) => setDataInicio(e.target.value)}
+                  className="w-full"
+                />
               </div>
 
-              {tipoFiltroData === "periodo" ? (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Período</label>
-                  <Select value={periodoFiltro} onValueChange={setPeriodoFiltro}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">Hoje</SelectItem>
-                      <SelectItem value="7">Últimos 7 dias</SelectItem>
-                      <SelectItem value="15">Últimos 15 dias</SelectItem>
-                      <SelectItem value="30">Últimos 30 dias</SelectItem>
-                      <SelectItem value="60">Últimos 60 dias</SelectItem>
-                      <SelectItem value="90">Últimos 90 dias</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Data (dd/mm/aaaa)</label>
-                  <Input
-                    type="date"
-                    value={dataEspecifica}
-                    onChange={(e) => setDataEspecifica(e.target.value)}
-                    className="w-full"
-                  />
-                </div>
-              )}
+              {/* Data Final */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Data Final</label>
+                <Input
+                  type="date"
+                  value={dataFim}
+                  onChange={(e) => setDataFim(e.target.value)}
+                  className="w-full"
+                />
+              </div>
             </div>
 
-            {/* Atalhos de data */}
-            {tipoFiltroData === "especifica" && (
-              <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
-                <span className="text-sm text-muted-foreground mr-2 self-center">Atalhos:</span>
-                <Button variant="outline" size="sm" onClick={setDataHoje}>
-                  <Calendar className="h-3 w-3 mr-1" />
-                  Hoje ({formatDateBR(new Date())})
-                </Button>
-                <Button variant="outline" size="sm" onClick={setDataOntem}>
-                  Ontem ({formatDateBR(new Date(Date.now() - 86400000))})
-                </Button>
-                <Button variant="outline" size="sm" onClick={setDataAnteontem}>
-                  Anteontem ({formatDateBR(new Date(Date.now() - 172800000))})
-                </Button>
-              </div>
-            )}
+            {/* Atalhos de período */}
+            <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
+              <span className="text-sm text-muted-foreground mr-2 self-center">Atalhos:</span>
+              <Button variant="outline" size="sm" onClick={setHoje}>
+                <Calendar className="h-3 w-3 mr-1" />
+                Hoje
+              </Button>
+              <Button variant="outline" size="sm" onClick={setOntem}>
+                Ontem
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setAtalho(7)}>
+                7 dias
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setAtalho(15)}>
+                15 dias
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setAtalho(30)}>
+                30 dias
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setAtalho(60)}>
+                60 dias
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setAtalho(90)}>
+                90 dias
+              </Button>
+              <Button variant="outline" size="sm" onClick={setMesAtual}>
+                Mês Atual
+              </Button>
+              <Button variant="outline" size="sm" onClick={setMesAnterior}>
+                Mês Anterior
+              </Button>
+            </div>
 
-            {/* Indicador de período selecionado */}
-            <div className="mt-4 pt-4 border-t">
+            {/* Indicador de período selecionado + totais */}
+            <div className="mt-4 pt-4 border-t flex flex-wrap gap-4 items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                <strong>Período selecionado:</strong>{" "}
-                {tipoFiltroData === "especifica" 
-                  ? formatDateBR(dataEspecifica)
-                  : `${formatDateBR(dataInicio)} a ${formatDateBR(dataFim)}`
-                }
+                <strong>Período:</strong> {formatDateBR(dataInicio)} a {formatDateBR(dataFim)}
               </p>
+              {vendas && vendas.length > 0 && (
+                <div className="flex flex-wrap gap-4 text-sm">
+                  <span className="text-muted-foreground">
+                    <strong>{formatNumber(totais.registros)}</strong> registros
+                  </span>
+                  <span className="text-blue-600">
+                    <strong>{formatNumber(totais.litros)}</strong> L
+                  </span>
+                  <span className="text-green-600">
+                    <strong>{formatCurrency(totais.valor)}</strong>
+                  </span>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -311,7 +327,7 @@ export default function Vendas() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {vendas.slice(0, 100).map(venda => (
+                    {vendas.slice(0, 200).map(venda => (
                       <TableRow key={venda.id}>
                         <TableCell>{formatDateBR(venda.dataVenda)}</TableCell>
                         <TableCell className="font-medium">{venda.postoNome}</TableCell>
@@ -324,9 +340,9 @@ export default function Vendas() {
                     ))}
                   </TableBody>
                 </Table>
-                {vendas.length > 100 && (
+                {vendas.length > 200 && (
                   <p className="text-center text-sm text-muted-foreground mt-4">
-                    Mostrando 100 de {vendas.length} registros. Exporte para ver todos.
+                    Mostrando 200 de {formatNumber(vendas.length)} registros. Exporte o CSV para ver todos.
                   </p>
                 )}
               </div>

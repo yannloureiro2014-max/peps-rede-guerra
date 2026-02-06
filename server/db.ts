@@ -195,6 +195,8 @@ export async function getLotes(postoId?: number, status?: string, limite?: numbe
   if (!db) return [];
   
   const conditions = [];
+  // Sempre filtrar apenas postos ativos
+  conditions.push(eq(postos.ativo, 1));
   if (postoId) conditions.push(eq(lotes.postoId, postoId));
   if (status) conditions.push(eq(lotes.status, status as any));
   
@@ -222,10 +224,10 @@ export async function getLotes(postoId?: number, status?: string, limite?: numbe
     produtoDescricao: produtos.descricao
   })
   .from(lotes)
-  .leftJoin(postos, eq(lotes.postoId, postos.id))
+  .innerJoin(postos, eq(lotes.postoId, postos.id))
   .leftJoin(tanques, eq(lotes.tanqueId, tanques.id))
   .leftJoin(produtos, eq(lotes.produtoId, produtos.id))
-  .where(conditions.length > 0 ? and(...conditions) : undefined)
+  .where(and(...conditions))
   .orderBy(desc(lotes.dataEntrada))
   .limit(limite || 500);
 }
@@ -291,6 +293,8 @@ export async function getVendas(filtros: { postoId?: number; produtoId?: number;
   if (!db) return [];
   
   const conditions = [];
+  // Sempre filtrar apenas postos ativos
+  conditions.push(eq(postos.ativo, 1));
   if (filtros.dataInicio) {
     const dataIni = new Date(filtros.dataInicio);
     dataIni.setHours(0, 0, 0, 0);
@@ -315,10 +319,10 @@ export async function getVendas(filtros: { postoId?: number; produtoId?: number;
     produtoDescricao: produtos.descricao
   })
   .from(vendas)
-  .leftJoin(tanques, eq(vendas.tanqueId, tanques.id))
-  .leftJoin(postos, eq(tanques.postoId, postos.id))
+  .innerJoin(tanques, eq(vendas.tanqueId, tanques.id))
+  .innerJoin(postos, eq(tanques.postoId, postos.id))
   .leftJoin(produtos, eq(tanques.produtoId, produtos.id))
-  .where(conditions.length > 0 ? and(...conditions) : undefined)
+  .where(and(...conditions))
   .orderBy(desc(vendas.dataVenda))
   .limit(1000);
 }
@@ -399,6 +403,8 @@ export async function getMedicoes(tanqueId?: number, postoId?: number, limite: n
   if (!db) return [];
   
   const conditions = [];
+  // Sempre filtrar apenas postos ativos
+  conditions.push(eq(postos.ativo, 1));
   if (tanqueId) conditions.push(eq(medicoes.tanqueId, tanqueId));
   if (postoId) conditions.push(eq(medicoes.postoId, postoId));
   
@@ -422,10 +428,10 @@ export async function getMedicoes(tanqueId?: number, postoId?: number, limite: n
     produtoDescricao: produtos.descricao
   })
   .from(medicoes)
+  .innerJoin(postos, eq(medicoes.postoId, postos.id))
   .leftJoin(tanques, eq(medicoes.tanqueId, tanques.id))
-  .leftJoin(postos, eq(medicoes.postoId, postos.id))
   .leftJoin(produtos, eq(tanques.produtoId, produtos.id))
-  .where(conditions.length > 0 ? and(...conditions) : undefined)
+  .where(and(...conditions))
   .orderBy(desc(medicoes.dataMedicao))
   .limit(limite);
 }

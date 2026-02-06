@@ -225,3 +225,14 @@
 ## Bug: Estoque mostrando postos inativos (CORRIGIDO)
 
 - [x] Filtrar postos inativos na aba Estoque - corrigido getTanques com innerJoin postos.ativo=1
+
+## Melhorias Aba Vendas - Solicitado pelo Usuário (CONCLUÍDO)
+
+- [x] Adicionar filtro por data inicial e data final (campos separados)
+- [x] Adicionar atalhos de período (Hoje, Ontem, 7d, 15d, 30d, 60d, 90d, Mês Atual, Mês Anterior)
+- [x] Filtrar postos inativos das vendas (innerJoin postos.ativo=1)
+- [x] Filtrar postos inativos das medições (innerJoin postos.ativo=1)
+- [x] Filtrar postos inativos das compras/lotes (innerJoin postos.ativo=1)
+- [x] Mostrar totais no rodapé (registros, litros, valor)
+- [x] Cards de resumo (Total Registros, Volume Total, Faturamento)
+- [x] Exportar CSV
