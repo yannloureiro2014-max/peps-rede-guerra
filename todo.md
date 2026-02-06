@@ -257,3 +257,7 @@
 - [x] Investigar getVendas() e getVendasResumo() - causa raiz: .limit(1000) cortava resultados quando período tinha >1000 registros
 - [x] Corrigir filtro de data - aumentado limit para 10000 para cobrir períodos maiores
 - [x] Validar com SQL direto e testes vitest - 03/02+04/02 = 1127 vendas, soma bate corretamente
+
+## Aumento de limite de registros - Solicitado pelo Usuário
+
+- [x] Aumentar limit do getVendas() de 10.000 para 100.000 para suportar alto volume de abastecimentos
