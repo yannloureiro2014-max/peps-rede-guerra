@@ -1,0 +1,62 @@
+{
+  "query": "SELECT nome, ativo FROM postos ORDER BY ativo DESC, nome;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT nome, ativo FROM postos ORDER BY ativo DESC, nome;",
+  "rows": [
+    {
+      "nome": "POSTO GUERRA FORTIM",
+      "ativo": "1"
+    },
+    {
+      "nome": "POSTO GUERRA PALHANO",
+      "ativo": "1"
+    },
+    {
+      "nome": "POSTO ITAIÇABA",
+      "ativo": "1"
+    },
+    {
+      "nome": "POSTO JAGUARUANA",
+      "ativo": "1"
+    },
+    {
+      "nome": "POSTO PAI TEREZA",
+      "ativo": "1"
+    },
+    {
+      "nome": "REDE SUPER PETROLEO",
+      "ativo": "1"
+    },
+    {
+      "nome": "POSTO ARACATI",
+      "ativo": "0"
+    },
+    {
+      "nome": "POSTO GUARARAPES VIP",
+      "ativo": "0"
+    },
+    {
+      "nome": "POSTO GUERRA SAO JOAO DO JAGUARIBE",
+      "ativo": "0"
+    },
+    {
+      "nome": "POSTO HORIZONTE",
+      "ativo": "0"
+    },
+    {
+      "nome": "POSTO LEITE",
+      "ativo": "0"
+    },
+    {
+      "nome": "POSTO POTIRETAMA",
+      "ativo": "0"
+    },
+    {
+      "nome": "SG PETROLEO",
+      "ativo": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "nome\tativo\nPOSTO GUERRA FORTIM\t1\nPOSTO GUERRA PALHANO\t1\nPOSTO ITAIÇABA\t1\nPOSTO JAGUARUANA\t1\nPOSTO PAI TEREZA\t1\nREDE SUPER PETROLEO\t1\nPOSTO ARACATI\t0\nPOSTO GUARARAPES VIP\t0\nPOSTO GUERRA SAO JOAO DO JAGUARIBE\t0\nPOSTO HORIZONTE\t0\nPOSTO LEITE\t0\nPOSTO POTIRETAMA\t0\nSG PETROLEO\t0\n",
+  "stderr": "",
+  "execution_time_ms": 52
+}

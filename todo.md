@@ -185,3 +185,39 @@
 - [x] Atalhos de período (7d, 15d, 30d, 60d, 90d, Mês Atual, Mês Anterior)
 - [x] Totais no rodapé dos filtros (registros, litros, valor)
 - [x] Backend já existia: função deleteLote e updateLote
+
+## Postos Ativo/Inativo + Data de Corte ACS - Solicitado pelo Usuário (CONCLUÍDO)
+
+### Schema e Banco
+- [x] Campo `ativo` já existia na tabela postos
+- [x] Sem necessidade de migration
+
+### Backend
+- [x] Filtrar postos inativos no dashboard (métricas, vendas, tanques)
+- [x] Filtrar postos inativos nos alertas pendentes
+- [x] Adicionar endpoint toggleAtivo e listAll no router postos
+- [x] Filtrar postos inativos na sincronização ACS
+
+### ETL - Data de Corte
+- [x] Definir DATA_CORTE = "2025-12-01" na sincronização ACS
+- [x] Sincronizar apenas vendas >= 01/12/2025
+- [x] Sincronizar apenas medições >= 01/12/2025
+- [x] Sincronizar apenas lotes/NFs >= 01/12/2025
+
+### Frontend - Aba Postos
+- [x] Adicionar toggle ativo/inativo na listagem de postos (admin_geral only)
+- [x] Mostrar badge de status (Ativo/Inativo) verde/vermelho
+- [x] Postos inativos com visual diferenciado (opacity-50)
+- [x] Toggle "Mostrar inativos" no header
+- [x] Card informativo sobre postos ativos/inativos e data de corte
+
+### Limpeza de Dados Antigos
+- [x] Excluir vendas anteriores a 01/12/2025
+- [x] Excluir medições anteriores a 01/12/2025
+- [x] Excluir lotes anteriores a 01/12/2025
+- [x] 7 postos desativados: Aracati, Guararapes VIP, São João do Jaguaribe, Horizonte, Leite, Potiretama, SG Petroleo
+
+### Verificação
+- [x] Dashboard mostra 6 postos ativos e 17 tanques
+- [x] Alertas filtram postos inativos
+- [x] Sem erros no console

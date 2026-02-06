@@ -66,6 +66,19 @@ export async function getPostos() {
   return db.select().from(postos).where(eq(postos.ativo, 1)).orderBy(postos.nome);
 }
 
+// Retorna TODOS os postos (incluindo inativos) - para a aba de gerenciamento
+export async function getAllPostos() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(postos).orderBy(postos.nome);
+}
+
+export async function togglePostoAtivo(id: number, ativo: boolean) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(postos).set({ ativo: ativo ? 1 : 0 }).where(eq(postos.id, id));
+}
+
 export async function getPostoById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
@@ -329,7 +342,8 @@ export async function getVendasResumo(dias: number = 30) {
     totalRegistros: sql<number>`COUNT(*)`
   })
   .from(vendas)
-  .where(gte(vendas.dataVenda, dataLimite));
+  .innerJoin(postos, eq(vendas.postoId, postos.id))
+  .where(and(gte(vendas.dataVenda, dataLimite), eq(postos.ativo, 1)));
   
   return {
     totalLitros: result[0]?.totalLitros || "0",
@@ -353,7 +367,7 @@ export async function getVendasPorPosto(dias: number = 30) {
   .from(vendas)
   .leftJoin(tanques, eq(vendas.tanqueId, tanques.id))
   .leftJoin(postos, eq(tanques.postoId, postos.id))
-  .where(gte(vendas.dataVenda, dataLimite))
+  .where(and(gte(vendas.dataVenda, dataLimite), eq(postos.ativo, 1)))
   .groupBy(postos.nome)
   .orderBy(desc(sum(vendas.quantidade)));
 }
@@ -372,8 +386,9 @@ export async function getVendasPorCombustivel(dias: number = 30) {
   })
   .from(vendas)
   .leftJoin(tanques, eq(vendas.tanqueId, tanques.id))
+  .leftJoin(postos, eq(vendas.postoId, postos.id))
   .leftJoin(produtos, eq(tanques.produtoId, produtos.id))
-  .where(gte(vendas.dataVenda, dataLimite))
+  .where(and(gte(vendas.dataVenda, dataLimite), eq(postos.ativo, 1)))
   .groupBy(produtos.descricao)
   .orderBy(desc(sum(vendas.quantidade)));
 }
@@ -523,8 +538,8 @@ export async function getAlertasPendentes() {
     postoNome: postos.nome
   })
   .from(alertas)
-  .leftJoin(postos, eq(alertas.postoId, postos.id))
-  .where(eq(alertas.status, "pendente"))
+  .innerJoin(postos, eq(alertas.postoId, postos.id))
+  .where(and(eq(alertas.status, "pendente"), eq(postos.ativo, 1)))
   .orderBy(desc(alertas.createdAt))
   .limit(50);
 }
@@ -545,8 +560,8 @@ export async function getAlertasPorTipo(tipo: string) {
     postoNome: postos.nome
   })
   .from(alertas)
-  .leftJoin(postos, eq(alertas.postoId, postos.id))
-  .where(eq(alertas.tipo, tipo as any))
+  .innerJoin(postos, eq(alertas.postoId, postos.id))
+  .where(and(eq(alertas.tipo, tipo as any), eq(postos.ativo, 1)))
   .orderBy(desc(alertas.createdAt))
   .limit(100);
 }
@@ -663,7 +678,9 @@ export async function getDashboardStats() {
   const [vendasResumo, postosCount, tanquesCount] = await Promise.all([
     getVendasResumo(30),
     db.select({ count: sql<number>`COUNT(*)` }).from(postos).where(eq(postos.ativo, 1)),
-    db.select({ count: sql<number>`COUNT(*)` }).from(tanques).where(eq(tanques.ativo, 1))
+    db.select({ count: sql<number>`COUNT(*)` }).from(tanques)
+      .innerJoin(postos, eq(tanques.postoId, postos.id))
+      .where(and(eq(tanques.ativo, 1), eq(postos.ativo, 1)))
   ]);
   
   return {

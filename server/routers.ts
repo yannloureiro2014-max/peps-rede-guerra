@@ -32,6 +32,9 @@ export const appRouter = router({
     list: publicProcedure.query(async () => {
       return db.getPostos();
     }),
+    listAll: publicProcedure.query(async () => {
+      return db.getAllPostos();
+    }),
     getById: publicProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
@@ -46,6 +49,15 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         await db.createPosto(input);
+        return { success: true };
+      }),
+    toggleAtivo: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        ativo: z.boolean()
+      }))
+      .mutation(async ({ input }) => {
+        await db.togglePostoAtivo(input.id, input.ativo);
         return { success: true };
       }),
   }),

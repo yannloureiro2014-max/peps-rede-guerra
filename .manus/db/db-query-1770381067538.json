@@ -1,0 +1,25 @@
+{
+  "query": "\nSELECT 'vendas' as tabela, COUNT(*) as total, MIN(dataVenda) as data_mais_antiga FROM vendas\nUNION ALL\nSELECT 'medicoes', COUNT(*), MIN(dataMedicao) FROM medicoes\nUNION ALL\nSELECT 'lotes', COUNT(*), MIN(dataEntrada) FROM lotes;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute \nSELECT 'vendas' as tabela, COUNT(*) as total, MIN(dataVenda) as data_mais_antiga FROM vendas\nUNION ALL\nSELECT 'medicoes', COUNT(*), MIN(dataMedicao) FROM medicoes\nUNION ALL\nSELECT 'lotes', COUNT(*), MIN(dataEntrada) FROM lotes;\n",
+  "rows": [
+    {
+      "tabela": "lotes",
+      "total": "225",
+      "data_mais_antiga": "2025-12-01"
+    },
+    {
+      "tabela": "medicoes",
+      "total": "1431",
+      "data_mais_antiga": "2025-12-01"
+    },
+    {
+      "tabela": "vendas",
+      "total": "12864",
+      "data_mais_antiga": "2026-01-30"
+    }
+  ],
+  "messages": [],
+  "stdout": "tabela\ttotal\tdata_mais_antiga\nlotes\t225\t2025-12-01\nmedicoes\t1431\t2025-12-01\nvendas\t12864\t2026-01-30\n",
+  "stderr": "",
+  "execution_time_ms": 61
+}

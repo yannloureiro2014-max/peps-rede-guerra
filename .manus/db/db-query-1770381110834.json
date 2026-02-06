@@ -1,0 +1,9 @@
+{
+  "query": "\nUPDATE postos SET ativo = 0 WHERE nome LIKE '%ARACATI%' OR nome LIKE '%GUARARAPES%' OR nome LIKE '%SAO JOAO DO JAGUARIBE%' OR nome LIKE '%HORIZONTE%' OR nome LIKE '%LEITE%' OR nome LIKE '%POTIRETAMA%' OR nome LIKE '%SG PETROLEO%';\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute \nUPDATE postos SET ativo = 0 WHERE nome LIKE '%ARACATI%' OR nome LIKE '%GUARARAPES%' OR nome LIKE '%SAO JOAO DO JAGUARIBE%' OR nome LIKE '%HORIZONTE%' OR nome LIKE '%LEITE%' OR nome LIKE '%POTIRETAMA%' OR nome LIKE '%SG PETROLEO%';\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 61
+}

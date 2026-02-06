@@ -1,0 +1,75 @@
+{
+  "query": "SELECT id, nome, ativo FROM postos ORDER BY nome;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT id, nome, ativo FROM postos ORDER BY nome;",
+  "rows": [
+    {
+      "id": "30006",
+      "nome": "POSTO ARACATI",
+      "ativo": "1"
+    },
+    {
+      "id": "30005",
+      "nome": "POSTO GUARARAPES VIP",
+      "ativo": "1"
+    },
+    {
+      "id": "2",
+      "nome": "POSTO GUERRA FORTIM",
+      "ativo": "1"
+    },
+    {
+      "id": "4",
+      "nome": "POSTO GUERRA PALHANO",
+      "ativo": "1"
+    },
+    {
+      "id": "30003",
+      "nome": "POSTO GUERRA SAO JOAO DO JAGUARIBE",
+      "ativo": "1"
+    },
+    {
+      "id": "30007",
+      "nome": "POSTO HORIZONTE",
+      "ativo": "1"
+    },
+    {
+      "id": "9",
+      "nome": "POSTO ITAIÇABA",
+      "ativo": "1"
+    },
+    {
+      "id": "8",
+      "nome": "POSTO JAGUARUANA",
+      "ativo": "1"
+    },
+    {
+      "id": "30002",
+      "nome": "POSTO LEITE",
+      "ativo": "1"
+    },
+    {
+      "id": "5",
+      "nome": "POSTO PAI TEREZA",
+      "ativo": "1"
+    },
+    {
+      "id": "30001",
+      "nome": "POSTO POTIRETAMA",
+      "ativo": "1"
+    },
+    {
+      "id": "1",
+      "nome": "REDE SUPER PETROLEO",
+      "ativo": "1"
+    },
+    {
+      "id": "30004",
+      "nome": "SG PETROLEO",
+      "ativo": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tnome\tativo\n30006\tPOSTO ARACATI\t1\n30005\tPOSTO GUARARAPES VIP\t1\n2\tPOSTO GUERRA FORTIM\t1\n4\tPOSTO GUERRA PALHANO\t1\n30003\tPOSTO GUERRA SAO JOAO DO JAGUARIBE\t1\n30007\tPOSTO HORIZONTE\t1\n9\tPOSTO ITAIÇABA\t1\n8\tPOSTO JAGUARUANA\t1\n30002\tPOSTO LEITE\t1\n5\tPOSTO PAI TEREZA\t1\n30001\tPOSTO POTIRETAMA\t1\n1\tREDE SUPER PETROLEO\t1\n30004\tSG PETROLEO\t1\n",
+  "stderr": "",
+  "execution_time_ms": 92
+}

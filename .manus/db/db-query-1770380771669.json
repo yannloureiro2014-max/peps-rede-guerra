@@ -1,0 +1,88 @@
+{
+  "query": "SELECT id, codigoAcs, nome, ativo FROM postos ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT id, codigoAcs, nome, ativo FROM postos ORDER BY id;",
+  "rows": [
+    {
+      "id": "1",
+      "codigoAcs": "06",
+      "nome": "REDE SUPER PETROLEO",
+      "ativo": "1"
+    },
+    {
+      "id": "2",
+      "codigoAcs": "01",
+      "nome": "POSTO GUERRA FORTIM",
+      "ativo": "1"
+    },
+    {
+      "id": "4",
+      "codigoAcs": "03",
+      "nome": "POSTO GUERRA PALHANO",
+      "ativo": "1"
+    },
+    {
+      "id": "5",
+      "codigoAcs": "04",
+      "nome": "POSTO PAI TEREZA",
+      "ativo": "1"
+    },
+    {
+      "id": "8",
+      "codigoAcs": "08",
+      "nome": "POSTO JAGUARUANA",
+      "ativo": "1"
+    },
+    {
+      "id": "9",
+      "codigoAcs": "09",
+      "nome": "POSTO ITAIÇABA",
+      "ativo": "1"
+    },
+    {
+      "id": "30001",
+      "codigoAcs": "02",
+      "nome": "POSTO POTIRETAMA",
+      "ativo": "1"
+    },
+    {
+      "id": "30002",
+      "codigoAcs": "05",
+      "nome": "POSTO LEITE",
+      "ativo": "1"
+    },
+    {
+      "id": "30003",
+      "codigoAcs": "07",
+      "nome": "POSTO GUERRA SAO JOAO DO JAGUARIBE",
+      "ativo": "1"
+    },
+    {
+      "id": "30004",
+      "codigoAcs": "10",
+      "nome": "SG PETROLEO",
+      "ativo": "1"
+    },
+    {
+      "id": "30005",
+      "codigoAcs": "11",
+      "nome": "POSTO GUARARAPES VIP",
+      "ativo": "1"
+    },
+    {
+      "id": "30006",
+      "codigoAcs": "12",
+      "nome": "POSTO ARACATI",
+      "ativo": "1"
+    },
+    {
+      "id": "30007",
+      "codigoAcs": "13",
+      "nome": "POSTO HORIZONTE",
+      "ativo": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tcodigoAcs\tnome\tativo\n1\t06\tREDE SUPER PETROLEO\t1\n2\t01\tPOSTO GUERRA FORTIM\t1\n4\t03\tPOSTO GUERRA PALHANO\t1\n5\t04\tPOSTO PAI TEREZA\t1\n8\t08\tPOSTO JAGUARUANA\t1\n9\t09\tPOSTO ITAIÇABA\t1\n30001\t02\tPOSTO POTIRETAMA\t1\n30002\t05\tPOSTO LEITE\t1\n30003\t07\tPOSTO GUERRA SAO JOAO DO JAGUARIBE\t1\n30004\t10\tSG PETROLEO\t1\n30005\t11\tPOSTO GUARARAPES VIP\t1\n30006\t12\tPOSTO ARACATI\t1\n30007\t13\tPOSTO HORIZONTE\t1\n",
+  "stderr": "",
+  "execution_time_ms": 55
+}

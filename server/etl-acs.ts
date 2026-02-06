@@ -12,6 +12,9 @@ const ACS_CONFIG = {
   password: "ZQ18Uaa4AD",
 };
 
+// Data de corte: só sincronizar dados a partir de 01/12/2025
+const DATA_CORTE = "2025-12-01";
+
 // Mapeamento de tipo_combustivel ACS para descrição padronizada
 const MAPEAMENTO_COMBUSTIVEL: Record<string, string> = {
   "GC": "GASOLINA COMUM",
@@ -268,11 +271,14 @@ export async function sincronizarVendasACS(diasAtras: number = 30) {
   }
 
   try {
-    console.log(`[ETL] Sincronizando vendas dos últimos ${diasAtras} dias...`);
+    console.log(`[ETL] Sincronizando vendas dos últimos ${diasAtras} dias (corte: ${DATA_CORTE})...`);
 
-    const dataInicio = new Date();
-    dataInicio.setDate(dataInicio.getDate() - diasAtras);
-    const dataInicioStr = dataInicio.toISOString().split("T")[0];
+    let dataInicioStr = new Date();
+    dataInicioStr.setDate(dataInicioStr.getDate() - diasAtras);
+    // Garantir que nunca busque antes da data de corte
+    const dataInicioCalc = dataInicioStr.toISOString().split("T")[0];
+    const dataInicioFinal = dataInicioCalc > DATA_CORTE ? dataInicioCalc : DATA_CORTE;
+    console.log(`[ETL] Data início vendas: ${dataInicioFinal}`);
 
     // Buscar abastecimentos do ACS
     const result = await acsClient.query(`
@@ -291,10 +297,10 @@ export async function sincronizarVendasACS(diasAtras: number = 30) {
         AND a.baixado = 'S'
       ORDER BY a.dt_abast DESC
       LIMIT 10000
-    `, [dataInicioStr]);
+    `, [dataInicioFinal]);
 
-    // Buscar postos, tanques e produtos do PEPS
-    const postosDb = await db.select().from(postos);
+    // Buscar postos ATIVOS, tanques e produtos do PEPS
+    const postosDb = await db.select().from(postos).where(eq(postos.ativo, 1));
     const tanquesDb = await db.select().from(tanques);
     const produtosDb = await db.select().from(produtos);
 
@@ -306,7 +312,7 @@ export async function sincronizarVendasACS(diasAtras: number = 30) {
       const codTanque = row.cod_tanque?.trim();
       const codAbast = row.cod_abastecimento?.trim();
 
-      // Encontrar posto
+      // Encontrar posto (apenas ativos)
       const posto = postosDb.find(p => p.codigoAcs === codEmpresa);
       if (!posto) {
         ignorados++;
@@ -397,11 +403,14 @@ export async function sincronizarMedicoesACS(diasAtras: number = 90) {
   }
 
   try {
-    console.log(`[ETL] Sincronizando medições físicas dos últimos ${diasAtras} dias...`);
+    console.log(`[ETL] Sincronizando medições físicas dos últimos ${diasAtras} dias (corte: ${DATA_CORTE})...`);
 
-    const dataInicio = new Date();
-    dataInicio.setDate(dataInicio.getDate() - diasAtras);
-    const dataInicioStr = dataInicio.toISOString().split("T")[0];
+    const dataInicioCalc = new Date();
+    dataInicioCalc.setDate(dataInicioCalc.getDate() - diasAtras);
+    const dataInicioStr = dataInicioCalc.toISOString().split("T")[0];
+    // Garantir que nunca busque antes da data de corte
+    const dataInicioFinal = dataInicioStr > DATA_CORTE ? dataInicioStr : DATA_CORTE;
+    console.log(`[ETL] Data início medições: ${dataInicioFinal}`);
 
     // Buscar medições da tabela aberturas do ACS
     // A tabela aberturas contém as medições físicas diárias de cada tanque (abertura do dia)
@@ -417,10 +426,10 @@ export async function sincronizarMedicoesACS(diasAtras: number = 90) {
       LEFT JOIN tanques t ON a.cod_empresa = t.cod_empresa AND a.cod_tanque = t.codigo
       WHERE a.data >= $1
       ORDER BY a.data DESC, a.cod_empresa, a.cod_tanque
-    `, [dataInicioStr]);
+    `, [dataInicioFinal]);
 
-    // Buscar postos e tanques do PEPS
-    const postosDb = await db.select().from(postos);
+    // Buscar postos ATIVOS e tanques do PEPS
+    const postosDb = await db.select().from(postos).where(eq(postos.ativo, 1));
     const tanquesDb = await db.select().from(tanques);
 
     let inseridos = 0;
@@ -534,11 +543,14 @@ export async function sincronizarComprasACS(diasAtras: number = 180) {
   }
 
   try {
-    console.log(`[ETL] Sincronizando notas fiscais de compra dos últimos ${diasAtras} dias...`);
+    console.log(`[ETL] Sincronizando notas fiscais de compra (corte: ${DATA_CORTE})...`);
 
-    const dataInicio = new Date();
-    dataInicio.setDate(dataInicio.getDate() - diasAtras);
-    const dataInicioStr = dataInicio.toISOString().split("T")[0];
+    const dataInicioCalc = new Date();
+    dataInicioCalc.setDate(dataInicioCalc.getDate() - diasAtras);
+    const dataInicioStr = dataInicioCalc.toISOString().split("T")[0];
+    // Garantir que nunca busque antes da data de corte
+    const dataInicioFinal = dataInicioStr > DATA_CORTE ? dataInicioStr : DATA_CORTE;
+    console.log(`[ETL] Data início compras: ${dataInicioFinal}`);
 
     // Buscar compras de combustível do ACS (tabela compras_comb + itens_compra_comb)
     const result = await acsClient.query(`
@@ -563,10 +575,10 @@ export async function sincronizarComprasACS(diasAtras: number = 180) {
       WHERE c.dt_recebimento >= $1
         AND (c.cancelada = 'N' OR c.cancelada IS NULL)
       ORDER BY c.dt_recebimento DESC
-    `, [dataInicioStr]);
+    `, [dataInicioFinal]);
 
-    // Buscar postos, tanques e produtos do PEPS
-    const postosDb = await db.select().from(postos);
+    // Buscar postos ATIVOS, tanques e produtos do PEPS
+    const postosDb = await db.select().from(postos).where(eq(postos.ativo, 1));
     const tanquesDb = await db.select().from(tanques);
     const produtosDb = await db.select().from(produtos);
 
