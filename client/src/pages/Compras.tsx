@@ -1,15 +1,14 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
-import { Plus, Package, FileText, Calendar, Edit, Trash2, RefreshCw } from "lucide-react";
+import { Plus, FileText, Edit, Trash2, RefreshCw, AlertTriangle, Search, X } from "lucide-react";
 import { useState, useMemo } from "react";
 
 
@@ -35,10 +34,21 @@ function getDateString(date: Date): string {
   return date.toISOString().split('T')[0];
 }
 
+function getDefaultDataInicio(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 60);
+  return getDateString(d);
+}
+
 export default function Compras() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingLote, setEditingLote] = useState<any>(null);
+  const [deletingLote, setDeletingLote] = useState<any>(null);
+  const [deleteJustificativa, setDeleteJustificativa] = useState("");
+  
+  // Form nova compra
   const [postoSelecionado, setPostoSelecionado] = useState<string>("");
   const [tanqueSelecionado, setTanqueSelecionado] = useState<string>("");
   const [numeroNf, setNumeroNf] = useState("");
@@ -49,12 +59,16 @@ export default function Compras() {
   const [custoUnitario, setCustoUnitario] = useState("");
   const [ordemLote, setOrdemLote] = useState("");
 
-  // Filtros
-  const [filtroTab, setFiltroTab] = useState("todos");
+  // Filtros - Data Inicial e Final
   const [filtroPostoId, setFiltroPostoId] = useState<string>("todos");
-  const [tipoFiltroData, setTipoFiltroData] = useState<string>("periodo");
-  const [periodoFiltro, setPeriodoFiltro] = useState<string>("60");
-  const [dataEspecifica, setDataEspecifica] = useState<string>(getDateString(new Date()));
+  const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+  const [dataInicio, setDataInicio] = useState<string>(getDefaultDataInicio());
+  const [dataFim, setDataFim] = useState<string>(getDateString(new Date()));
+
+  // Seleção múltipla para exclusão em lote
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [deleteMultiDialogOpen, setDeleteMultiDialogOpen] = useState(false);
+  const [deleteMultiJustificativa, setDeleteMultiJustificativa] = useState("");
 
   const { data: postos } = trpc.postos.list.useQuery();
   const { data: tanques } = trpc.tanques.byPosto.useQuery(
@@ -63,23 +77,10 @@ export default function Compras() {
   );
   const { data: lotesAtivos, isLoading: loadingAtivos, refetch: refetchAtivos } = trpc.lotes.listAtivos.useQuery();
   const { data: todoLotes, isLoading: loadingTodos, refetch: refetchTodos } = trpc.lotes.list.useQuery();
-  const utils = trpc.useUtils();
 
-  // Calcular datas para filtro
-  const { dataInicio, dataFim } = useMemo(() => {
-    if (tipoFiltroData === "especifica") {
-      return { dataInicio: dataEspecifica, dataFim: dataEspecifica };
-    } else {
-      const fim = new Date();
-      const inicio = new Date();
-      inicio.setDate(inicio.getDate() - parseInt(periodoFiltro));
-      return { dataInicio: getDateString(inicio), dataFim: getDateString(fim) };
-    }
-  }, [tipoFiltroData, periodoFiltro, dataEspecifica]);
-
-  // Filtrar lotes
+  // Filtrar lotes por data inicial, data final, posto e status
   const lotesFiltrados = useMemo(() => {
-    const lotes = filtroTab === "ativos" ? lotesAtivos : todoLotes;
+    const lotes = filtroStatus === "ativos" ? lotesAtivos : todoLotes;
     if (!lotes) return [];
     
     return lotes.filter(lote => {
@@ -87,14 +88,26 @@ export default function Compras() {
       if (filtroPostoId !== "todos" && lote.postoId !== parseInt(filtroPostoId)) {
         return false;
       }
-      // Filtro por data
+      // Filtro por data inicial
       const dataLote = new Date(lote.dataEntrada).toISOString().split('T')[0];
-      if (dataLote < dataInicio || dataLote > dataFim) {
+      if (dataInicio && dataLote < dataInicio) {
+        return false;
+      }
+      // Filtro por data final
+      if (dataFim && dataLote > dataFim) {
         return false;
       }
       return true;
     });
-  }, [filtroTab, lotesAtivos, todoLotes, filtroPostoId, dataInicio, dataFim]);
+  }, [filtroStatus, lotesAtivos, todoLotes, filtroPostoId, dataInicio, dataFim]);
+
+  // Totais
+  const totais = useMemo(() => {
+    return lotesFiltrados.reduce((acc, lote) => ({
+      quantidade: acc.quantidade + parseFloat(String(lote.quantidadeOriginal) || "0"),
+      valor: acc.valor + parseFloat(String(lote.custoTotal) || "0"),
+    }), { quantidade: 0, valor: 0 });
+  }, [lotesFiltrados]);
 
   const createLote = trpc.lotes.create.useMutation({
     onSuccess: () => {
@@ -104,7 +117,7 @@ export default function Compras() {
       refetchAtivos();
       refetchTodos();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       alert("Erro ao registrar compra: " + error.message);
     }
   });
@@ -117,18 +130,20 @@ export default function Compras() {
       refetchAtivos();
       refetchTodos();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       alert("Erro ao atualizar compra: " + error.message);
     }
   });
 
   const deleteLote = trpc.lotes.delete.useMutation({
     onSuccess: () => {
-      alert("Compra excluída com sucesso!");
+      setDeleteDialogOpen(false);
+      setDeletingLote(null);
+      setDeleteJustificativa("");
       refetchAtivos();
       refetchTodos();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       alert("Erro ao excluir compra: " + error.message);
     }
   });
@@ -164,7 +179,7 @@ export default function Compras() {
   };
 
   const handleEdit = (lote: any) => {
-    setEditingLote(lote);
+    setEditingLote({ ...lote });
     setEditDialogOpen(true);
   };
 
@@ -175,32 +190,95 @@ export default function Compras() {
       id: editingLote.id,
       numeroNf: editingLote.numeroNf,
       chaveNfe: editingLote.chaveNfe,
-      custoUnitario: editingLote.custoUnitario,
+      custoUnitario: editingLote.custoUnitario?.toString(),
+      quantidadeOriginal: editingLote.quantidadeOriginal?.toString(),
       justificativa: "Edição manual via interface",
     });
   };
 
-  const handleDelete = (id: number, origem: string) => {
-    if (origem === "acs") {
-      alert("Não é possível excluir compras importadas do ACS");
-      return;
-    }
-    if (confirm("Tem certeza que deseja excluir esta compra?")) {
-      deleteLote.mutate({ id, justificativa: "Exclusão manual via interface" });
+  const handleDeleteClick = (lote: any) => {
+    setDeletingLote(lote);
+    setDeleteJustificativa("");
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!deletingLote) return;
+    deleteLote.mutate({ 
+      id: deletingLote.id, 
+      justificativa: deleteJustificativa || "Nota não necessária para DRE" 
+    });
+  };
+
+  // Seleção múltipla
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === lotesFiltrados.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(lotesFiltrados.map(l => l.id)));
     }
   };
 
-  // Atalhos de data
-  const setDataHoje = () => {
-    setTipoFiltroData("especifica");
-    setDataEspecifica(getDateString(new Date()));
+  const handleDeleteMultiConfirm = async () => {
+    const ids = Array.from(selectedIds);
+    let successCount = 0;
+    let errorCount = 0;
+    
+    for (const id of ids) {
+      try {
+        await deleteLote.mutateAsync({ 
+          id, 
+          justificativa: deleteMultiJustificativa || "Exclusão em lote - Nota não necessária para DRE" 
+        });
+        successCount++;
+      } catch {
+        errorCount++;
+      }
+    }
+    
+    setDeleteMultiDialogOpen(false);
+    setDeleteMultiJustificativa("");
+    setSelectedIds(new Set());
+    refetchAtivos();
+    refetchTodos();
+    
+    alert(`${successCount} compra(s) excluída(s) com sucesso.${errorCount > 0 ? ` ${errorCount} erro(s).` : ''}`);
   };
 
-  const setDataOntem = () => {
-    setTipoFiltroData("especifica");
-    const ontem = new Date();
-    ontem.setDate(ontem.getDate() - 1);
-    setDataEspecifica(getDateString(ontem));
+  // Atalhos de período
+  const setPeriodo = (dias: number) => {
+    const fim = new Date();
+    const inicio = new Date();
+    inicio.setDate(inicio.getDate() - dias);
+    setDataInicio(getDateString(inicio));
+    setDataFim(getDateString(fim));
+  };
+
+  const setMesAtual = () => {
+    const now = new Date();
+    const inicio = new Date(now.getFullYear(), now.getMonth(), 1);
+    setDataInicio(getDateString(inicio));
+    setDataFim(getDateString(now));
+  };
+
+  const setMesAnterior = () => {
+    const now = new Date();
+    const inicio = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const fim = new Date(now.getFullYear(), now.getMonth(), 0);
+    setDataInicio(getDateString(inicio));
+    setDataFim(getDateString(fim));
   };
 
   return (
@@ -237,7 +315,7 @@ export default function Compras() {
                       </SelectTrigger>
                       <SelectContent>
                         {postos?.map(posto => (
-                          <SelectItem key={posto.id} value={posto.id.toString()}>
+                          <SelectItem key={`novo-posto-${posto.id}`} value={posto.id.toString()}>
                             {posto.nome}
                           </SelectItem>
                         ))}
@@ -253,7 +331,7 @@ export default function Compras() {
                       </SelectTrigger>
                       <SelectContent>
                         {tanques?.map(tanque => (
-                          <SelectItem key={tanque.id} value={tanque.id.toString()}>
+                          <SelectItem key={`novo-tanque-${tanque.id}`} value={tanque.id.toString()}>
                             Tanque {tanque.codigoAcs} - {tanque.produtoDescricao}
                           </SelectItem>
                         ))}
@@ -314,14 +392,14 @@ export default function Compras() {
                     </div>
                   </div>
 
-                  {quantidade && custoUnitario && (
+                  {quantidade && custoUnitario ? (
                     <div className="p-3 bg-muted rounded-lg">
                       <p className="text-sm text-muted-foreground">Valor Total:</p>
                       <p className="text-lg font-bold">
                         {formatCurrency(parseFloat(quantidade) * parseFloat(custoUnitario))}
                       </p>
                     </div>
-                  )}
+                  ) : null}
 
                   <Button onClick={handleSubmit} className="w-full" disabled={createLote.isPending}>
                     {createLote.isPending ? "Salvando..." : "Registrar Compra"}
@@ -334,8 +412,35 @@ export default function Compras() {
 
         {/* Filtros */}
         <Card>
-          <CardContent className="pt-6">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Filtros
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Data Inicial */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Data Inicial</label>
+                <Input
+                  type="date"
+                  value={dataInicio}
+                  onChange={(e) => setDataInicio(e.target.value)}
+                />
+              </div>
+
+              {/* Data Final */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Data Final</label>
+                <Input
+                  type="date"
+                  value={dataFim}
+                  onChange={(e) => setDataFim(e.target.value)}
+                />
+              </div>
+
+              {/* Posto */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Posto</label>
                 <Select value={filtroPostoId} onValueChange={setFiltroPostoId}>
@@ -345,7 +450,7 @@ export default function Compras() {
                   <SelectContent>
                     <SelectItem value="todos">Todos os Postos</SelectItem>
                     {postos?.map(posto => (
-                      <SelectItem key={posto.id} value={posto.id.toString()}>
+                      <SelectItem key={`filtro-posto-${posto.id}`} value={posto.id.toString()}>
                         {posto.nome}
                       </SelectItem>
                     ))}
@@ -353,50 +458,10 @@ export default function Compras() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Tipo de Filtro</label>
-                <Select value={tipoFiltroData} onValueChange={setTipoFiltroData}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="periodo">Por Período</SelectItem>
-                    <SelectItem value="especifica">Data Específica</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {tipoFiltroData === "periodo" ? (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Período</label>
-                  <Select value={periodoFiltro} onValueChange={setPeriodoFiltro}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="7">Últimos 7 dias</SelectItem>
-                      <SelectItem value="15">Últimos 15 dias</SelectItem>
-                      <SelectItem value="30">Últimos 30 dias</SelectItem>
-                      <SelectItem value="60">Últimos 60 dias</SelectItem>
-                      <SelectItem value="90">Últimos 90 dias</SelectItem>
-                      <SelectItem value="180">Últimos 180 dias</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Data (dd/mm/aaaa)</label>
-                  <Input
-                    type="date"
-                    value={dataEspecifica}
-                    onChange={(e) => setDataEspecifica(e.target.value)}
-                  />
-                </div>
-              )}
-
+              {/* Status */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Status</label>
-                <Select value={filtroTab} onValueChange={setFiltroTab}>
+                <Select value={filtroStatus} onValueChange={setFiltroStatus}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -408,35 +473,74 @@ export default function Compras() {
               </div>
             </div>
 
-            {/* Atalhos de data */}
-            {tipoFiltroData === "especifica" && (
-              <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
-                <span className="text-sm text-muted-foreground mr-2 self-center">Atalhos:</span>
-                <Button variant="outline" size="sm" onClick={setDataHoje}>
-                  <Calendar className="h-3 w-3 mr-1" />
-                  Hoje ({formatDateBR(new Date())})
-                </Button>
-                <Button variant="outline" size="sm" onClick={setDataOntem}>
-                  Ontem ({formatDateBR(new Date(Date.now() - 86400000))})
-                </Button>
-              </div>
-            )}
+            {/* Atalhos de período */}
+            <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
+              <span className="text-sm text-muted-foreground mr-2 self-center">Atalhos:</span>
+              <Button variant="outline" size="sm" onClick={() => setPeriodo(7)}>7 dias</Button>
+              <Button variant="outline" size="sm" onClick={() => setPeriodo(15)}>15 dias</Button>
+              <Button variant="outline" size="sm" onClick={() => setPeriodo(30)}>30 dias</Button>
+              <Button variant="outline" size="sm" onClick={() => setPeriodo(60)}>60 dias</Button>
+              <Button variant="outline" size="sm" onClick={() => setPeriodo(90)}>90 dias</Button>
+              <Button variant="outline" size="sm" onClick={setMesAtual}>Mês Atual</Button>
+              <Button variant="outline" size="sm" onClick={setMesAnterior}>Mês Anterior</Button>
+            </div>
 
-            {/* Indicador de período */}
-            <div className="mt-4 pt-4 border-t flex justify-between items-center">
+            {/* Indicador de período e totais */}
+            <div className="mt-4 pt-4 border-t flex flex-wrap justify-between items-center gap-2">
               <p className="text-sm text-muted-foreground">
-                <strong>Período:</strong>{" "}
-                {tipoFiltroData === "especifica" 
-                  ? formatDateBR(dataEspecifica)
-                  : `${formatDateBR(dataInicio)} a ${formatDateBR(dataFim)}`
-                }
+                <strong>Período:</strong> {formatDateBR(dataInicio)} a {formatDateBR(dataFim)}
               </p>
-              <p className="text-sm text-muted-foreground">
-                <strong>{lotesFiltrados.length}</strong> registros encontrados
-              </p>
+              <div className="flex gap-4">
+                <p className="text-sm text-muted-foreground">
+                  <strong>{lotesFiltrados.length}</strong> registros
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  <strong>{formatNumber(totais.quantidade)}</strong> L
+                </p>
+                <p className="text-sm font-semibold">
+                  {formatCurrency(totais.valor)}
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
+
+        {/* Barra de ações de seleção */}
+        {selectedIds.size > 0 ? (
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-5 w-5 text-red-500" />
+                  <span className="text-sm font-medium text-red-700">
+                    {selectedIds.size} compra(s) selecionada(s)
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setSelectedIds(new Set())}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Limpar Seleção
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    onClick={() => {
+                      setDeleteMultiJustificativa("");
+                      setDeleteMultiDialogOpen(true);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Excluir Selecionadas
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
 
         {/* Tabela de Compras/NFes */}
         <Card>
@@ -458,12 +562,19 @@ export default function Compras() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-10">
+                        <input 
+                          type="checkbox" 
+                          checked={selectedIds.size === lotesFiltrados.length && lotesFiltrados.length > 0}
+                          onChange={toggleSelectAll}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                      </TableHead>
                       <TableHead>Data</TableHead>
                       <TableHead>Posto</TableHead>
                       <TableHead>Tanque</TableHead>
                       <TableHead>Combustível</TableHead>
                       <TableHead>NF</TableHead>
-                      <TableHead>Fornecedor</TableHead>
                       <TableHead className="text-right">Quantidade</TableHead>
                       <TableHead className="text-right">Custo Unit.</TableHead>
                       <TableHead className="text-right">Total</TableHead>
@@ -473,13 +584,23 @@ export default function Compras() {
                   </TableHeader>
                   <TableBody>
                     {lotesFiltrados.map(lote => (
-                      <TableRow key={lote.id}>
-                        <TableCell>{formatDateBR(lote.dataEntrada)}</TableCell>
+                      <TableRow 
+                        key={`lote-${lote.id}`} 
+                        className={selectedIds.has(lote.id) ? "bg-red-50" : undefined}
+                      >
+                        <TableCell>
+                          <input 
+                            type="checkbox" 
+                            checked={selectedIds.has(lote.id)}
+                            onChange={() => toggleSelect(lote.id)}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">{formatDateBR(lote.dataEntrada)}</TableCell>
                         <TableCell className="font-medium">{lote.postoNome}</TableCell>
                         <TableCell>{lote.tanqueCodigo}</TableCell>
                         <TableCell>{lote.produtoDescricao}</TableCell>
                         <TableCell>{lote.numeroNf || '-'}</TableCell>
-                        <TableCell>-</TableCell>
                         <TableCell className="text-right">{formatNumber(lote.quantidadeOriginal)} L</TableCell>
                         <TableCell className="text-right">{formatCurrency(lote.custoUnitario)}</TableCell>
                         <TableCell className="text-right font-semibold">{formatCurrency(lote.custoTotal)}</TableCell>
@@ -490,14 +611,17 @@ export default function Compras() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => handleEdit(lote)}>
+                            <Button variant="ghost" size="icon" onClick={() => handleEdit(lote)} title="Editar compra">
                               <Edit className="h-4 w-4" />
                             </Button>
-                            {lote.origem !== "acs" && (
-                              <Button variant="ghost" size="icon" onClick={() => handleDelete(lote.id, lote.origem || "manual")}>
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
-                            )}
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => handleDeleteClick(lote)}
+                              title="Excluir compra"
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -515,12 +639,13 @@ export default function Compras() {
             <DialogHeader>
               <DialogTitle>Editar Compra</DialogTitle>
             </DialogHeader>
-            {editingLote && (
+            {editingLote ? (
               <div className="space-y-4 py-4">
                 <div className="p-3 bg-muted rounded-lg">
                   <p className="text-sm text-muted-foreground">Posto: <strong>{editingLote.postoNome}</strong></p>
                   <p className="text-sm text-muted-foreground">Tanque: <strong>{editingLote.tanqueCodigo}</strong></p>
                   <p className="text-sm text-muted-foreground">Data: <strong>{formatDateBR(editingLote.dataEntrada)}</strong></p>
+                  <p className="text-sm text-muted-foreground">Origem: <strong>{editingLote.origem === "acs" ? "ACS" : "Manual"}</strong></p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -543,6 +668,16 @@ export default function Compras() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label>Quantidade (L)</Label>
+                  <Input 
+                    type="number"
+                    value={editingLote.quantidadeOriginal || ''} 
+                    onChange={e => setEditingLote({...editingLote, quantidadeOriginal: e.target.value})} 
+                    step="0.001"
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <Label>Chave NFe</Label>
                   <Input 
                     value={editingLote.chaveNfe || ''} 
@@ -551,29 +686,112 @@ export default function Compras() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Fornecedor</Label>
-                  <Input 
-                    value={editingLote.fornecedorNome || ''} 
-                    onChange={e => setEditingLote({...editingLote, fornecedorNome: e.target.value})} 
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Ordem do Lote (PEPS)</Label>
-                  <Input 
-                    type="number"
-                    value={editingLote.ordemLote || ''} 
-                    onChange={e => setEditingLote({...editingLote, ordemLote: parseInt(e.target.value) || null})} 
-                    placeholder="Ordem para cálculo PEPS"
-                  />
-                </div>
+                {editingLote.quantidadeOriginal && editingLote.custoUnitario ? (
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground">Valor Total Atualizado:</p>
+                    <p className="text-lg font-bold">
+                      {formatCurrency(parseFloat(editingLote.quantidadeOriginal) * parseFloat(editingLote.custoUnitario))}
+                    </p>
+                  </div>
+                ) : null}
 
                 <Button onClick={handleUpdate} className="w-full" disabled={updateLote.isPending}>
                   {updateLote.isPending ? "Salvando..." : "Salvar Alterações"}
                 </Button>
               </div>
-            )}
+            ) : null}
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Confirmação de Exclusão Individual */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <AlertTriangle className="h-5 w-5" />
+                Confirmar Exclusão
+              </DialogTitle>
+              <DialogDescription>
+                Esta ação não pode ser desfeita. A compra será removida permanentemente do sistema.
+              </DialogDescription>
+            </DialogHeader>
+            {deletingLote ? (
+              <div className="space-y-4 py-2">
+                <div className="p-3 bg-red-50 rounded-lg border border-red-200">
+                  <p className="text-sm"><strong>Posto:</strong> {deletingLote.postoNome}</p>
+                  <p className="text-sm"><strong>NF:</strong> {deletingLote.numeroNf || 'Sem NF'}</p>
+                  <p className="text-sm"><strong>Data:</strong> {formatDateBR(deletingLote.dataEntrada)}</p>
+                  <p className="text-sm"><strong>Combustível:</strong> {deletingLote.produtoDescricao}</p>
+                  <p className="text-sm"><strong>Quantidade:</strong> {formatNumber(deletingLote.quantidadeOriginal)} L</p>
+                  <p className="text-sm"><strong>Valor:</strong> {formatCurrency(deletingLote.custoTotal)}</p>
+                  <p className="text-sm"><strong>Origem:</strong> {deletingLote.origem === "acs" ? "ACS" : "Manual"}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Justificativa (opcional)</Label>
+                  <Input 
+                    value={deleteJustificativa} 
+                    onChange={e => setDeleteJustificativa(e.target.value)}
+                    placeholder="Ex: Nota não necessária para DRE, nota duplicada..."
+                  />
+                </div>
+              </div>
+            ) : null}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleDeleteConfirm}
+                disabled={deleteLote.isPending}
+              >
+                {deleteLote.isPending ? "Excluindo..." : "Excluir Compra"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Exclusão em Lote */}
+        <Dialog open={deleteMultiDialogOpen} onOpenChange={setDeleteMultiDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <AlertTriangle className="h-5 w-5" />
+                Excluir {selectedIds.size} Compra(s)
+              </DialogTitle>
+              <DialogDescription>
+                Esta ação não pode ser desfeita. Todas as compras selecionadas serão removidas permanentemente.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="p-3 bg-red-50 rounded-lg border border-red-200">
+                <p className="text-sm font-medium text-red-700">
+                  {selectedIds.size} compra(s) serão excluídas permanentemente.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Justificativa (opcional)</Label>
+                <Input 
+                  value={deleteMultiJustificativa} 
+                  onChange={e => setDeleteMultiJustificativa(e.target.value)}
+                  placeholder="Ex: Notas não necessárias para DRE..."
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteMultiDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleDeleteMultiConfirm}
+                disabled={deleteLote.isPending}
+              >
+                {deleteLote.isPending ? "Excluindo..." : `Excluir ${selectedIds.size} Compra(s)`}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

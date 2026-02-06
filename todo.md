@@ -174,3 +174,14 @@
 - [x] Data de inicialização = primeiro dia do mês
 - [x] Aviso de recálculo CMV ao editar
 - [x] Confirmação ao excluir
+
+## Melhorias Aba Compras - Solicitado pelo Usuário (CONCLUÍDO)
+
+- [x] Adicionar filtro por data inicial e data final
+- [x] Adicionar opção de excluir compras (notas desnecessárias para DRE) - incluindo ACS
+- [x] Adicionar opção de editar compras
+- [x] Confirmação antes de excluir (dialog com justificativa)
+- [x] Seleção múltipla com exclusão em lote
+- [x] Atalhos de período (7d, 15d, 30d, 60d, 90d, Mês Atual, Mês Anterior)
+- [x] Totais no rodapé dos filtros (registros, litros, valor)
+- [x] Backend já existia: função deleteLote e updateLote
