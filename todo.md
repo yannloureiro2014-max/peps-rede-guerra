@@ -261,3 +261,7 @@
 ## Aumento de limite de registros - Solicitado pelo Usuário
 
 - [x] Aumentar limit do getVendas() de 10.000 para 100.000 para suportar alto volume de abastecimentos
+
+## Bug: Erro ao alterar usuário - Reportado pelo Usuário
+
+- [x] Investigar e corrigir erro "An unexpected error occurred" ao tentar alterar usuário na Gestão de Usuários - causa: SelectItem com value="" (vazio) crashava o shadcn/ui Select; corrigido para value="none"

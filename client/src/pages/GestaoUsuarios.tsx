@@ -43,7 +43,7 @@ export default function GestaoUsuarios() {
   const [formEmail, setFormEmail] = useState("");
   const [formName, setFormName] = useState("");
   const [formRole, setFormRole] = useState<"user" | "admin_geral" | "visualizacao">("user");
-  const [formPostoId, setFormPostoId] = useState<string>("");
+  const [formPostoId, setFormPostoId] = useState<string>("none");
 
   const { data: usuarios, refetch } = trpc.usuarios.list.useQuery(undefined, {
     enabled: currentUser?.role === "admin_geral"
@@ -89,7 +89,7 @@ export default function GestaoUsuarios() {
     setFormEmail("");
     setFormName("");
     setFormRole("user");
-    setFormPostoId("");
+    setFormPostoId("none");
     setEditingUser(null);
   };
 
@@ -98,7 +98,7 @@ export default function GestaoUsuarios() {
     setFormEmail(usuario.email || "");
     setFormName(usuario.name || "");
     setFormRole(usuario.role || "user");
-    setFormPostoId(usuario.postoId?.toString() || "");
+    setFormPostoId(usuario.postoId?.toString() || "none");
     setDialogOpen(true);
   };
 
@@ -113,7 +113,7 @@ export default function GestaoUsuarios() {
         id: editingUser.id,
         name: formName,
         role: formRole,
-        postoId: formPostoId ? parseInt(formPostoId) : null
+        postoId: formPostoId && formPostoId !== "none" ? parseInt(formPostoId) : null
       });
     } else {
       if (!formEmail || !formName) {
@@ -124,7 +124,7 @@ export default function GestaoUsuarios() {
         email: formEmail,
         name: formName,
         role: formRole,
-        postoId: formPostoId ? parseInt(formPostoId) : undefined
+        postoId: formPostoId && formPostoId !== "none" ? parseInt(formPostoId) : undefined
       });
     }
   };
@@ -218,7 +218,7 @@ export default function GestaoUsuarios() {
                         <SelectValue placeholder="Todos os postos" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos os postos</SelectItem>
+                        <SelectItem value="none">Todos os postos</SelectItem>
                         {postos?.map(posto => (
                           <SelectItem key={posto.id} value={posto.id.toString()}>
                             {posto.nome}
