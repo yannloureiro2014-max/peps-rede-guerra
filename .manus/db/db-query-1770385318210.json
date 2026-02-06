@@ -1,0 +1,40 @@
+{
+  "query": "SELECT p.nome, p.ativo, COUNT(*) as total_afericoes FROM vendas v JOIN postos p ON v.postoId = p.id WHERE v.afericao = 1 GROUP BY p.nome, p.ativo",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT p.nome, p.ativo, COUNT(*) as total_afericoes FROM vendas v JOIN postos p ON v.postoId = p.id WHERE v.afericao = 1 GROUP BY p.nome, p.ativo",
+  "rows": [
+    {
+      "nome": "POSTO PAI TEREZA",
+      "ativo": "1",
+      "total_afericoes": "5"
+    },
+    {
+      "nome": "POSTO ITAIÇABA",
+      "ativo": "1",
+      "total_afericoes": "4"
+    },
+    {
+      "nome": "REDE SUPER PETROLEO",
+      "ativo": "1",
+      "total_afericoes": "9"
+    },
+    {
+      "nome": "POSTO JAGUARUANA",
+      "ativo": "1",
+      "total_afericoes": "4"
+    },
+    {
+      "nome": "POSTO GUERRA PALHANO",
+      "ativo": "1",
+      "total_afericoes": "4"
+    },
+    {
+      "nome": "POSTO GUARARAPES VIP",
+      "ativo": "0",
+      "total_afericoes": "3"
+    }
+  ],
+  "messages": [],
+  "stdout": "nome\tativo\ttotal_afericoes\nPOSTO PAI TEREZA\t1\t5\nPOSTO ITAIÇABA\t1\t4\nREDE SUPER PETROLEO\t1\t9\nPOSTO JAGUARUANA\t1\t4\nPOSTO GUERRA PALHANO\t1\t4\nPOSTO GUARARAPES VIP\t0\t3\n",
+  "stderr": "",
+  "execution_time_ms": 77
+}

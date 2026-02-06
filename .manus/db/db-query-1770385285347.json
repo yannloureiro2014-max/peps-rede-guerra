@@ -1,0 +1,18 @@
+{
+  "query": "SELECT afericao, COUNT(*) as total FROM vendas GROUP BY afericao",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT afericao, COUNT(*) as total FROM vendas GROUP BY afericao",
+  "rows": [
+    {
+      "afericao": "0",
+      "total": "12835"
+    },
+    {
+      "afericao": "1",
+      "total": "29"
+    }
+  ],
+  "messages": [],
+  "stdout": "afericao\ttotal\n0\t12835\n1\t29\n",
+  "stderr": "",
+  "execution_time_ms": 131
+}

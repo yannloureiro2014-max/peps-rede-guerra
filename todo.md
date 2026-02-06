@@ -236,3 +236,18 @@
 - [x] Mostrar totais no rodapé (registros, litros, valor)
 - [x] Cards de resumo (Total Registros, Volume Total, Faturamento)
 - [x] Exportar CSV
+
+## Correção Data Detalhamento + Separação Aferições - Solicitado pelo Usuário
+
+### Bug 1: Data inconsistente no detalhamento
+- [x] Corrigir exibição de data no detalhamento (mostra dia anterior por fuso horário UTC) - corrigido com UTC T00:00:00.000Z e T23:59:59.999Z
+- [x] Garantir que data exibida seja idêntica à data do filtro - testado e confirmado
+
+### Bug 2: Aferições contabilizadas como vendas
+- [x] Identificar como aferições são marcadas no banco ACS - campo afericao='S' no ACS, convertido para afericao=1 no PEPS
+- [x] Filtrar aferições do cálculo de vendas e DRE - calcularDRE() agora filtra afericao=0
+- [x] Exibir aferições separadamente como informação operacional - aba Aferições em Vendas.tsx
+- [x] Mostrar litragem total vendida vs litragem de aferições - cards separados em Vendas.tsx
+- [x] Manter rastreabilidade para auditoria - aferições visíveis na aba separada
+- [x] Excluir aferições do recálculo retroativo de CMV - recalcularCMVRetroativo() filtra afericao=0
+- [x] Dashboard já exclui aferições (getVendasResumo, getVendasPorPosto, getVendasPorCombustivel)

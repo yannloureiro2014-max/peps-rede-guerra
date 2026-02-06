@@ -1,0 +1,20 @@
+{
+  "query": "SELECT afericao, COUNT(*) as total, SUM(CAST(quantidade AS DECIMAL(12,3))) as litros_total FROM vendas GROUP BY afericao;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT afericao, COUNT(*) as total, SUM(CAST(quantidade AS DECIMAL(12,3))) as litros_total FROM vendas GROUP BY afericao;",
+  "rows": [
+    {
+      "afericao": "0",
+      "total": "12835",
+      "litros_total": "101574.212"
+    },
+    {
+      "afericao": "1",
+      "total": "29",
+      "litros_total": "3462.211"
+    }
+  ],
+  "messages": [],
+  "stdout": "afericao\ttotal\tlitros_total\n0\t12835\t101574.212\n1\t29\t3462.211\n",
+  "stderr": "",
+  "execution_time_ms": 63
+}

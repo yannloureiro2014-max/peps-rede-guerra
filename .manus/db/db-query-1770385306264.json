@@ -1,0 +1,40 @@
+{
+  "query": "SELECT id, nome, ativo FROM postos WHERE id IN (1, 8) OR ativo = 1 ORDER BY ativo DESC, id",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT id, nome, ativo FROM postos WHERE id IN (1, 8) OR ativo = 1 ORDER BY ativo DESC, id",
+  "rows": [
+    {
+      "id": "1",
+      "nome": "REDE SUPER PETROLEO",
+      "ativo": "1"
+    },
+    {
+      "id": "2",
+      "nome": "POSTO GUERRA FORTIM",
+      "ativo": "1"
+    },
+    {
+      "id": "4",
+      "nome": "POSTO GUERRA PALHANO",
+      "ativo": "1"
+    },
+    {
+      "id": "5",
+      "nome": "POSTO PAI TEREZA",
+      "ativo": "1"
+    },
+    {
+      "id": "8",
+      "nome": "POSTO JAGUARUANA",
+      "ativo": "1"
+    },
+    {
+      "id": "9",
+      "nome": "POSTO ITAIÇABA",
+      "ativo": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tnome\tativo\n1\tREDE SUPER PETROLEO\t1\n2\tPOSTO GUERRA FORTIM\t1\n4\tPOSTO GUERRA PALHANO\t1\n5\tPOSTO PAI TEREZA\t1\n8\tPOSTO JAGUARUANA\t1\n9\tPOSTO ITAIÇABA\t1\n",
+  "stderr": "",
+  "execution_time_ms": 58
+}

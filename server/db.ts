@@ -296,13 +296,12 @@ export async function getVendas(filtros: { postoId?: number; produtoId?: number;
   // Sempre filtrar apenas postos ativos
   conditions.push(eq(postos.ativo, 1));
   if (filtros.dataInicio) {
-    const dataIni = new Date(filtros.dataInicio);
-    dataIni.setHours(0, 0, 0, 0);
+    // Usar UTC para evitar deslocamento de fuso horário
+    const dataIni = new Date(filtros.dataInicio + 'T00:00:00.000Z');
     conditions.push(gte(vendas.dataVenda, dataIni));
   }
   if (filtros.dataFim) {
-    const dataFi = new Date(filtros.dataFim);
-    dataFi.setHours(23, 59, 59, 999);
+    const dataFi = new Date(filtros.dataFim + 'T23:59:59.999Z');
     conditions.push(lte(vendas.dataVenda, dataFi));
   }
   if (filtros.postoId) conditions.push(eq(postos.id, filtros.postoId));
@@ -314,6 +313,7 @@ export async function getVendas(filtros: { postoId?: number; produtoId?: number;
     quantidade: vendas.quantidade,
     valorUnitario: vendas.valorUnitario,
     valorTotal: vendas.valorTotal,
+    afericao: vendas.afericao,
     postoNome: postos.nome,
     tanqueCodigo: tanques.codigoAcs,
     produtoDescricao: produtos.descricao
@@ -347,7 +347,7 @@ export async function getVendasResumo(dias: number = 30) {
   })
   .from(vendas)
   .innerJoin(postos, eq(vendas.postoId, postos.id))
-  .where(and(gte(vendas.dataVenda, dataLimite), eq(postos.ativo, 1)));
+  .where(and(gte(vendas.dataVenda, dataLimite), eq(postos.ativo, 1), eq(vendas.afericao, 0)));
   
   return {
     totalLitros: result[0]?.totalLitros || "0",
@@ -371,7 +371,7 @@ export async function getVendasPorPosto(dias: number = 30) {
   .from(vendas)
   .leftJoin(tanques, eq(vendas.tanqueId, tanques.id))
   .leftJoin(postos, eq(tanques.postoId, postos.id))
-  .where(and(gte(vendas.dataVenda, dataLimite), eq(postos.ativo, 1)))
+  .where(and(gte(vendas.dataVenda, dataLimite), eq(postos.ativo, 1), eq(vendas.afericao, 0)))
   .groupBy(postos.nome)
   .orderBy(desc(sum(vendas.quantidade)));
 }
@@ -392,7 +392,7 @@ export async function getVendasPorCombustivel(dias: number = 30) {
   .leftJoin(tanques, eq(vendas.tanqueId, tanques.id))
   .leftJoin(postos, eq(vendas.postoId, postos.id))
   .leftJoin(produtos, eq(tanques.produtoId, produtos.id))
-  .where(and(gte(vendas.dataVenda, dataLimite), eq(postos.ativo, 1)))
+  .where(and(gte(vendas.dataVenda, dataLimite), eq(postos.ativo, 1), eq(vendas.afericao, 0)))
   .groupBy(produtos.descricao)
   .orderBy(desc(sum(vendas.quantidade)));
 }
@@ -1090,13 +1090,15 @@ export async function calcularDRE(filtros: {
   // Buscar vendas do período com CMV já calculado
   const conditions = [];
   
-  const dataIni = new Date(filtros.dataInicio);
-  dataIni.setHours(0, 0, 0, 0);
+  // Usar UTC para evitar deslocamento de fuso horário
+  const dataIni = new Date(filtros.dataInicio + 'T00:00:00.000Z');
   conditions.push(gte(vendas.dataVenda, dataIni));
   
-  const dataFi = new Date(filtros.dataFim);
-  dataFi.setHours(23, 59, 59, 999);
+  const dataFi = new Date(filtros.dataFim + 'T23:59:59.999Z');
   conditions.push(lte(vendas.dataVenda, dataFi));
+  
+  // IMPORTANTE: Excluir aferições do DRE - apenas vendas reais (afericao = 0)
+  conditions.push(eq(vendas.afericao, 0));
   
   if (filtros.postoId) conditions.push(eq(vendas.postoId, filtros.postoId));
   if (filtros.produtoId) conditions.push(eq(vendas.produtoId, filtros.produtoId));
@@ -1211,12 +1213,14 @@ export async function recalcularCMVRetroativo(
   
   // 2. Buscar TODAS as vendas do posto/produto a partir da data de início
   // (não apenas pendentes, pois precisamos recalcular tudo na ordem correta)
+  // IMPORTANTE: Excluir aferições (afericao = 1) - não devem consumir lotes
   const vendasParaRecalcular = await db.select()
     .from(vendas)
     .where(and(
       eq(vendas.postoId, postoId),
       eq(vendas.produtoId, produtoId),
-      gte(vendas.dataVenda, dataInicio)
+      gte(vendas.dataVenda, dataInicio),
+      eq(vendas.afericao, 0)
     ))
     .orderBy(vendas.dataVenda, vendas.id);
   

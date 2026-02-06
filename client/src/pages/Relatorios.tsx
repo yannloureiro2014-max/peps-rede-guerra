@@ -196,7 +196,7 @@ export default function Relatorios() {
                   size="sm"
                   onClick={() => exportarCSV(
                     medicoes?.map(m => ({
-                      Data: new Date(m.dataMedicao).toLocaleDateString('pt-BR'),
+                      Data: new Date(m.dataMedicao).toLocaleDateString('pt-BR', { timeZone: 'UTC' }),
                       Posto: m.postoNome,
                       Tanque: m.tanqueCodigo,
                       Combustível: m.produtoDescricao,
@@ -231,7 +231,7 @@ export default function Relatorios() {
                     <TableBody>
                       {medicoes?.map(med => (
                         <TableRow key={med.id}>
-                          <TableCell>{new Date(med.dataMedicao).toLocaleDateString('pt-BR')}</TableCell>
+                          <TableCell>{new Date(med.dataMedicao).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</TableCell>
                           <TableCell className="font-medium">{med.postoNome}</TableCell>
                           <TableCell>{med.tanqueCodigo}</TableCell>
                           <TableCell className="text-right">{formatNumber(med.volumeMedido)} L</TableCell>
@@ -275,7 +275,7 @@ export default function Relatorios() {
                       Combustível: l.produtoDescricao,
                       NF: l.numeroNf,
                       Fornecedor: l.fornecedorId || 'N/A',
-                      'Data Entrada': new Date(l.dataEntrada).toLocaleDateString('pt-BR'),
+                      'Data Entrada': new Date(l.dataEntrada).toLocaleDateString('pt-BR', { timeZone: 'UTC' }),
                       'Qtd Original': l.quantidadeOriginal,
                       'Qtd Disponível': l.quantidadeDisponivel,
                       'Custo Unit.': l.custoUnitario
@@ -310,7 +310,7 @@ export default function Relatorios() {
                           <TableCell>{lote.tanqueCodigo}</TableCell>
                           <TableCell>{lote.produtoDescricao}</TableCell>
                           <TableCell>{lote.numeroNf || '-'}</TableCell>
-                          <TableCell>{new Date(lote.dataEntrada).toLocaleDateString('pt-BR')}</TableCell>
+                          <TableCell>{new Date(lote.dataEntrada).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</TableCell>
                           <TableCell className="text-right">{formatNumber(lote.quantidadeOriginal)} L</TableCell>
                           <TableCell className="text-right font-semibold">{formatNumber(lote.quantidadeDisponivel)} L</TableCell>
                           <TableCell className="text-right">{formatCurrency(lote.custoUnitario)}</TableCell>

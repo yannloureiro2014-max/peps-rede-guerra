@@ -14,8 +14,12 @@ import { toast } from "sonner";
 
 function formatDate(date: Date | string | null): string {
   if (!date) return "-";
+  if (typeof date === 'string') {
+    const match = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  }
   const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleDateString('pt-BR');
+  return d.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 }
 
 function getRoleBadge(role: string) {

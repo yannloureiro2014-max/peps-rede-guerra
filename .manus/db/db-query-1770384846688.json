@@ -1,0 +1,16 @@
+{
+  "query": "SELECT COUNT(*) as total, \n  SUM(CASE WHEN CAST(valorTotal AS DECIMAL(12,2)) = 0 THEN 1 ELSE 0 END) as valor_zero,\n  SUM(CASE WHEN CAST(valorUnitario AS DECIMAL(12,4)) = 0 THEN 1 ELSE 0 END) as preco_zero,\n  SUM(CASE WHEN CAST(valorTotal AS DECIMAL(12,2)) = 0 AND CAST(valorUnitario AS DECIMAL(12,4)) = 0 THEN 1 ELSE 0 END) as ambos_zero\nFROM vendas",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT COUNT(*) as total, \n  SUM(CASE WHEN CAST(valorTotal AS DECIMAL(12,2)) = 0 THEN 1 ELSE 0 END) as valor_zero,\n  SUM(CASE WHEN CAST(valorUnitario AS DECIMAL(12,4)) = 0 THEN 1 ELSE 0 END) as preco_zero,\n  SUM(CASE WHEN CAST(valorTotal AS DECIMAL(12,2)) = 0 AND CAST(valorUnitario AS DECIMAL(12,4)) = 0 THEN 1 ELSE 0 END) as ambos_zero\nFROM vendas",
+  "rows": [
+    {
+      "total": "12864",
+      "valor_zero": "0",
+      "preco_zero": "0",
+      "ambos_zero": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "total\tvalor_zero\tpreco_zero\tambos_zero\n12864\t0\t0\t0\n",
+  "stderr": "",
+  "execution_time_ms": 91
+}

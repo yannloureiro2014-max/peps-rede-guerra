@@ -267,7 +267,7 @@ export default function Medicoes() {
                       const pct = parseFloat(med.percentualDiferenca || '0');
                       return (
                         <TableRow key={med.id}>
-                          <TableCell>{new Date(med.dataMedicao).toLocaleDateString('pt-BR')}</TableCell>
+                          <TableCell>{new Date(med.dataMedicao).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</TableCell>
                           <TableCell className="font-medium">{med.postoNome}</TableCell>
                           <TableCell>{med.tanqueCodigo}</TableCell>
                           <TableCell>{med.produtoDescricao}</TableCell>

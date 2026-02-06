@@ -117,6 +117,7 @@ export const vendas = mysqlTable("vendas", {
   cmvCalculado: decimal("cmvCalculado", { precision: 14, scale: 2 }).default("0"),
   cmvUnitario: decimal("cmvUnitario", { precision: 12, scale: 4 }).default("0"),
   statusCmv: mysqlEnum("statusCmv", ["pendente", "calculado", "erro"]).default("pendente").notNull(),
+  afericao: int("afericao").default(0).notNull(),
   origem: varchar("origem", { length: 20 }).default("acs").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });

@@ -1,0 +1,8 @@
+{
+  "query": "SELECT afericao, COUNT(*) as total, ROUND(SUM(CAST(quantidade AS DECIMAL(12,3))), 3) as litros_total, ROUND(SUM(CAST(valor_total AS DECIMAL(12,2))), 2) as valor_total FROM vendas GROUP BY afericao ORDER BY afericao;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT afericao, COUNT(*) as total, ROUND(SUM(CAST(quantidade AS DECIMAL(12,3))), 3) as litros_total, ROUND(SUM(CAST(valor_total AS DECIMAL(12,2))), 2) as valor_total FROM vendas GROUP BY afericao ORDER BY afericao;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'valor_total' in 'group statement'"
+  ]
+}

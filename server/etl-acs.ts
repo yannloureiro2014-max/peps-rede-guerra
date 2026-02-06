@@ -291,7 +291,8 @@ export async function sincronizarVendasACS(diasAtras: number = 30) {
         a.litros,
         a.preco,
         a.total,
-        a.tipo_combustivel
+        a.tipo_combustivel,
+        a.afericao
       FROM abastecimentos a
       WHERE a.dt_abast >= $1
         AND a.baixado = 'S'
@@ -339,6 +340,7 @@ export async function sincronizarVendasACS(diasAtras: number = 30) {
 
       if (existente.length === 0) {
         // Inserir a venda
+        const isAfericao = row.afericao?.trim() === 'S' ? 1 : 0;
         const insertResult = await db.insert(vendas).values({
           postoId: posto.id,
           tanqueId: tanque?.id || null,
@@ -348,12 +350,13 @@ export async function sincronizarVendasACS(diasAtras: number = 30) {
           quantidade: row.litros?.toString() || "0",
           valorUnitario: row.preco?.toString() || "0",
           valorTotal: row.total?.toString() || "0",
-          statusCmv: "pendente",
+          afericao: isAfericao,
+          statusCmv: isAfericao ? "calculado" : "pendente",
         });
         inseridos++;
         
-        // Calcular CMV automaticamente após inserir a venda
-        if (insertResult[0]?.insertId) {
+        // Calcular CMV automaticamente após inserir a venda (pular aferições)
+        if (insertResult[0]?.insertId && !isAfericao) {
           try {
             const { calcularCMVPEPS } = await import("./db");
             await calcularCMVPEPS(insertResult[0].insertId);

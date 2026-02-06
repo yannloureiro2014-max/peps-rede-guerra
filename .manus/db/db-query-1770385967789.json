@@ -1,0 +1,15 @@
+{
+  "query": "SELECT afericao, COUNT(*) as total, ROUND(SUM(CAST(quantidade AS DECIMAL(12,3))), 3) as litros FROM vendas WHERE dataVenda >= '2026-02-06 00:00:00' AND dataVenda <= '2026-02-06 23:59:59' GROUP BY afericao;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT afericao, COUNT(*) as total, ROUND(SUM(CAST(quantidade AS DECIMAL(12,3))), 3) as litros FROM vendas WHERE dataVenda >= '2026-02-06 00:00:00' AND dataVenda <= '2026-02-06 23:59:59' GROUP BY afericao;",
+  "rows": [
+    {
+      "afericao": "0",
+      "total": "87",
+      "litros": "703.015"
+    }
+  ],
+  "messages": [],
+  "stdout": "afericao\ttotal\tlitros\n0\t87\t703.015\n",
+  "stderr": "",
+  "execution_time_ms": 55
+}
