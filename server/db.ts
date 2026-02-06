@@ -120,9 +120,9 @@ export async function getTanques() {
     produtoDescricao: produtos.descricao
   })
   .from(tanques)
-  .leftJoin(postos, eq(tanques.postoId, postos.id))
+  .innerJoin(postos, eq(tanques.postoId, postos.id))
   .leftJoin(produtos, eq(tanques.produtoId, produtos.id))
-  .where(eq(tanques.ativo, 1))
+  .where(and(eq(tanques.ativo, 1), eq(postos.ativo, 1)))
   .orderBy(postos.nome, tanques.codigoAcs);
 }
 

@@ -221,3 +221,7 @@
 - [x] Dashboard mostra 6 postos ativos e 17 tanques
 - [x] Alertas filtram postos inativos
 - [x] Sem erros no console
+
+## Bug: Estoque mostrando postos inativos (CORRIGIDO)
+
+- [x] Filtrar postos inativos na aba Estoque - corrigido getTanques com innerJoin postos.ativo=1
