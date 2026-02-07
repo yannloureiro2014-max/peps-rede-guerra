@@ -271,27 +271,13 @@ export async function sincronizarVendasACS(diasAtras: number = 90) {
   }
 
   try {
-    // Sincronização incremental: buscar a partir da última venda sincronizada
-    const ultimaVenda = await db.select({ maxData: sql<string>`MAX(dataVenda)` }).from(vendas);
-    const ultimaDataStr = ultimaVenda[0]?.maxData;
+    // Sincronização: usar diasAtras para calcular data de início
+    const dataInicioStr = new Date();
+    dataInicioStr.setDate(dataInicioStr.getDate() - diasAtras);
+    const dataInicioCalc = dataInicioStr.toISOString().split("T")[0];
+    const dataInicioFinal = dataInicioCalc > DATA_CORTE ? dataInicioCalc : DATA_CORTE;
     
-    let dataInicioFinal: string;
-    if (ultimaDataStr) {
-      // Buscar a partir de 2 dias antes da última venda (margem de segurança)
-      const ultimaData = new Date(ultimaDataStr);
-      ultimaData.setDate(ultimaData.getDate() - 2);
-      const incrementalDate = ultimaData.toISOString().split("T")[0];
-      // Usar a data mais recente entre incremental e DATA_CORTE
-      dataInicioFinal = incrementalDate > DATA_CORTE ? incrementalDate : DATA_CORTE;
-    } else {
-      // Primeira sincronização: usar diasAtras ou DATA_CORTE
-      const dataInicioStr = new Date();
-      dataInicioStr.setDate(dataInicioStr.getDate() - diasAtras);
-      const dataInicioCalc = dataInicioStr.toISOString().split("T")[0];
-      dataInicioFinal = dataInicioCalc > DATA_CORTE ? dataInicioCalc : DATA_CORTE;
-    }
-    
-    console.log(`[ETL] Sincronizando vendas (incremental desde: ${dataInicioFinal})...`);
+    console.log(`[ETL] Sincronizando vendas (desde: ${dataInicioFinal}, diasAtras=${diasAtras})...`);
 
     // Buscar abastecimentos do ACS - limite menor para performance
     const result = await acsClient.query(`

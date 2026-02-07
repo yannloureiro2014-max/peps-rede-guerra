@@ -308,3 +308,10 @@
 - [x] Implementar sincronização automática a cada 60 minutos no servidor (server/_core/index.ts)
 - [x] Flag syncRunning impede execução concorrente
 - [x] Primeira sync 2 min após boot, depois a cada 60 min (7 dias incremental)
+
+## Bug: Vendas de janeiro/2026 faltantes - Reportado pelo Usuário
+
+- [x] Comparar dados do banco PEPS com relatório ACS Gerente - banco só tinha 4 dias (01,02,30,31), faltavam 27 dias
+- [x] Identificar causa raiz - lógica incremental pulava dias com gap, corrigida para usar diasAtras diretamente
+- [x] Re-executar sincronização - 37.288 vendas importadas via script dia-a-dia
+- [x] Validar totais - 27/31 dias batem exatamente com ACS (dif <1L), total REDE SUPER: 147.533L vs 147.538L ACS
