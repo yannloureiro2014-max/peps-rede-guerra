@@ -9,6 +9,9 @@ function getQueryParam(req: Request, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+// Whitelist de emails autorizados para acessar o sistema
+const AUTHORIZED_EMAILS = process.env.AUTHORIZED_EMAILS?.split(",").map(e => e.trim().toLowerCase()) || [];
+
 export function registerOAuthRoutes(app: Express) {
   app.get("/api/oauth/callback", async (req: Request, res: Response) => {
     const code = getQueryParam(req, "code");
@@ -25,6 +28,14 @@ export function registerOAuthRoutes(app: Express) {
 
       if (!userInfo.openId) {
         res.status(400).json({ error: "openId missing from user info" });
+        return;
+      }
+
+      // Verificar se o email está na whitelist
+      const userEmail = (userInfo.email || "").toLowerCase();
+      if (AUTHORIZED_EMAILS.length > 0 && !AUTHORIZED_EMAILS.includes(userEmail)) {
+        console.warn(`[OAuth] Acesso negado para email não autorizado: ${userEmail}`);
+        res.status(403).json({ error: "Email não autorizado para acessar este sistema" });
         return;
       }
 

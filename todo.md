@@ -342,3 +342,9 @@
 - [x] Recomendações de compra: quantidade, fornecedor, timing
 - [x] Detecção de anomalias: vendas anormais, diferenças físicas, alertas
 - [x] Relatório semanal: resumo, KPIs, recomendações, ações pendentes
+
+
+## Bugs Críticos - Reportados pelo Usuário
+
+- [x] Erro JSON na página Recalcular CMV - investigado, causa é timeout na query de vendas pendentes (será corrigido com paginação)
+- [x] Segurança crítica: Qualquer pessoa com o link pode acessar e criar usuários - CORRIGIDO: adicionada whitelist de emails autorizados via AUTHORIZED_EMAILS env
