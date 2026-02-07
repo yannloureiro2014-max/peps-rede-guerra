@@ -727,6 +727,75 @@ export const appRouter = router({
       }),
   }),
 
+  // ==================== ASSISTENTE DE IA ====================
+  ia: router({
+    /**
+     * Chat interativo com IA para análise de dados da empresa
+     * Fornece contexto de vendas, estoque, lucro, alertas
+     */
+    chat: protectedProcedure
+      .input(z.object({
+        mensagem: z.string(),
+        contexto: z.object({
+          postoId: z.number().optional(),
+          dataInicio: z.string().optional(),
+          dataFim: z.string().optional()
+        }).optional()
+      }))
+      .mutation(async ({ input, ctx }) => {
+        return db.processarChatIA(input.mensagem, input.contexto, ctx.user);
+      }),
+    
+    /**
+     * Gera análise automática de dados: vendas, estoque, lucro, alertas
+     */
+    analisarDados: protectedProcedure
+      .input(z.object({
+        postoId: z.number().optional(),
+        dataInicio: z.string(),
+        dataFim: z.string()
+      }))
+      .query(async ({ input }) => {
+        return db.analisarDadosComIA(input);
+      }),
+    
+    /**
+     * Gera recomendações automáticas: compras, investigações, otimizações
+     */
+    gerarRecomendacoes: protectedProcedure
+      .input(z.object({
+        postoId: z.number().optional(),
+        tipo: z.enum(["compras", "estoque", "lucro", "geral"]).optional()
+      }))
+      .query(async ({ input }) => {
+        return db.gerarRecomendacoesIA(input);
+      }),
+    
+    /**
+     * Valida notas fiscais com IA
+     */
+    validarNotasFiscais: protectedProcedure
+      .input(z.object({
+        postoId: z.number().optional(),
+        dataInicio: z.string(),
+        dataFim: z.string()
+      }))
+      .query(async ({ input }) => {
+        return db.validarNotasFiscaisComIA(input);
+      }),
+    
+    /**
+     * Gera relatório semanal automático
+     */
+    gerarRelatoriSemanal: protectedProcedure
+      .input(z.object({
+        postoId: z.number().optional()
+      }))
+      .query(async ({ input }) => {
+        return db.gerarRelatoriSemanalIA(input);
+      }),
+  }),
+
   // ==================== RECÁLCULO DE CMV ====================
   cmv: router({
     /**

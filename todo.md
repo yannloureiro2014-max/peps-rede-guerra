@@ -49,7 +49,7 @@
 ## Correções Solicitadas
 
 - [x] Sincronizar histórico de compras/NFes do banco ACS
-- [x] Filtro de data com seleção específica (hoje, ontem, dia X)
+- [x] Filtros de datacom seleção específica (hoje, ontem, dia X)
 - [x] Formato de data brasileiro dd/mm/aaaa em todas as telas
 - [ ] Campo para ordenar lotes por ordem de consumo PEPS
 
@@ -315,3 +315,30 @@
 - [x] Identificar causa raiz - lógica incremental pulava dias com gap, corrigida para usar diasAtras diretamente
 - [x] Re-executar sincronização - 37.288 vendas importadas via script dia-a-dia
 - [x] Validar totais - 27/31 dias batem exatamente com ACS (dif <1L), total REDE SUPER: 147.533L vs 147.538L ACS
+
+
+## Feature: Assistente de IA - Solicitado pelo Usuário (CONCLUÍDO)
+
+### Backend
+- [x] Criar procedure tRPC para análise de dados com LLM (vendas, estoque, lucro, alertas)
+- [x] Criar procedure tRPC para chat interativo com contexto de dados da empresa
+- [x] Criar procedure tRPC para gerar recomendações automáticas (compras, investigações, otimizações)
+- [x] Criar procedure tRPC para validar notas fiscais com IA
+- [x] Criar procedure tRPC para gerar relatório semanal automático
+
+### Frontend
+- [x] Criar componente AssistenteIA.tsx com chat interativo
+- [x] Adicionar rota /assistente-ia e link no menu
+- [x] Interface de chat com histórico de mensagens
+- [x] Exibir análises automáticas e recomendações
+- [x] Cards de insights (alertas críticos, oportunidades, anomalias)
+- [x] Botões de ação rápida (investigar, comprar, corrigir)
+
+### Análises Automáticas
+- [x] Análise de vendas: tendências, picos, quedas
+- [x] Análise de estoque: níveis baixos, rupturas previstas, otimização
+- [x] Análise de lucro: margem por combustível, por posto, comparação período
+- [x] Validação de notas: inconsistências, duplicatas, erros
+- [x] Recomendações de compra: quantidade, fornecedor, timing
+- [x] Detecção de anomalias: vendas anormais, diferenças físicas, alertas
+- [x] Relatório semanal: resumo, KPIs, recomendações, ações pendentes

@@ -1456,3 +1456,233 @@ export async function recalcularTodasVendasPendentes(): Promise<{
     detalhes 
   };
 }
+
+
+// ==================== ASSISTENTE DE IA ====================
+import { invokeLLM } from './_core/llm';
+
+export async function processarChatIA(
+  mensagem: string,
+  contexto: { postoId?: number; dataInicio?: string; dataFim?: string } | undefined,
+  user: any
+): Promise<{ resposta: string; contexto?: any }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection failed");
+
+  // Buscar contexto de dados da empresa
+  const dataInicio = contexto?.dataInicio || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const dataFim = contexto?.dataFim || new Date().toISOString().split('T')[0];
+  
+  const vendas = await getVendasResumo(30, dataInicio, dataFim, contexto?.postoId);
+  const alertas = await getAlertasPendentes();
+  const postoInfo = contexto?.postoId ? await getPostoById(contexto.postoId) : null;
+  
+  const contextoDados = {
+    usuario: user?.name,
+    periodo: `${dataInicio} a ${dataFim}`,
+    posto: postoInfo?.nome || "Todos os postos",
+    vendas: vendas,
+    alertas: alertas.slice(0, 10), // Top 10 alertas
+    timestamp: new Date().toISOString()
+  };
+
+  const prompt = `Você é um assistente de IA especializado em gestão de postos de combustível e estoque. 
+Analise os dados fornecidos e responda à pergunta do usuário com recomendações práticas e acionáveis.
+
+CONTEXTO DA EMPRESA:
+${JSON.stringify(contextoDados, null, 2)}
+
+PERGUNTA DO USUÁRIO: ${mensagem}
+
+Forneça uma resposta clara, concisa e com recomendações específicas baseadas nos dados.`;
+
+  const response = await invokeLLM({
+    messages: [
+      { role: "system", content: "Você é um assistente de IA para gestão de postos de combustível. Forneça análises e recomendações práticas." },
+      { role: "user", content: prompt }
+    ]
+  });
+
+  const resposta = typeof response.choices[0]?.message?.content === 'string' 
+    ? response.choices[0].message.content 
+    : "Desculpe, não consegui processar sua pergunta.";
+
+  return {
+    resposta,
+    contexto: contextoDados
+  };
+}
+
+export async function analisarDadosComIA(input: {
+  postoId?: number;
+  dataInicio: string;
+  dataFim: string;
+}): Promise<any> {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection failed");
+
+  // Buscar dados para análise
+  const vendas = await getVendasResumo(30, input.dataInicio, input.dataFim, input.postoId);
+  const dre = await calcularDRE({ postoId: input.postoId, dataInicio: input.dataInicio, dataFim: input.dataFim });
+  const alertas = await getAlertasPendentes();
+  const tanques = await getTanques();
+  
+  const prompt = `Analise os seguintes dados de um posto de combustível e forneça insights detalhados:
+
+VENDAS: ${JSON.stringify(vendas, null, 2)}
+DRE: ${JSON.stringify(dre, null, 2)}
+ALERTAS: ${JSON.stringify(alertas.slice(0, 5), null, 2)}
+TANQUES: ${JSON.stringify(tanques, null, 2)}
+
+Forneça:
+1. Resumo executivo (2-3 linhas)
+2. Principais insights (3-5 pontos)
+3. Anomalias detectadas (se houver)
+4. Recomendações imediatas (2-3 ações)`;
+
+  const response = await invokeLLM({
+    messages: [
+      { role: "system", content: "Você é um analista de dados especializado em postos de combustível. Forneça análises profundas e acionáveis." },
+      { role: "user", content: prompt }
+    ]
+  });
+
+  return {
+    analise: response.choices[0]?.message?.content || "Análise não disponível",
+    dados: { vendas, dre, alertas: alertas.slice(0, 5) }
+  };
+}
+
+export async function gerarRecomendacoesIA(input: {
+  postoId?: number;
+  tipo?: "compras" | "estoque" | "lucro" | "geral";
+}): Promise<any> {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection failed");
+
+  const dataInicio = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const dataFim = new Date().toISOString().split('T')[0];
+
+  const vendas = await getVendasResumo(30, dataInicio, dataFim, input.postoId);
+  const lotes = await getLotes();
+  const alertas = await getAlertasPendentes();
+
+  const tipoAnalise = input.tipo || "geral";
+  const prompt = `Com base nos dados de um posto de combustível, gere recomendações de ${tipoAnalise}:
+
+VENDAS (últimos 30 dias): ${JSON.stringify(vendas, null, 2)}
+LOTES ATIVOS: ${JSON.stringify(lotes.slice(0, 10), null, 2)}
+ALERTAS: ${JSON.stringify(alertas.slice(0, 5), null, 2)}
+
+Forneça 3-5 recomendações específicas e acionáveis para otimizar o ${tipoAnalise}.`;
+
+  const response = await invokeLLM({
+    messages: [
+      { role: "system", content: "Você é um consultor de negócios especializado em postos de combustível. Forneça recomendações práticas e viáveis." },
+      { role: "user", content: prompt }
+    ]
+  });
+
+  const recomendacoes = typeof response.choices[0]?.message?.content === 'string' 
+    ? response.choices[0].message.content 
+    : "Recomendações não disponíveis";
+
+  return {
+    recomendacoes,
+    tipo: tipoAnalise
+  };
+}
+
+export async function validarNotasFiscaisComIA(input: {
+  postoId?: number;
+  dataInicio: string;
+  dataFim: string;
+}): Promise<any> {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection failed");
+
+  const lotes = await getLotes();
+  const filtrados = lotes.filter(l => {
+    const dataL = new Date(l.dataEntrada);
+    const inicio = new Date(input.dataInicio);
+    const fim = new Date(input.dataFim);
+    return dataL >= inicio && dataL <= fim && (!input.postoId || l.postoId === input.postoId);
+  });
+
+  const prompt = `Valide as seguintes notas fiscais de compra de combustível:
+
+NOTAS FISCAIS: ${JSON.stringify(filtrados.slice(0, 20), null, 2)}
+
+Identifique:
+1. Inconsistências (preços anormais, quantidades suspeitas)
+2. Duplicatas possíveis
+3. Erros de digitação
+4. Fornecedores não usuais
+5. Recomendações de revisão
+
+Forneça um relatório estruturado.`;
+
+  const response = await invokeLLM({
+    messages: [
+      { role: "system", content: "Você é um auditor especializado em notas fiscais de combustível. Identifique inconsistências e anomalias." },
+      { role: "user", content: prompt }
+    ]
+  });
+
+  const validacao = typeof response.choices[0]?.message?.content === 'string' 
+    ? response.choices[0].message.content 
+    : "Validação não disponível";
+
+  return {
+    validacao,
+    notasAnalisadas: filtrados.length
+  };
+}
+
+export async function gerarRelatoriSemanalIA(input: {
+  postoId?: number;
+}): Promise<any> {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection failed");
+
+  const hoje = new Date();
+  const umaSemanaAtras = new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const dataInicio = umaSemanaAtras.toISOString().split('T')[0];
+  const dataFim = hoje.toISOString().split('T')[0];
+
+  const vendas = await getVendasResumo(30, dataInicio, dataFim, input.postoId);
+  const dre = await calcularDRE({ postoId: input.postoId, dataInicio, dataFim });
+  const alertas = await getAlertasPendentes();
+
+  const prompt = `Gere um relatório semanal executivo para um posto de combustível:
+
+PERÍODO: ${dataInicio} a ${dataFim}
+VENDAS: ${JSON.stringify(vendas, null, 2)}
+DRE: ${JSON.stringify(dre, null, 2)}
+ALERTAS PENDENTES: ${JSON.stringify(alertas.slice(0, 10), null, 2)}
+
+Forneça:
+1. Resumo executivo (3-4 linhas)
+2. KPIs principais (vendas, lucro, margem)
+3. Comparação com semana anterior (se disponível)
+4. Alertas críticos
+5. Ações recomendadas para a próxima semana
+6. Previsão para os próximos 7 dias`;
+
+  const response = await invokeLLM({
+    messages: [
+      { role: "system", content: "Você é um gerente de negócios especializado em postos de combustível. Gere relatórios executivos claros e acionáveis." },
+      { role: "user", content: prompt }
+    ]
+  });
+
+  const relatorio = typeof response.choices[0]?.message?.content === 'string' 
+    ? response.choices[0].message.content 
+    : "Relatório não disponível";
+
+  return {
+    relatorio,
+    periodo: `${dataInicio} a ${dataFim}`,
+    geradoEm: new Date().toISOString()
+  };
+}
