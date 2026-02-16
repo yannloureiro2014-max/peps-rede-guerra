@@ -2,6 +2,7 @@ import { getDb } from "./db";
 import { postos, produtos, tanques, vendas, syncLogs, medicoes, lotes, fornecedores, alertas } from "../drizzle/schema";
 import { eq, sql, and, between, isNull } from "drizzle-orm";
 import pg from "pg";
+import { executeWithRetry, executeSequentialWithRetry } from "./utils/retry";
 
 // Configuração do banco ACS (PostgreSQL externo)
 const ACS_CONFIG = {
@@ -807,21 +808,50 @@ export async function verificarMedicoesFaltantes(diasVerificar: number = 30) {
   }
 }
 
-// Função de sincronização completa atualizada
-export async function sincronizarTudo(diasVendas: number = 90) {
+// Função de sincronização completa atualizada com Retry Logic
+export async function sincronizarTudo(diasVendas: number = 90): Promise<{ success: boolean; resultados: any }> {
   console.log("[ETL] Iniciando sincronização completa com ACS...");
   
-  const resultados = {
-    postos: await sincronizarPostosACS(),
-    produtos: await sincronizarProdutosACS(),
-    tanques: await sincronizarTanquesACS(),
-    vendas: await sincronizarVendasACS(diasVendas),
-    medicoes: await sincronizarMedicoesACS(90),
-    compras: await sincronizarComprasACS(180),
-    alertasMedicoes: await verificarMedicoesFaltantes(30),
-  };
+  // Usar executeSequentialWithRetry para executar todas as sincronizações com retry automático
+  const resultados: any = await executeSequentialWithRetry([
+    {
+      fn: () => sincronizarPostosACS(),
+      name: "sincronizarPostosACS",
+      options: { maxAttempts: 3, initialDelayMs: 2000 }
+    },
+    {
+      fn: () => sincronizarProdutosACS(),
+      name: "sincronizarProdutosACS",
+      options: { maxAttempts: 3, initialDelayMs: 2000 }
+    },
+    {
+      fn: () => sincronizarTanquesACS(),
+      name: "sincronizarTanquesACS",
+      options: { maxAttempts: 3, initialDelayMs: 2000 }
+    },
+    {
+      fn: () => sincronizarVendasACS(diasVendas),
+      name: "sincronizarVendasACS",
+      options: { maxAttempts: 3, initialDelayMs: 2000 }
+    },
+    {
+      fn: () => sincronizarMedicoesACS(90),
+      name: "sincronizarMedicoesACS",
+      options: { maxAttempts: 3, initialDelayMs: 2000 }
+    },
+    {
+      fn: () => sincronizarComprasACS(180),
+      name: "sincronizarComprasACS",
+      options: { maxAttempts: 3, initialDelayMs: 2000 }
+    },
+    {
+      fn: () => verificarMedicoesFaltantes(30) as any,
+      name: "verificarMedicoesFaltantes",
+      options: { maxAttempts: 2, initialDelayMs: 1000 }
+    }
+  ]) as any;
 
-  const sucesso = Object.values(resultados).every(r => r.success);
+  const sucesso = resultados.every((r: any) => r.success);
   
   console.log("[ETL] Sincronização completa:", sucesso ? "SUCESSO" : "COM ERROS");
   console.log("[ETL] Resultados:", JSON.stringify(resultados, null, 2));

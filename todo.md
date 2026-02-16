@@ -348,3 +348,110 @@
 
 - [x] Erro JSON na página Recalcular CMV - investigado, causa é timeout na query de vendas pendentes (será corrigido com paginação)
 - [x] Segurança crítica: Qualquer pessoa com o link pode acessar e criar usuários - CORRIGIDO: adicionada whitelist de emails autorizados via AUTHORIZED_EMAILS env
+
+## Melhorias Sugeridas pela IA Revisora (14 itens)
+
+### Estabilidade e Confiabilidade
+- [ ] 1.1 Retry Logic com Exponential Backoff no ETL
+- [ ] 1.2 Validação Rigorosa com Zod
+- [ ] 1.3 Notificações Proativas para Alertas Críticos
+
+### Performance e Escalabilidade
+- [ ] 2.1 Índices Otimizados no Banco de Dados
+- [ ] 2.2 Paginação no Recálculo de CMV
+- [ ] 2.3 Cache com Redis para DRE e Dashboard
+
+### Segurança e Auditoria
+- [ ] 3.1 Criptografia de Dados Sensíveis
+- [ ] 3.2 Logs de Auditoria Detalhados
+
+### Funcionalidades Adicionais
+- [ ] 4.1 Integração com NF-e (SEFAZ)
+- [ ] 4.2 Machine Learning para Previsão de Demanda
+- [ ] 4.3 Dashboard Mobile Responsivo
+- [ ] 4.4 API Pública para ERPs Externos
+
+### Testes e Qualidade
+- [ ] 5.1 Aumentar Cobertura de Testes para 90%+
+- [ ] 5.2 Implementar Testes de Carga
+
+
+## Fuel Physical Allocation Engine (Novo Módulo Avançado)
+
+### Objetivo
+Separar completamente as camadas Fiscal, Física e Financeira para resolver inconsistências críticas de CMV, DRE e estoque em rede com redistribuição de combustível entre postos.
+
+### Problema a Resolver
+- Postos compram combustível com CNPJ de outro posto (por crédito)
+- Combustível é redistribuído fisicamente para outros postos
+- Sistema calcula CMV incorreto (baseado em fiscal, não em físico)
+- DRE e estoque divergem da realidade operacional
+
+### Fase 1: Schema do Banco de Dados
+- [ ] Criar tabela `nfeStaging` (staging de NFes importadas)
+- [ ] Criar tabela `alocacoesFisicas` (alocações manuais de combustível)
+- [ ] Criar tabela `lotesFisicos` (lotes com descarga real do combustível)
+- [ ] Criar tabela `reordenacaoPEPS` (histórico de reordenações automáticas)
+- [ ] Criar tabela `snapshotCMV` (snapshots antes/depois de recalculos)
+- [ ] Criar índices para performance (tanque, data_descarga, ordem_peps)
+
+### Fase 2: Staging de NFes e Alocação Física
+- [ ] Implementar importação de NFes para staging (não impacta estoque automaticamente)
+- [ ] Implementar validação de NFes (chave, quantidade, custo)
+- [ ] Implementar alocação física manual (usuário define destino real)
+- [ ] Implementar cálculo de saldo disponível por NFe
+
+### Fase 3: Geração de Lotes Físicos com PEPS Real
+- [ ] Implementar geração de lotes físicos (um por descarga)
+- [ ] Implementar PEPS baseado em data_descarga_real (não data fiscal)
+- [ ] Implementar rastreamento de consumo de lotes
+- [ ] Implementar validação de volume físico
+
+### Fase 4: Quebra de Ordem Cronológica e Reordenação
+- [ ] Implementar detecção de quebra de ordem cronológica
+- [ ] Implementar reordenação automática de lotes (quando NFe alocada retroativamente)
+- [ ] Implementar atualização de ordem_peps
+- [ ] Implementar recalculo de CMV após reordenação
+- [ ] Implementar registro de impacto financeiro estimado
+
+### Fase 5: Motor de Reprocessamento CMV Idempotente
+- [ ] Implementar motor idempotente de CMV (recalcula apenas quando necessário)
+- [ ] Implementar consumo PEPS real (lote mais antigo aberto)
+- [ ] Implementar snapshot antes/depois
+- [ ] Implementar validação de integridade de dados
+
+### Fase 6: Auditoria Avançada e Rastreabilidade
+- [ ] Expandir logs de auditoria para Fuel Engine
+- [ ] Registrar usuário, timestamp, operação executada
+- [ ] Registrar lote afetado, CMV antes/depois
+- [ ] Registrar vendas recalculadas, tempo de processamento
+- [ ] Registrar motivo operacional (justificativa)
+
+### Fase 7: tRPC Procedures para Fuel Engine
+- [ ] `fuelEngine.importarNFes` - Importar NFes para staging
+- [ ] `fuelEngine.listarNFesStaging` - Listar NFes pendentes
+- [ ] `fuelEngine.alocarFisicamente` - Alocar NFe para posto/tanque
+- [ ] `fuelEngine.listarAlocacoes` - Listar alocações realizadas
+- [ ] `fuelEngine.listarLotesFisicos` - Listar lotes físicos criados
+- [ ] `fuelEngine.recalcularCMV` - Recalcular CMV após reordenação
+- [ ] `fuelEngine.obterHistoricoReordenacao` - Histórico de reordenações
+- [ ] `fuelEngine.obterSnapshotCMV` - Snapshots de CMV
+
+### Fase 8: Testes Vitest Completos
+- [ ] Teste de importação de NFes
+- [ ] Teste de alocação física
+- [ ] Teste de PEPS com descarga real
+- [ ] Teste de reordenação automática
+- [ ] Teste de recalculo CMV idempotente
+- [ ] Teste de auditoria completa
+- [ ] Teste de integridade de dados
+- [ ] Teste de performance (alto volume)
+
+### Fase 9: Documentação
+- [ ] Documentar arquitetura de 3 camadas (Fiscal, Física, Financeira)
+- [ ] Documentar fluxo de alocação física
+- [ ] Documentar algoritmo de PEPS real
+- [ ] Documentar motor de reordenação automática
+- [ ] Documentar motor de CMV idempotente
+- [ ] Criar exemplos de uso das procedures tRPC
+- [ ] Criar guia de troubleshooting
