@@ -471,3 +471,11 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [x] Verificar acs-nfes.ts (já estava atualizado)
 - [x] Testar conexão direta ao banco - OK
 - [x] Reiniciar servidor e verificar sincronização automática - SUCESSO (147 registros, 119 atualizadas)
+
+## Melhorias Alocação SEFAZ - Tanques Reais e Teste NFes
+
+- [x] Mapear tanques reais do banco (38 tanques) na tela de Alocação SEFAZ
+- [x] Buscar tanques via tRPC em vez de lista estática (6 postos, 17 tanques carregados)
+- [x] Testar busca de NFes com dados reais do ACS (87 NFes encontradas, custo unitário calculado, posto mapeado)
+- [x] Enriquecer dados das NFes: custoUnitario calculado (totalNota/totalLitros), postoDestino mapeado por codEmpresa
+- [ ] Preparar para publicação

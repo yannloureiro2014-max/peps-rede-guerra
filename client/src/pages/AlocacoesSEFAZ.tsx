@@ -7,28 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, CheckCircle, Plus, Search, RefreshCw } from "lucide-react";
+import { AlertCircle, CheckCircle, Plus, Search, RefreshCw, Fuel } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
-
-const POSTOS = [
-  { id: "1", nome: "Fotim" },
-  { id: "2", nome: "Palhano" },
-  { id: "3", nome: "Itaiçaba (Novo Guerra)" },
-  { id: "4", nome: "Pai Tereza" },
-  { id: "5", nome: "Rede Super Petróleo (Mãe e Filho)" },
-  { id: "6", nome: "Jaguaruana (Novo Jaguaruana)" },
-];
-
-const TANQUES: Record<string, Array<{ id: string; nome: string }>> = {
-  "1": [{ id: "1", nome: "Tanque 1" }, { id: "2", nome: "Tanque 2" }],
-  "2": [{ id: "3", nome: "Tanque 1" }, { id: "4", nome: "Tanque 2" }],
-  "3": [{ id: "5", nome: "Tanque 1" }],
-  "4": [{ id: "6", nome: "Tanque 1" }, { id: "7", nome: "Tanque 2" }],
-  "5": [{ id: "8", nome: "Tanque 1" }, { id: "9", nome: "Tanque 2" }],
-  "6": [{ id: "10", nome: "Tanque 1" }],
-};
 
 export default function AlocacoesSEFAZ() {
   const [openDialog, setOpenDialog] = useState(false);
@@ -36,14 +18,12 @@ export default function AlocacoesSEFAZ() {
 
   // Filtros
   const [filtroPostoId, setFiltroPostoId] = useState("todos");
-  const [dataInicio] = useState(() => {
+  const [dataInicioInput, setDataInicioInput] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
     return d.toISOString().split("T")[0];
   });
-  const [dataFim] = useState(() => new Date().toISOString().split("T")[0]);
-  const [dataInicioInput, setDataInicioInput] = useState(dataInicio);
-  const [dataFimInput, setDataFimInput] = useState(dataFim);
+  const [dataFimInput, setDataFimInput] = useState(() => new Date().toISOString().split("T")[0]);
 
   // Parâmetros de busca estabilizados
   const [searchParams, setSearchParams] = useState<{ dataInicio: string; dataFim: string } | null>(null);
@@ -58,19 +38,35 @@ export default function AlocacoesSEFAZ() {
     justificativa: "",
   });
 
-  // tRPC query - busca NFes pendentes (só executa quando searchParams existe)
+  // ========== tRPC Queries: Postos e Tanques REAIS do banco ==========
+  const postosQuery = trpc.postos.list.useQuery();
+  const tanquesQuery = trpc.tanques.list.useQuery();
+
+  // Postos reais do banco
+  const postosReais = useMemo(() => {
+    return postosQuery.data || [];
+  }, [postosQuery.data]);
+
+  // Tanques filtrados pelo posto selecionado no formulário de alocação
+  const tanquesDoPosto = useMemo(() => {
+    if (!novaAlocacao.postoDestino || !tanquesQuery.data) return [];
+    const postoId = parseInt(novaAlocacao.postoDestino);
+    return (tanquesQuery.data as any[]).filter((t: any) => t.postoId === postoId);
+  }, [novaAlocacao.postoDestino, tanquesQuery.data]);
+
+  // ========== tRPC Query: NFes pendentes ==========
   const nfesQuery = trpc.alocacoesFisicas.listarNfesPendentes.useQuery(
     searchParams ?? { dataInicio: dataInicioInput, dataFim: dataFimInput },
     { enabled: searchParams !== null }
   );
 
-  // tRPC query - busca alocações realizadas
+  // ========== tRPC Query: Alocações realizadas ==========
   const alocacoesQuery = trpc.alocacoesFisicas.listarAlocacoesRealizadas.useQuery(
     {},
     { enabled: true }
   );
 
-  // tRPC mutation - criar alocação
+  // ========== tRPC Mutation: Criar alocação ==========
   const criarAlocacaoMutation = trpc.alocacoesFisicas.criarAlocacao.useMutation({
     onSuccess: () => {
       alert("Alocação criada com sucesso!");
@@ -84,7 +80,6 @@ export default function AlocacoesSEFAZ() {
         horaDescarga: "",
         justificativa: "",
       });
-      // Recarregar dados
       nfesQuery.refetch();
       alocacoesQuery.refetch();
     },
@@ -97,12 +92,12 @@ export default function AlocacoesSEFAZ() {
   const nfesFiltradas = useMemo(() => {
     const dados = nfesQuery.data?.dados || [];
     if (filtroPostoId === "todos") return dados;
-    const postoSelecionado = POSTOS.find((p) => p.id === filtroPostoId);
+    const postoSelecionado = postosReais.find((p: any) => String(p.id) === filtroPostoId);
     if (!postoSelecionado) return dados;
     return dados.filter(
-      (nfe: any) => nfe.postoDestino?.toLowerCase().includes(postoSelecionado.nome.toLowerCase())
+      (nfe: any) => nfe.postoDestino?.toLowerCase().includes(postoSelecionado.nome?.toLowerCase())
     );
-  }, [nfesQuery.data, filtroPostoId]);
+  }, [nfesQuery.data, filtroPostoId, postosReais]);
 
   const selectedNfe = useMemo(() => {
     return nfesFiltradas.find((n: any) => n.id === selectedNfeId) || null;
@@ -120,16 +115,16 @@ export default function AlocacoesSEFAZ() {
 
     try {
       await criarAlocacaoMutation.mutateAsync({
-        chaveNfe: selectedNfe.chaveNfe,
-        numeroNf: selectedNfe.numeroNf,
-        serieNf: selectedNfe.serieNf,
+        chaveNfe: selectedNfe.chaveNfe || `NFE-${selectedNfe.id}`,
+        numeroNf: selectedNfe.numeroNf || selectedNfe.documento || "",
+        serieNf: selectedNfe.serieNf || selectedNfe.serie || "1",
         dataEmissao: typeof selectedNfe.dataEmissao === "string" ? selectedNfe.dataEmissao : new Date(selectedNfe.dataEmissao).toISOString(),
         postoDestinoId: parseInt(novaAlocacao.postoDestino),
         tanqueDestinoId: parseInt(novaAlocacao.tanqueDestino),
         dataDescargaReal: novaAlocacao.dataDescarga,
         horaDescargaReal: novaAlocacao.horaDescarga || undefined,
         volumeAlocado: parseFloat(novaAlocacao.volumeAlocado),
-        custoUnitarioAplicado: selectedNfe.custoUnitario,
+        custoUnitarioAplicado: selectedNfe.custoUnitario || selectedNfe.valorUnitario || 0,
         justificativa: novaAlocacao.justificativa || undefined,
       });
     } catch (error) {
@@ -146,9 +141,20 @@ export default function AlocacoesSEFAZ() {
     return colors[status] || "bg-gray-100 text-gray-800";
   };
 
-  const tanquesSelecionados = novaAlocacao.postoDestino ? TANQUES[novaAlocacao.postoDestino] || [] : [];
-
   const loading = nfesQuery.isLoading || nfesQuery.isFetching;
+
+  // Encontrar nome do posto pelo ID
+  const getNomePosto = (postoId: number) => {
+    const posto = postosReais.find((p: any) => p.id === postoId);
+    return posto?.nome || `Posto ${postoId}`;
+  };
+
+  // Encontrar info do tanque pelo ID
+  const getInfoTanque = (tanqueId: number) => {
+    const tanque = tanquesQuery.data?.find((t: any) => t.id === tanqueId);
+    if (!tanque) return `Tanque ${tanqueId}`;
+    return `${tanque.codigoAcs || tanque.id} - ${tanque.produtoDescricao || "Combustível"} (${Number(tanque.capacidade || 0).toLocaleString("pt-BR")}L)`;
+  };
 
   return (
     <DashboardLayout>
@@ -162,11 +168,18 @@ export default function AlocacoesSEFAZ() {
             </p>
           </div>
 
-          {/* Alertas */}
+          {/* Info */}
           <Alert className="mb-6 border-blue-200 bg-blue-50">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800">
-              As alocações utilizam a data de descarga real (não fiscal) para cálculo de PEPS. O sistema busca automaticamente NFes da SEFAZ.
+              As alocações utilizam a data de descarga real (não fiscal) para cálculo de PEPS. 
+              {postosReais.length > 0 && (
+                <span className="font-semibold"> {postosReais.length} postos ativos</span>
+              )}
+              {tanquesQuery.data && (
+                <span className="font-semibold"> e {tanquesQuery.data.length} tanques</span>
+              )}
+              {" "}carregados do banco.
             </AlertDescription>
           </Alert>
 
@@ -191,15 +204,15 @@ export default function AlocacoesSEFAZ() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Filtro: Posto */}
                     <div>
-                      <Label htmlFor="posto">Posto</Label>
+                      <Label>Posto</Label>
                       <Select value={filtroPostoId} onValueChange={setFiltroPostoId}>
                         <SelectTrigger>
                           <SelectValue placeholder="Todos os postos" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="todos">Todos os postos</SelectItem>
-                          {POSTOS.map((posto) => (
-                            <SelectItem key={posto.id} value={posto.id}>
+                          {postosReais.map((posto: any) => (
+                            <SelectItem key={posto.id} value={String(posto.id)}>
                               {posto.nome}
                             </SelectItem>
                           ))}
@@ -209,7 +222,7 @@ export default function AlocacoesSEFAZ() {
 
                     {/* Filtro: Data Início */}
                     <div>
-                      <Label htmlFor="dataInicio">Data Inicial</Label>
+                      <Label>Data Inicial</Label>
                       <Input
                         type="date"
                         value={dataInicioInput}
@@ -219,7 +232,7 @@ export default function AlocacoesSEFAZ() {
 
                     {/* Filtro: Data Fim */}
                     <div>
-                      <Label htmlFor="dataFim">Data Final</Label>
+                      <Label>Data Final</Label>
                       <Input
                         type="date"
                         value={dataFimInput}
@@ -258,7 +271,7 @@ export default function AlocacoesSEFAZ() {
               {nfesFiltradas.length > 0 && (
                 <div className="space-y-4">
                   <div className="text-sm text-slate-600">
-                    {nfesFiltradas.length} NFe(s) encontrada(s) - {nfesFiltradas.filter((n: any) => n.statusAlocacao === "pendente").length} pendente(s)
+                    {nfesFiltradas.length} NFe(s) encontrada(s) - {nfesFiltradas.filter((n: any) => n.statusAlocacao === "pendente" || n.quantidadePendente > 0).length} pendente(s)
                     {nfesQuery.data?.origem && (
                       <span className="ml-2 text-xs bg-slate-100 px-2 py-1 rounded">
                         Fonte: {nfesQuery.data.origem}
@@ -266,42 +279,46 @@ export default function AlocacoesSEFAZ() {
                     )}
                   </div>
 
-                  {nfesFiltradas.map((nfe: any) => (
-                    <Card key={nfe.id} className="hover:shadow-md transition-shadow">
+                  {nfesFiltradas.map((nfe: any, idx: number) => (
+                    <Card key={nfe.id || idx} className="hover:shadow-md transition-shadow">
                       <CardContent className="pt-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
                           <div>
-                            <Label className="text-xs text-slate-500">Número NF</Label>
-                            <p className="font-mono text-sm">{nfe.numeroNf}</p>
+                            <Label className="text-xs text-slate-500">Número NF / Doc</Label>
+                            <p className="font-mono text-sm">{nfe.numeroNf || nfe.documento || "-"}</p>
                           </div>
                           <div>
                             <Label className="text-xs text-slate-500">Data Emissão</Label>
-                            <p className="text-sm">{new Date(nfe.dataEmissao).toLocaleDateString("pt-BR")}</p>
+                            <p className="text-sm">{nfe.dataEmissao ? new Date(nfe.dataEmissao).toLocaleDateString("pt-BR") : "-"}</p>
                           </div>
                           <div>
                             <Label className="text-xs text-slate-500">Quantidade (L)</Label>
-                            <p className="text-sm font-semibold">{Number(nfe.quantidade).toLocaleString("pt-BR")}</p>
+                            <p className="text-sm font-semibold">{Number(nfe.quantidade || nfe.totalLitros || 0).toLocaleString("pt-BR")}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-slate-500">Custo Unit.</Label>
+                            <p className="text-sm font-semibold">R$ {Number(nfe.custoUnitario || nfe.valorUnitario || 0).toLocaleString("pt-BR", { minimumFractionDigits: 4 })}</p>
                           </div>
                           <div>
                             <Label className="text-xs text-slate-500">Status</Label>
-                            <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${statusBadge(nfe.statusAlocacao)}`}>
-                              {nfe.statusAlocacao}
+                            <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${statusBadge(nfe.statusAlocacao || "pendente")}`}>
+                              {nfe.statusAlocacao || "pendente"}
                             </span>
                           </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-sm">
                           <div>
-                            <Label className="text-xs text-slate-500">Posto Destino</Label>
-                            <p>{nfe.postoDestino || "Não identificado"}</p>
+                            <Label className="text-xs text-slate-500">Posto Destino (NF)</Label>
+                            <p>{nfe.postoDestino || nfe.empresaNome || "Não identificado"}</p>
                           </div>
                           <div>
                             <Label className="text-xs text-slate-500">Produto</Label>
-                            <p>{nfe.produto || "Combustível"}</p>
+                            <p>{nfe.produto || nfe.tipoCombustivel || "Combustível"}</p>
                           </div>
                           <div>
-                            <Label className="text-xs text-slate-500">Custo Unitário</Label>
-                            <p className="font-semibold">R$ {Number(nfe.custoUnitario).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                            <Label className="text-xs text-slate-500">Custo Total</Label>
+                            <p className="font-semibold">R$ {Number(nfe.custoTotal || nfe.totalNota || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
                           </div>
                         </div>
 
@@ -360,7 +377,7 @@ export default function AlocacoesSEFAZ() {
                   {alocacoesQuery.data.dados.map((aloc: any, idx: number) => (
                     <Card key={aloc.id || idx}>
                       <CardContent className="pt-6">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                           <div>
                             <Label className="text-xs text-slate-500">NFe</Label>
                             <p className="font-mono text-sm">{aloc.numeroNf || aloc.chaveNfe?.substring(0, 20) || "-"}</p>
@@ -368,6 +385,10 @@ export default function AlocacoesSEFAZ() {
                           <div>
                             <Label className="text-xs text-slate-500">Volume</Label>
                             <p className="text-sm font-semibold">{Number(aloc.volumeAlocado || aloc.volume || 0).toLocaleString("pt-BR")} L</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-slate-500">Posto</Label>
+                            <p className="text-sm">{aloc.postoId ? getNomePosto(aloc.postoId) : "-"}</p>
                           </div>
                           <div>
                             <Label className="text-xs text-slate-500">Data Descarga</Label>
@@ -387,6 +408,7 @@ export default function AlocacoesSEFAZ() {
               ) : (
                 <Card>
                   <CardContent className="pt-6 text-center text-slate-500">
+                    <Fuel className="mx-auto h-12 w-12 text-slate-300 mb-4" />
                     <p>Nenhuma alocação encontrada</p>
                   </CardContent>
                 </Card>
@@ -407,7 +429,7 @@ export default function AlocacoesSEFAZ() {
                   {alocacoesQuery.data.dados.map((aloc: any, idx: number) => (
                     <Card key={aloc.id || idx}>
                       <CardContent className="pt-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                           <div>
                             <Label className="text-xs text-slate-500">NFe</Label>
                             <p className="font-mono text-sm">{aloc.numeroNf || "-"}</p>
@@ -417,8 +439,12 @@ export default function AlocacoesSEFAZ() {
                             <p className="text-sm font-semibold">{Number(aloc.volumeAlocado || aloc.volume || 0).toLocaleString("pt-BR")} L</p>
                           </div>
                           <div>
+                            <Label className="text-xs text-slate-500">Posto</Label>
+                            <p className="text-sm">{aloc.postoId ? getNomePosto(aloc.postoId) : "-"}</p>
+                          </div>
+                          <div>
                             <Label className="text-xs text-slate-500">Custo Unit.</Label>
-                            <p className="text-sm">R$ {Number(aloc.custoUnitario || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                            <p className="text-sm">R$ {Number(aloc.custoUnitario || 0).toLocaleString("pt-BR", { minimumFractionDigits: 4 })}</p>
                           </div>
                           <div>
                             <Label className="text-xs text-slate-500">Data Descarga</Label>
@@ -426,7 +452,7 @@ export default function AlocacoesSEFAZ() {
                           </div>
                           <div>
                             <Label className="text-xs text-slate-500">Justificativa</Label>
-                            <p className="text-sm text-slate-600">{aloc.justificativa || "Sem justificativa"}</p>
+                            <p className="text-sm text-slate-600 truncate">{aloc.justificativa || "Sem justificativa"}</p>
                           </div>
                         </div>
                       </CardContent>
@@ -436,6 +462,7 @@ export default function AlocacoesSEFAZ() {
               ) : (
                 <Card>
                   <CardContent className="pt-6 text-center text-slate-500">
+                    <Fuel className="mx-auto h-12 w-12 text-slate-300 mb-4" />
                     <p>Nenhuma alocação realizada ainda</p>
                   </CardContent>
                 </Card>
@@ -445,23 +472,33 @@ export default function AlocacoesSEFAZ() {
         </div>
       </div>
 
-      {/* Dialog de Alocação - fora do loop */}
+      {/* Dialog de Alocação */}
       <Dialog open={openDialog} onOpenChange={(open) => {
         setOpenDialog(open);
-        if (!open) setSelectedNfeId(null);
+        if (!open) {
+          setSelectedNfeId(null);
+          setNovaAlocacao(prev => ({ ...prev, postoDestino: "", tanqueDestino: "" }));
+        }
       }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Alocar NFe</DialogTitle>
             <DialogDescription>
               {selectedNfe ? (
-                <>NF {selectedNfe.numeroNf} - {Number(selectedNfe.quantidade).toLocaleString("pt-BR")} L</>
+                <>NF {selectedNfe.numeroNf || selectedNfe.documento} - {Number(selectedNfe.quantidade || selectedNfe.totalLitros || 0).toLocaleString("pt-BR")} L</>
               ) : "Selecione uma NFe"}
             </DialogDescription>
           </DialogHeader>
 
           {selectedNfe && (
             <div className="space-y-4">
+              {/* Resumo da NFe */}
+              <div className="bg-slate-50 p-3 rounded-lg text-sm space-y-1">
+                <p><span className="text-slate-500">Produto:</span> <span className="font-medium">{selectedNfe.produto || selectedNfe.tipoCombustivel || "Combustível"}</span></p>
+                <p><span className="text-slate-500">Custo Unit.:</span> <span className="font-medium">R$ {Number(selectedNfe.custoUnitario || selectedNfe.valorUnitario || 0).toLocaleString("pt-BR", { minimumFractionDigits: 4 })}</span></p>
+                <p><span className="text-slate-500">Posto NF:</span> <span className="font-medium">{selectedNfe.postoDestino || selectedNfe.empresaNome || "-"}</span></p>
+              </div>
+
               {/* Volume */}
               <div>
                 <Label>Volume a Alocar (L) *</Label>
@@ -470,41 +507,43 @@ export default function AlocacoesSEFAZ() {
                   placeholder="0"
                   value={novaAlocacao.volumeAlocado}
                   onChange={(e) => setNovaAlocacao({ ...novaAlocacao, volumeAlocado: e.target.value })}
-                  max={selectedNfe.quantidadePendente || selectedNfe.quantidade}
                 />
                 <p className="text-xs text-slate-500 mt-1">
-                  Máximo: {Number(selectedNfe.quantidadePendente || selectedNfe.quantidade).toLocaleString("pt-BR")} L
+                  Máximo: {Number(selectedNfe.quantidadePendente || selectedNfe.quantidade || selectedNfe.totalLitros || 0).toLocaleString("pt-BR")} L
                 </p>
               </div>
 
-              {/* Posto */}
+              {/* Posto de Destino REAL */}
               <div>
-                <Label>Posto de Destino *</Label>
+                <Label>Posto de Destino Real *</Label>
                 <Select value={novaAlocacao.postoDestino} onValueChange={(value) => setNovaAlocacao({ ...novaAlocacao, postoDestino: value, tanqueDestino: "" })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione um posto" />
+                    <SelectValue placeholder="Selecione o posto onde foi descarregado" />
                   </SelectTrigger>
                   <SelectContent>
-                    {POSTOS.map((posto) => (
-                      <SelectItem key={posto.id} value={posto.id}>
+                    {postosReais.map((posto: any) => (
+                      <SelectItem key={posto.id} value={String(posto.id)}>
                         {posto.nome}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-slate-500 mt-1">
+                  Selecione o posto onde o combustível foi realmente descarregado
+                </p>
               </div>
 
-              {/* Tanque */}
+              {/* Tanque de Destino REAL */}
               <div>
                 <Label>Tanque de Destino *</Label>
                 <Select value={novaAlocacao.tanqueDestino} onValueChange={(value) => setNovaAlocacao({ ...novaAlocacao, tanqueDestino: value })}>
                   <SelectTrigger disabled={!novaAlocacao.postoDestino}>
-                    <SelectValue placeholder="Selecione um tanque" />
+                    <SelectValue placeholder={novaAlocacao.postoDestino ? "Selecione o tanque" : "Selecione um posto primeiro"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {tanquesSelecionados.map((tanque) => (
-                      <SelectItem key={tanque.id} value={tanque.id}>
-                        {tanque.nome}
+                    {tanquesDoPosto.map((tanque: any) => (
+                      <SelectItem key={tanque.id} value={String(tanque.id)}>
+                        Tanque {tanque.codigoAcs || tanque.id} - {tanque.produtoDescricao || "Combustível"} ({Number(tanque.capacidade || 0).toLocaleString("pt-BR")}L)
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -535,7 +574,7 @@ export default function AlocacoesSEFAZ() {
               <div>
                 <Label>Justificativa (se CNPJ diferente)</Label>
                 <Textarea
-                  placeholder="Ex: Compra com CNPJ X, descarga em Y"
+                  placeholder="Ex: Compra com CNPJ Novo Guerra, descarga em Pai Tereza"
                   value={novaAlocacao.justificativa}
                   onChange={(e) => setNovaAlocacao({ ...novaAlocacao, justificativa: e.target.value })}
                   rows={3}

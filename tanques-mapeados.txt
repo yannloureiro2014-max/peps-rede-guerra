@@ -1,0 +1,17 @@
+Tanques Reais Mapeados - POSTO GUERRA FORTIM:
+- Tanque 01 - ETANOL HIDRATADO COMUM (10.000L)
+- Tanque 02 - GASOLINA C COMUM (10.000L)
+- Tanque 03 - OLEO DIESEL B S10 (10.000L)
+
+Postos Disponíveis:
+1. POSTO GUERRA FORTIM
+2. POSTO GUERRA PALHANO
+3. POSTO ITAIÇABA
+4. POSTO JAGUARUANA
+5. POSTO PAI TEREZA
+6. REDE SUPER PETROLEO
+
+NFes encontradas: 87 (todas pendentes)
+Fonte: ACS (banco Sintese_Rede_Guerra)
+Custo Unitário calculado: totalNota / totalLitros
+Posto Destino mapeado: codEmpresa -> nome do posto

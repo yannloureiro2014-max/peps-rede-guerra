@@ -252,6 +252,7 @@ export async function contarComprasNaoAlocadas(): Promise<number> {
 
 /**
  * Buscar NFes (para compatibilidade com interface anterior)
+ * Enriquece dados com custoUnitario calculado e nome do posto
  */
 export async function buscarNfesDoACS(filtros?: {
   dataInicio?: string;
@@ -259,9 +260,45 @@ export async function buscarNfesDoACS(filtros?: {
   postoId?: string;
   status?: string;
 }): Promise<any[]> {
-  // Redirecionar para buscarComprasDoACS
-  return buscarComprasDoACS({
+  const compras = await buscarComprasDoACS({
     dataInicio: filtros?.dataInicio,
     dataFim: filtros?.dataFim,
+    codEmpresa: filtros?.postoId,
+  });
+
+  // Mapeamento de cod_empresa para nomes de postos
+  const MAPA_POSTOS: Record<string, string> = {
+    "01": "NOVO GUERRA - Fotim",
+    "02": "PALHANO",
+    "03": "NOVO GUERRA - Itaiçaba",
+    "04": "PAI TEREZA",
+    "05": "LEITE LEITE",
+    "06": "MÃE E FILHO",
+    "07": "GUERRA COMB.",
+    "08": "JAGUARUANA",
+    "09": "GUERRA COMB. LTDA",
+    "10": "SG PETROLEO",
+    "11": "GUARARAPES",
+    "12": "ARACATI",
+    "13": "HORIZONTE",
+  };
+
+  return compras.map((c: any) => {
+    const codEmpTrimmed = (c.codEmpresa || "").trim();
+    const custoUnitario = c.totalLitros > 0 ? c.totalNota / c.totalLitros : 0;
+    return {
+      ...c,
+      quantidade: c.totalLitros,
+      custoUnitario,
+      custoTotal: c.totalNota,
+      postoDestino: MAPA_POSTOS[codEmpTrimmed] || `Empresa ${codEmpTrimmed}`,
+      produto: "Combustível",
+      statusAlocacao: "pendente",
+      quantidadePendente: c.totalLitros,
+      numeroNf: c.documento,
+      serieNf: c.serie,
+      dataEmissao: c.dataEmissao,
+      chaveNfe: `ACS-${codEmpTrimmed}-${c.codigo}`,
+    };
   });
 }
