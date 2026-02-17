@@ -1,48 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, CheckCircle, Clock, Download, Plus, Search, Trash2 } from "lucide-react";
+import { AlertCircle, CheckCircle, Plus, Search, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
-
-interface NFe {
-  id: string;
-  chaveNfe: string;
-  numeroNf: string;
-  serieNf: string;
-  dataEmissao: string;
-  cnpjFaturado: string;
-  cnpjFornecedor: string;
-  postoDestino: string;
-  produto: string;
-  quantidade: number;
-  custoUnitario: number;
-  custoTotal: number;
-  statusAlocacao: "pendente" | "parcial" | "alocada";
-  quantidadePendente: number;
-}
-
-interface Alocacao {
-  id: string;
-  chaveNfe: string;
-  numeroNf: string;
-  postoDestino: string;
-  tanqueDestino: string;
-  volumeAlocado: number;
-  dataDescarga: string;
-  horaDescarga?: string;
-  custoUnitario: number;
-  custoTotal: number;
-  justificativa?: string;
-  dataAlocacao: string;
-}
 
 const POSTOS = [
   { id: "1", nome: "Fotim" },
@@ -63,18 +31,22 @@ const TANQUES: Record<string, Array<{ id: string; nome: string }>> = {
 };
 
 export default function AlocacoesSEFAZ() {
-  const [nfes, setNfes] = useState<NFe[]>([]);
-  const [alocacoes, setAlocacoes] = useState<Alocacao[]>([]);
-  const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
-  const [selectedNfe, setSelectedNfe] = useState<NFe | null>(null);
+  const [selectedNfeId, setSelectedNfeId] = useState<string | null>(null);
 
   // Filtros
-  const [filtros, setFiltros] = useState({
-    postoId: "",
-    dataInicio: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-    dataFim: new Date().toISOString().split("T")[0],
+  const [filtroPostoId, setFiltroPostoId] = useState("todos");
+  const [dataInicio] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split("T")[0];
   });
+  const [dataFim] = useState(() => new Date().toISOString().split("T")[0]);
+  const [dataInicioInput, setDataInicioInput] = useState(dataInicio);
+  const [dataFimInput, setDataFimInput] = useState(dataFim);
+
+  // Parâmetros de busca estabilizados
+  const [searchParams, setSearchParams] = useState<{ dataInicio: string; dataFim: string } | null>(null);
 
   // Formulário de alocação
   const [novaAlocacao, setNovaAlocacao] = useState({
@@ -86,12 +58,24 @@ export default function AlocacoesSEFAZ() {
     justificativa: "",
   });
 
-  // tRPC mutations
+  // tRPC query - busca NFes pendentes (só executa quando searchParams existe)
+  const nfesQuery = trpc.alocacoesFisicas.listarNfesPendentes.useQuery(
+    searchParams ?? { dataInicio: dataInicioInput, dataFim: dataFimInput },
+    { enabled: searchParams !== null }
+  );
+
+  // tRPC query - busca alocações realizadas
+  const alocacoesQuery = trpc.alocacoesFisicas.listarAlocacoesRealizadas.useQuery(
+    {},
+    { enabled: true }
+  );
+
+  // tRPC mutation - criar alocação
   const criarAlocacaoMutation = trpc.alocacoesFisicas.criarAlocacao.useMutation({
     onSuccess: () => {
       alert("Alocação criada com sucesso!");
       setOpenDialog(false);
-      setSelectedNfe(null);
+      setSelectedNfeId(null);
       setNovaAlocacao({
         volumeAlocado: "",
         postoDestino: "",
@@ -100,44 +84,32 @@ export default function AlocacoesSEFAZ() {
         horaDescarga: "",
         justificativa: "",
       });
-      buscarNfes();
+      // Recarregar dados
+      nfesQuery.refetch();
+      alocacoesQuery.refetch();
     },
-    onError: (error) => {
-      alert("Erro ao criar alocação: " + (error instanceof Error ? error.message : "Erro desconhecido"));
+    onError: (error: any) => {
+      alert("Erro ao criar alocação: " + (error?.message || "Erro desconhecido"));
     },
   });
 
-  const buscarNfes = async () => {
-    setLoading(true);
-    try {
-      const response = await trpc.alocacoesFisicas.listarNfesPendentes.useQuery({
-        dataInicio: filtros.dataInicio,
-        dataFim: filtros.dataFim,
-      }).data;
+  // Filtrar NFes por posto selecionado
+  const nfesFiltradas = useMemo(() => {
+    const dados = nfesQuery.data?.dados || [];
+    if (filtroPostoId === "todos") return dados;
+    const postoSelecionado = POSTOS.find((p) => p.id === filtroPostoId);
+    if (!postoSelecionado) return dados;
+    return dados.filter(
+      (nfe: any) => nfe.postoDestino?.toLowerCase().includes(postoSelecionado.nome.toLowerCase())
+    );
+  }, [nfesQuery.data, filtroPostoId]);
 
-      if (response?.sucesso) {
-        let nfesFiltered = response.dados || [];
+  const selectedNfe = useMemo(() => {
+    return nfesFiltradas.find((n: any) => n.id === selectedNfeId) || null;
+  }, [nfesFiltradas, selectedNfeId]);
 
-        // Filtrar por posto se selecionado
-        if (filtros.postoId) {
-          const postoSelecionado = POSTOS.find((p) => p.id === filtros.postoId);
-          if (postoSelecionado) {
-            nfesFiltered = nfesFiltered.filter(
-              (nfe) => nfe.postoDestino.toLowerCase() === postoSelecionado.nome.toLowerCase()
-            );
-          }
-        }
-
-        setNfes(nfesFiltered);
-      } else {
-        alert("Erro ao buscar NFes: " + response?.erro);
-      }
-    } catch (error) {
-      console.error("Erro ao buscar NFes:", error);
-      alert("Erro ao buscar NFes: " + (error instanceof Error ? error.message : "Erro desconhecido"));
-    } finally {
-      setLoading(false);
-    }
+  const buscarNfes = () => {
+    setSearchParams({ dataInicio: dataInicioInput, dataFim: dataFimInput });
   };
 
   const handleAlocar = async () => {
@@ -151,14 +123,14 @@ export default function AlocacoesSEFAZ() {
         chaveNfe: selectedNfe.chaveNfe,
         numeroNf: selectedNfe.numeroNf,
         serieNf: selectedNfe.serieNf,
-        dataEmissao: selectedNfe.dataEmissao,
+        dataEmissao: typeof selectedNfe.dataEmissao === "string" ? selectedNfe.dataEmissao : new Date(selectedNfe.dataEmissao).toISOString(),
         postoDestinoId: parseInt(novaAlocacao.postoDestino),
         tanqueDestinoId: parseInt(novaAlocacao.tanqueDestino),
         dataDescargaReal: novaAlocacao.dataDescarga,
-        horaDescargaReal: novaAlocacao.horaDescarga,
+        horaDescargaReal: novaAlocacao.horaDescarga || undefined,
         volumeAlocado: parseFloat(novaAlocacao.volumeAlocado),
         custoUnitarioAplicado: selectedNfe.custoUnitario,
-        justificativa: novaAlocacao.justificativa,
+        justificativa: novaAlocacao.justificativa || undefined,
       });
     } catch (error) {
       console.error("Erro ao alocar:", error);
@@ -175,6 +147,8 @@ export default function AlocacoesSEFAZ() {
   };
 
   const tanquesSelecionados = novaAlocacao.postoDestino ? TANQUES[novaAlocacao.postoDestino] || [] : [];
+
+  const loading = nfesQuery.isLoading || nfesQuery.isFetching;
 
   return (
     <DashboardLayout>
@@ -218,12 +192,12 @@ export default function AlocacoesSEFAZ() {
                     {/* Filtro: Posto */}
                     <div>
                       <Label htmlFor="posto">Posto</Label>
-                      <Select value={filtros.postoId} onValueChange={(value) => setFiltros({ ...filtros, postoId: value })}>
+                      <Select value={filtroPostoId} onValueChange={setFiltroPostoId}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecione um posto" />
+                          <SelectValue placeholder="Todos os postos" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Todos os postos</SelectItem>
+                          <SelectItem value="todos">Todos os postos</SelectItem>
                           {POSTOS.map((posto) => (
                             <SelectItem key={posto.id} value={posto.id}>
                               {posto.nome}
@@ -238,8 +212,8 @@ export default function AlocacoesSEFAZ() {
                       <Label htmlFor="dataInicio">Data Inicial</Label>
                       <Input
                         type="date"
-                        value={filtros.dataInicio}
-                        onChange={(e) => setFiltros({ ...filtros, dataInicio: e.target.value })}
+                        value={dataInicioInput}
+                        onChange={(e) => setDataInicioInput(e.target.value)}
                       />
                     </div>
 
@@ -248,26 +222,51 @@ export default function AlocacoesSEFAZ() {
                       <Label htmlFor="dataFim">Data Final</Label>
                       <Input
                         type="date"
-                        value={filtros.dataFim}
-                        onChange={(e) => setFiltros({ ...filtros, dataFim: e.target.value })}
+                        value={dataFimInput}
+                        onChange={(e) => setDataFimInput(e.target.value)}
                       />
                     </div>
                   </div>
 
                   <Button onClick={buscarNfes} disabled={loading} className="w-full">
-                    <Search className="mr-2 h-4 w-4" />
-                    {loading ? "Buscando..." : "Buscar NFes"}
+                    {loading ? (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                        Buscando...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="mr-2 h-4 w-4" />
+                        Buscar NFes
+                      </>
+                    )}
                   </Button>
                 </CardContent>
               </Card>
 
-              {nfes.length > 0 && (
+              {/* Erro */}
+              {nfesQuery.isError && (
+                <Alert className="border-red-200 bg-red-50">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                  <AlertDescription className="text-red-800">
+                    Erro ao buscar NFes: {nfesQuery.error?.message || "Erro desconhecido"}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Resultados */}
+              {nfesFiltradas.length > 0 && (
                 <div className="space-y-4">
                   <div className="text-sm text-slate-600">
-                    {nfes.length} NFe(s) encontrada(s) - {nfes.filter((n) => n.statusAlocacao === "pendente").length} pendente(s)
+                    {nfesFiltradas.length} NFe(s) encontrada(s) - {nfesFiltradas.filter((n: any) => n.statusAlocacao === "pendente").length} pendente(s)
+                    {nfesQuery.data?.origem && (
+                      <span className="ml-2 text-xs bg-slate-100 px-2 py-1 rounded">
+                        Fonte: {nfesQuery.data.origem}
+                      </span>
+                    )}
                   </div>
 
-                  {nfes.map((nfe: NFe) => (
+                  {nfesFiltradas.map((nfe: any) => (
                     <Card key={nfe.id} className="hover:shadow-md transition-shadow">
                       <CardContent className="pt-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
@@ -281,7 +280,7 @@ export default function AlocacoesSEFAZ() {
                           </div>
                           <div>
                             <Label className="text-xs text-slate-500">Quantidade (L)</Label>
-                            <p className="text-sm font-semibold">{nfe.quantidade.toLocaleString("pt-BR")}</p>
+                            <p className="text-sm font-semibold">{Number(nfe.quantidade).toLocaleString("pt-BR")}</p>
                           </div>
                           <div>
                             <Label className="text-xs text-slate-500">Status</Label>
@@ -291,137 +290,54 @@ export default function AlocacoesSEFAZ() {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-sm">
                           <div>
-                            <Label className="text-xs text-slate-500">Custo Total</Label>
-                            <p className="font-semibold">R$ {nfe.custoTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                            <Label className="text-xs text-slate-500">Posto Destino</Label>
+                            <p>{nfe.postoDestino || "Não identificado"}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-slate-500">Produto</Label>
+                            <p>{nfe.produto || "Combustível"}</p>
                           </div>
                           <div>
                             <Label className="text-xs text-slate-500">Custo Unitário</Label>
-                            <p className="font-semibold">R$ {nfe.custoUnitario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                            <p className="font-semibold">R$ {Number(nfe.custoUnitario).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
                           </div>
                         </div>
 
-                        <Dialog open={openDialog && selectedNfe?.id === nfe.id} onOpenChange={setOpenDialog}>
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedNfe(nfe);
-                                setOpenDialog(true);
-                              }}
-                              disabled={nfe.statusAlocacao === "alocada"}
-                            >
-                              <Plus className="mr-2 h-4 w-4" />
-                              Alocar
-                            </Button>
-                          </DialogTrigger>
-
-                          <DialogContent className="max-w-md">
-                            <DialogHeader>
-                              <DialogTitle>Alocar NFe</DialogTitle>
-                              <DialogDescription>
-                                NF {nfe.numeroNf} - {nfe.quantidade.toLocaleString("pt-BR")} L
-                              </DialogDescription>
-                            </DialogHeader>
-
-                            <div className="space-y-4">
-                              {/* Volume */}
-                              <div>
-                                <Label>Volume a Alocar (L) *</Label>
-                                <Input
-                                  type="number"
-                                  placeholder="0"
-                                  value={novaAlocacao.volumeAlocado}
-                                  onChange={(e) => setNovaAlocacao({ ...novaAlocacao, volumeAlocado: e.target.value })}
-                                  max={nfe.quantidadePendente}
-                                />
-                                <p className="text-xs text-slate-500 mt-1">Máximo: {nfe.quantidadePendente.toLocaleString("pt-BR")} L</p>
-                              </div>
-
-                              {/* Posto */}
-                              <div>
-                                <Label>Posto de Destino *</Label>
-                                <Select value={novaAlocacao.postoDestino} onValueChange={(value) => setNovaAlocacao({ ...novaAlocacao, postoDestino: value, tanqueDestino: "" })}>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Selecione um posto" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {POSTOS.map((posto) => (
-                                      <SelectItem key={posto.id} value={posto.id}>
-                                        {posto.nome}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              {/* Tanque */}
-                              <div>
-                                <Label>Tanque de Destino *</Label>
-                                <Select value={novaAlocacao.tanqueDestino} onValueChange={(value) => setNovaAlocacao({ ...novaAlocacao, tanqueDestino: value })}>
-                                  <SelectTrigger disabled={!novaAlocacao.postoDestino}>
-                                    <SelectValue placeholder="Selecione um tanque" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {tanquesSelecionados.map((tanque) => (
-                                      <SelectItem key={tanque.id} value={tanque.id}>
-                                        {tanque.nome}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              {/* Data de Descarga */}
-                              <div>
-                                <Label>Data de Descarga Real *</Label>
-                                <Input
-                                  type="date"
-                                  value={novaAlocacao.dataDescarga}
-                                  onChange={(e) => setNovaAlocacao({ ...novaAlocacao, dataDescarga: e.target.value })}
-                                />
-                              </div>
-
-                              {/* Hora de Descarga */}
-                              <div>
-                                <Label>Hora de Descarga (opcional)</Label>
-                                <Input
-                                  type="time"
-                                  value={novaAlocacao.horaDescarga}
-                                  onChange={(e) => setNovaAlocacao({ ...novaAlocacao, horaDescarga: e.target.value })}
-                                />
-                              </div>
-
-                              {/* Justificativa */}
-                              <div>
-                                <Label>Justificativa (se CNPJ diferente)</Label>
-                                <Textarea
-                                  placeholder="Ex: Compra com CNPJ X, descarga em Y"
-                                  value={novaAlocacao.justificativa}
-                                  onChange={(e) => setNovaAlocacao({ ...novaAlocacao, justificativa: e.target.value })}
-                                  rows={3}
-                                />
-                              </div>
-
-                              <Button onClick={handleAlocar} className="w-full">
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                                Confirmar Alocação
-                              </Button>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedNfeId(nfe.id);
+                              setOpenDialog(true);
+                            }}
+                            disabled={nfe.statusAlocacao === "alocada"}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Alocar
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
               )}
 
-              {!loading && nfes.length === 0 && (
+              {searchParams && !loading && nfesFiltradas.length === 0 && !nfesQuery.isError && (
                 <Card>
                   <CardContent className="pt-6 text-center text-slate-500">
                     <p>Nenhuma NFe encontrada com os filtros selecionados</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!searchParams && (
+                <Card>
+                  <CardContent className="pt-6 text-center text-slate-500">
+                    <Search className="mx-auto h-12 w-12 text-slate-300 mb-4" />
+                    <p>Selecione os filtros e clique em "Buscar NFes" para começar</p>
                   </CardContent>
                 </Card>
               )}
@@ -429,24 +345,215 @@ export default function AlocacoesSEFAZ() {
 
             {/* Tab: NFes Alocadas */}
             <TabsContent value="alocadas" className="space-y-4">
-              <Card>
-                <CardContent className="pt-6 text-center text-slate-500">
-                  <p>Funcionalidade em desenvolvimento</p>
-                </CardContent>
-              </Card>
+              {alocacoesQuery.isLoading ? (
+                <Card>
+                  <CardContent className="pt-6 text-center text-slate-500">
+                    <RefreshCw className="mx-auto h-8 w-8 animate-spin text-slate-300 mb-4" />
+                    <p>Carregando alocações...</p>
+                  </CardContent>
+                </Card>
+              ) : alocacoesQuery.data?.dados && alocacoesQuery.data.dados.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="text-sm text-slate-600">
+                    {alocacoesQuery.data.dados.length} alocação(ões) encontrada(s)
+                  </div>
+                  {alocacoesQuery.data.dados.map((aloc: any, idx: number) => (
+                    <Card key={aloc.id || idx}>
+                      <CardContent className="pt-6">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div>
+                            <Label className="text-xs text-slate-500">NFe</Label>
+                            <p className="font-mono text-sm">{aloc.numeroNf || aloc.chaveNfe?.substring(0, 20) || "-"}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-slate-500">Volume</Label>
+                            <p className="text-sm font-semibold">{Number(aloc.volumeAlocado || aloc.volume || 0).toLocaleString("pt-BR")} L</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-slate-500">Data Descarga</Label>
+                            <p className="text-sm">{aloc.dataDescargaReal ? new Date(aloc.dataDescargaReal).toLocaleDateString("pt-BR") : "-"}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-slate-500">Status</Label>
+                            <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-800">
+                              Alocada
+                            </span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="pt-6 text-center text-slate-500">
+                    <p>Nenhuma alocação encontrada</p>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
 
             {/* Tab: Alocações Realizadas */}
             <TabsContent value="realizadas" className="space-y-4">
-              <Card>
-                <CardContent className="pt-6 text-center text-slate-500">
-                  <p>Funcionalidade em desenvolvimento</p>
-                </CardContent>
-              </Card>
+              {alocacoesQuery.isLoading ? (
+                <Card>
+                  <CardContent className="pt-6 text-center text-slate-500">
+                    <RefreshCw className="mx-auto h-8 w-8 animate-spin text-slate-300 mb-4" />
+                    <p>Carregando...</p>
+                  </CardContent>
+                </Card>
+              ) : alocacoesQuery.data?.dados && alocacoesQuery.data.dados.length > 0 ? (
+                <div className="space-y-4">
+                  {alocacoesQuery.data.dados.map((aloc: any, idx: number) => (
+                    <Card key={aloc.id || idx}>
+                      <CardContent className="pt-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                          <div>
+                            <Label className="text-xs text-slate-500">NFe</Label>
+                            <p className="font-mono text-sm">{aloc.numeroNf || "-"}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-slate-500">Volume</Label>
+                            <p className="text-sm font-semibold">{Number(aloc.volumeAlocado || aloc.volume || 0).toLocaleString("pt-BR")} L</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-slate-500">Custo Unit.</Label>
+                            <p className="text-sm">R$ {Number(aloc.custoUnitario || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-slate-500">Data Descarga</Label>
+                            <p className="text-sm">{aloc.dataDescargaReal ? new Date(aloc.dataDescargaReal).toLocaleDateString("pt-BR") : "-"}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-slate-500">Justificativa</Label>
+                            <p className="text-sm text-slate-600">{aloc.justificativa || "Sem justificativa"}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="pt-6 text-center text-slate-500">
+                    <p>Nenhuma alocação realizada ainda</p>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
           </Tabs>
         </div>
       </div>
+
+      {/* Dialog de Alocação - fora do loop */}
+      <Dialog open={openDialog} onOpenChange={(open) => {
+        setOpenDialog(open);
+        if (!open) setSelectedNfeId(null);
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Alocar NFe</DialogTitle>
+            <DialogDescription>
+              {selectedNfe ? (
+                <>NF {selectedNfe.numeroNf} - {Number(selectedNfe.quantidade).toLocaleString("pt-BR")} L</>
+              ) : "Selecione uma NFe"}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedNfe && (
+            <div className="space-y-4">
+              {/* Volume */}
+              <div>
+                <Label>Volume a Alocar (L) *</Label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={novaAlocacao.volumeAlocado}
+                  onChange={(e) => setNovaAlocacao({ ...novaAlocacao, volumeAlocado: e.target.value })}
+                  max={selectedNfe.quantidadePendente || selectedNfe.quantidade}
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Máximo: {Number(selectedNfe.quantidadePendente || selectedNfe.quantidade).toLocaleString("pt-BR")} L
+                </p>
+              </div>
+
+              {/* Posto */}
+              <div>
+                <Label>Posto de Destino *</Label>
+                <Select value={novaAlocacao.postoDestino} onValueChange={(value) => setNovaAlocacao({ ...novaAlocacao, postoDestino: value, tanqueDestino: "" })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um posto" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {POSTOS.map((posto) => (
+                      <SelectItem key={posto.id} value={posto.id}>
+                        {posto.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Tanque */}
+              <div>
+                <Label>Tanque de Destino *</Label>
+                <Select value={novaAlocacao.tanqueDestino} onValueChange={(value) => setNovaAlocacao({ ...novaAlocacao, tanqueDestino: value })}>
+                  <SelectTrigger disabled={!novaAlocacao.postoDestino}>
+                    <SelectValue placeholder="Selecione um tanque" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tanquesSelecionados.map((tanque) => (
+                      <SelectItem key={tanque.id} value={tanque.id}>
+                        {tanque.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Data de Descarga */}
+              <div>
+                <Label>Data de Descarga Real *</Label>
+                <Input
+                  type="date"
+                  value={novaAlocacao.dataDescarga}
+                  onChange={(e) => setNovaAlocacao({ ...novaAlocacao, dataDescarga: e.target.value })}
+                />
+              </div>
+
+              {/* Hora de Descarga */}
+              <div>
+                <Label>Hora de Descarga (opcional)</Label>
+                <Input
+                  type="time"
+                  value={novaAlocacao.horaDescarga}
+                  onChange={(e) => setNovaAlocacao({ ...novaAlocacao, horaDescarga: e.target.value })}
+                />
+              </div>
+
+              {/* Justificativa */}
+              <div>
+                <Label>Justificativa (se CNPJ diferente)</Label>
+                <Textarea
+                  placeholder="Ex: Compra com CNPJ X, descarga em Y"
+                  value={novaAlocacao.justificativa}
+                  onChange={(e) => setNovaAlocacao({ ...novaAlocacao, justificativa: e.target.value })}
+                  rows={3}
+                />
+              </div>
+
+              <Button
+                onClick={handleAlocar}
+                className="w-full"
+                disabled={criarAlocacaoMutation.isPending}
+              >
+                <CheckCircle className="mr-2 h-4 w-4" />
+                {criarAlocacaoMutation.isPending ? "Alocando..." : "Confirmar Alocação"}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

@@ -455,3 +455,11 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [ ] Documentar motor de CMV idempotente
 - [ ] Criar exemplos de uso das procedures tRPC
 - [ ] Criar guia de troubleshooting
+
+## Bug: Erro "An unexpected error occurred" na página Alocações SEFAZ
+
+- [x] Corrigir uso de hook tRPC dentro de função async (useQuery chamado dentro de buscarNfes) - substituído por useQuery no nível do componente com refetch manual
+- [x] Corrigir SelectItem com value="" vazio que crashava Radix Select - substituído por value="todos"
+- [x] Mover Dialog para fora do loop de NFes (evitar re-render desnecessário)
+- [x] Estabilizar referências com useMemo para evitar re-renders infinitos
+- [x] Build de produção testado sem erros
