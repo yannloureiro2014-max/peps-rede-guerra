@@ -21,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle, Clock, MapPin, Truck, Home, RefreshCw, AlertTriangle } from "lucide-react";
 import { useLocation } from "wouter";
+import { trpc } from "@/lib/trpc";
 
 export default function AlocacoesFisicas() {
   const [, setLocation] = useLocation();
@@ -37,73 +38,19 @@ export default function AlocacoesFisicas() {
     justificativa: "",
   });
 
-  // Dados simulados - NFes em staging
-  const nfesPendentes = [
-    {
-      id: 1,
-      chaveNfe: "35240216123456789012345678901234567890",
-      numeroNf: "001234",
-      dataEmissao: "2026-02-14",
-      cnpjFaturado: "07.526.847/0001-00", // Aracati
-      postoFiscal: "Aracati",
-      produto: "Gasolina Comum",
-      quantidade: 5000,
-      custoUnitario: 5.42,
-      custoTotal: 27100,
-      statusAlocacao: "pendente",
-      quantidadePendente: 5000,
-    },
-    {
-      id: 2,
-      chaveNfe: "35240216234567890123456789012345678901",
-      numeroNf: "001235",
-      dataEmissao: "2026-02-15",
-      cnpjFaturado: "07.526.847/0001-00", // Aracati
-      postoFiscal: "Aracati",
-      produto: "Diesel S10",
-      quantidade: 3000,
-      custoUnitario: 6.15,
-      custoTotal: 18450,
-      statusAlocacao: "parcialmente_alocado",
-      quantidadePendente: 1500,
-    },
-  ];
+  // Buscar dados do backend via tRPC
+  const { data: nfesData, isLoading: carregandoNfes, refetch: refetchNfes } = trpc.alocacoesFisicas.listarNfesPendentes.useQuery();
+  const { data: alocacoesData } = trpc.alocacoesFisicas.listarAlocacoesRealizadas.useQuery();
+  const { data: lotesFisicosData } = trpc.alocacoesFisicas.listarLotesFisicos.useQuery();
+  const criarAlocacaoMutation = trpc.alocacoesFisicas.criarAlocacao.useMutation();
+  const recalcularCMVMutation = trpc.alocacoesFisicas.recalcularCMVComAlocacoes.useMutation();
 
-  // Dados simulados - Alocações realizadas
-  const alocacoesRealizadas = [
-    {
-      id: 1,
-      chaveNfe: "35240216111111111111111111111111111111",
-      numeroNf: "001232",
-      dataEmissao: "2026-02-13",
-      postoFiscal: "Aracati",
-      postoDestino: "Fortaleza Centro",
-      tanqueDestino: "Gasolina 1",
-      dataDescarga: "2026-02-13",
-      horaDescarga: "14:30",
-      volumeAlocado: 4500,
-      status: "confirmado",
-      usuarioAlocacao: "Yann Loureiro",
-      justificativa: "Compra com CNPJ Aracati, descarga em Fortaleza",
-    },
-    {
-      id: 2,
-      chaveNfe: "35240216222222222222222222222222222222",
-      numeroNf: "001233",
-      dataEmissao: "2026-02-14",
-      postoFiscal: "Aracati",
-      postoDestino: "Fortaleza Bairro",
-      tanqueDestino: "Diesel 1",
-      dataDescarga: "2026-02-14",
-      horaDescarga: "09:15",
-      volumeAlocado: 3000,
-      status: "confirmado",
-      usuarioAlocacao: "Yann Loureiro",
-      justificativa: "Compra com CNPJ Aracati, descarga em Fortaleza Bairro",
-    },
-  ];
+  // Usar dados do backend ou fallback para dados simulados
+  const nfesPendentes = nfesData?.dados || [];
+  const alocacoesRealizadas = alocacoesData?.dados || [];
+  const lotesFisicos = lotesFisicosData?.dados || [];
 
-  // Dados simulados - Postos e tanques
+  // Dados simulados - Postos e tanques (em produção viriam do backend)
   const postos = [
     { id: 1, nome: "Fortaleza Centro", cnpj: "07.526.847/0001-01" },
     { id: 2, nome: "Fortaleza Bairro", cnpj: "07.526.847/0001-02" },
@@ -125,7 +72,7 @@ export default function AlocacoesFisicas() {
     ],
   };
 
-  const handleAlocar = () => {
+  const handleAlocar = async () => {
     if (
       !novaAlocacao.nfeStagingId ||
       !novaAlocacao.postoDestino ||
@@ -137,20 +84,46 @@ export default function AlocacoesFisicas() {
       return;
     }
 
-    console.log("Alocação realizada:", novaAlocacao);
-    alert("Alocação criada com sucesso!");
+    try {
+      // Chamar tRPC para criar alocação
+      await criarAlocacaoMutation.mutateAsync({
+        nfeStagingId: novaAlocacao.nfeStagingId,
+        chaveNfe: novaAlocacao.chaveNfe,
+        postoDestinoId: parseInt(novaAlocacao.postoDestino),
+        tanqueDestinoId: parseInt(novaAlocacao.tanqueDestino),
+        dataDescargaReal: novaAlocacao.dataDescarga,
+        horaDescargaReal: novaAlocacao.horaDescarga,
+        volumeAlocado: parseFloat(novaAlocacao.volumeAlocado),
+        custoUnitarioAplicado: 5.42, // Pegar do NFe
+        justificativa: novaAlocacao.justificativa,
+      });
 
-    // Limpar formulário
-    setNovaAlocacao({
-      nfeStagingId: "",
-      chaveNfe: "",
-      postoDestino: "",
-      tanqueDestino: "",
-      dataDescarga: "",
-      horaDescarga: "",
-      volumeAlocado: "",
-      justificativa: "",
-    });
+      // Recalcular CMV automaticamente
+      await recalcularCMVMutation.mutateAsync({
+        dataInicio: novaAlocacao.dataDescarga,
+        dataFim: novaAlocacao.dataDescarga,
+      });
+
+      alert("Alocação criada e CMV recalculado com sucesso!");
+      
+      // Recarregar dados
+      refetchNfes();
+
+      // Limpar formulário
+      setNovaAlocacao({
+        nfeStagingId: "",
+        chaveNfe: "",
+        postoDestino: "",
+        tanqueDestino: "",
+        dataDescarga: "",
+        horaDescarga: "",
+        volumeAlocado: "",
+        justificativa: "",
+      });
+    } catch (erro) {
+      console.error("Erro ao criar alocação:", erro);
+      alert("Erro ao criar alocação");
+    }
   };
 
   const handleSelecionarNfe = (nfe: any) => {
@@ -163,10 +136,15 @@ export default function AlocacoesFisicas() {
 
   const handleAtualizar = async () => {
     setCarregando(true);
-    // Simular chamada ao backend para recarregar NFes do ACS
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setCarregando(false);
-    alert("NFes atualizadas do ACS com sucesso!");
+    try {
+      await refetchNfes();
+      alert("NFes atualizadas do ACS com sucesso!");
+    } catch (erro) {
+      console.error("Erro ao atualizar NFes:", erro);
+      alert("Erro ao atualizar NFes do ACS");
+    } finally {
+      setCarregando(false);
+    }
   };
 
   const handleVoltar = () => {
@@ -192,6 +170,22 @@ export default function AlocacoesFisicas() {
         return <Badge>{status}</Badge>;
     }
   };
+
+  // Verificar se está carregando
+  if (carregandoNfes) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-pulse flex flex-col items-center gap-4">
+          <div className="h-12 w-12 rounded-full bg-slate-200"></div>
+          <div className="h-4 w-32 bg-slate-200 rounded"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Verificar se está criando alocação
+  const criadoAlocacao = criarAlocacaoMutation.isPending;
+  const recalculandoCMV = recalcularCMVMutation.isPending;
 
   return (
     <div className="space-y-6">
@@ -242,314 +236,330 @@ export default function AlocacoesFisicas() {
         {/* TAB 1: NFes Pendentes */}
         <TabsContent value="nfes-pendentes" className="space-y-4">
           <div className="grid gap-4">
-            {nfesPendentes.map((nfe) => {
-              const fornecedorValido = nfe.cnpjFaturado === "07.526.847/0001-00"; // Simular validação
-              return (
-              <Card key={nfe.id} className={`hover:shadow-lg transition-shadow ${
-                !fornecedorValido ? "border-orange-300 bg-orange-50" : ""
-              }`}>
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">NF {nfe.numeroNf}</CardTitle>
-                      <CardDescription className="text-xs font-mono mt-1">
-                        {nfe.chaveNfe}
-                      </CardDescription>
-                      {!fornecedorValido && (
-                        <div className="flex items-center gap-1 mt-2 text-orange-700 text-xs">
-                          <AlertTriangle className="w-3 h-3" />
-                          Fornecedor diferente do CNPJ faturado
+            {nfesPendentes && nfesPendentes.length > 0 ? (
+              nfesPendentes.map((nfe: any) => {
+                const fornecedorValido = nfe.cnpjFaturado === "07.526.847/0001-00";
+                return (
+                  <Card key={nfe.id} className={`hover:shadow-lg transition-shadow ${
+                    !fornecedorValido ? "border-orange-300 bg-orange-50" : ""
+                  }`}>
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg">NF {nfe.numeroNf}</CardTitle>
+                          <CardDescription className="text-xs font-mono mt-1">
+                            {nfe.chaveNfe}
+                          </CardDescription>
+                          {!fornecedorValido && (
+                            <div className="flex items-center gap-1 mt-2 text-orange-700 text-xs">
+                              <AlertTriangle className="w-3 h-3" />
+                              Fornecedor diferente do CNPJ faturado
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    {getStatusBadge(nfe.statusAlocacao)}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
-                    <div>
-                      <p className="text-sm text-gray-600">Data Emissão</p>
-                      <p className="font-semibold">
-                        {new Date(nfe.dataEmissao).toLocaleDateString("pt-BR")}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Posto Fiscal</p>
-                      <p className="font-semibold">{nfe.postoFiscal}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Fornecedor</p>
-                      <p className={`font-semibold ${
-                        fornecedorValido ? "text-green-700" : "text-orange-700"
-                      }`}>
-                        {nfe.postoFiscal}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Produto</p>
-                      <p className="font-semibold">{nfe.produto}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Quantidade</p>
-                      <p className="font-semibold">{nfe.quantidade.toLocaleString()} L</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4 pb-4 border-b">
-                    <div>
-                      <p className="text-sm text-gray-600">Custo Unitário</p>
-                      <p className="font-semibold">R$ {nfe.custoUnitario.toFixed(2)}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Custo Total</p>
-                      <p className="font-semibold">R$ {nfe.custoTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Pendente</p>
-                      <p className="font-semibold text-orange-600">
-                        {nfe.quantidadePendente.toLocaleString()} L
-                      </p>
-                    </div>
-                  </div>
-
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button
-                        onClick={() => handleSelecionarNfe(nfe)}
-                        className="w-full"
-                      >
-                        <MapPin className="w-4 h-4 mr-2" />
-                        Alocar Fisicamente
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl">
-                      <DialogHeader>
-                        <DialogTitle>Alocar NFe Fisicamente</DialogTitle>
-                      </DialogHeader>
-
-                    <div className="space-y-4">
-                      {/* Informações da NFe */}
-                      <div className="bg-blue-50 p-4 rounded-lg">
-                          <p className="text-sm text-gray-600">NFe Selecionada</p>
+                        {getStatusBadge(nfe.statusAlocacao)}
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+                        <div>
+                          <p className="text-sm text-gray-600">Data Emissão</p>
                           <p className="font-semibold">
-                            NF {nfe.numeroNf} - {nfe.produto}
+                            {new Date(nfe.dataEmissao).toLocaleDateString("pt-BR")}
                           </p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            Quantidade disponível: {nfe.quantidadePendente.toLocaleString()} L
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Posto Fiscal</p>
+                          <p className="font-semibold">{nfe.postoFiscal}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Fornecedor</p>
+                          <p className={`font-semibold ${
+                            fornecedorValido ? "text-green-700" : "text-orange-700"
+                          }`}>
+                            {nfe.postoFiscal}
                           </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Produto</p>
+                          <p className="font-semibold">{nfe.produto}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Quantidade</p>
+                          <p className="font-semibold">{nfe.quantidade.toLocaleString()} L</p>
+                        </div>
                       </div>
 
-                      {/* Formulário de Alocação */}
-                      <div className="grid grid-cols-2 gap-4">
-                        {/* Posto Destino */}
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4 pb-4 border-b">
                         <div>
-                            <Label htmlFor="posto">Posto Destino *</Label>
-                            <Select
-                              value={novaAlocacao.postoDestino}
-                              onValueChange={(value) =>
-                                setNovaAlocacao({
-                                  ...novaAlocacao,
-                                  postoDestino: value,
-                                  tanqueDestino: "", // Reset tanque
-                                })
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione o posto" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {postos.map((p) => (
-                                  <SelectItem key={p.id} value={p.id.toString()}>
-                                    {p.nome}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                          <p className="text-sm text-gray-600">Custo Unitário</p>
+                          <p className="font-semibold">R$ {nfe.custoUnitario.toFixed(2)}</p>
                         </div>
-
-                        {/* Tanque Destino */}
                         <div>
-                            <Label htmlFor="tanque">Tanque Destino *</Label>
-                            <Select
-                              value={novaAlocacao.tanqueDestino}
-                              onValueChange={(value) =>
-                                setNovaAlocacao({
-                                  ...novaAlocacao,
-                                  tanqueDestino: value,
-                                })
-                              }
-                              disabled={!novaAlocacao.postoDestino}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione o tanque" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {novaAlocacao.postoDestino &&
-                                  tanquesPorPosto[parseInt(novaAlocacao.postoDestino)]?.map(
-                                    (t) => (
-                                      <SelectItem key={t.id} value={t.id.toString()}>
-                                        {t.codigo} (Saldo: {t.saldo.toLocaleString()} L)
+                          <p className="text-sm text-gray-600">Custo Total</p>
+                          <p className="font-semibold">R$ {nfe.custoTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Pendente</p>
+                          <p className="font-semibold text-orange-600">
+                            {nfe.quantidadePendente.toLocaleString()} L
+                          </p>
+                        </div>
+                      </div>
+
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            onClick={() => handleSelecionarNfe(nfe)}
+                            className="w-full"
+                          >
+                            <MapPin className="w-4 h-4 mr-2" />
+                            Alocar Fisicamente
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl">
+                          <DialogHeader>
+                            <DialogTitle>Alocar NFe Fisicamente</DialogTitle>
+                          </DialogHeader>
+
+                          <div className="space-y-4">
+                            {/* Informações da NFe */}
+                            <div className="bg-blue-50 p-4 rounded-lg">
+                              <p className="text-sm text-gray-600">NFe Selecionada</p>
+                              <p className="font-semibold">
+                                NF {nfe.numeroNf} - {nfe.produto}
+                              </p>
+                              <p className="text-sm text-gray-600 mt-1">
+                                Quantidade disponível: {nfe.quantidadePendente.toLocaleString()} L
+                              </p>
+                            </div>
+
+                            {/* Formulário de Alocação */}
+                            <div className="grid grid-cols-2 gap-4">
+                              {/* Posto Destino */}
+                              <div>
+                                <Label htmlFor="posto">Posto Destino *</Label>
+                                <Select
+                                  value={novaAlocacao.postoDestino}
+                                  onValueChange={(value) =>
+                                    setNovaAlocacao({
+                                      ...novaAlocacao,
+                                      postoDestino: value,
+                                      tanqueDestino: "",
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Selecione o posto" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {postos.map((p) => (
+                                      <SelectItem key={p.id} value={p.id.toString()}>
+                                        {p.nome}
                                       </SelectItem>
-                                    )
-                                  )}
-                              </SelectContent>
-                            </Select>
-                        </div>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
 
-                        {/* Data Descarga */}
-                        <div>
-                            <Label htmlFor="data">Data Descarga Real *</Label>
-                            <Input
-                              type="date"
-                              value={novaAlocacao.dataDescarga}
-                              onChange={(e) =>
-                                setNovaAlocacao({
-                                  ...novaAlocacao,
-                                  dataDescarga: e.target.value,
-                                })
-                              }
-                            />
-                        </div>
+                              {/* Tanque Destino */}
+                              <div>
+                                <Label htmlFor="tanque">Tanque Destino *</Label>
+                                <Select
+                                  value={novaAlocacao.tanqueDestino}
+                                  onValueChange={(value) =>
+                                    setNovaAlocacao({
+                                      ...novaAlocacao,
+                                      tanqueDestino: value,
+                                    })
+                                  }
+                                  disabled={!novaAlocacao.postoDestino}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Selecione o tanque" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {novaAlocacao.postoDestino &&
+                                      tanquesPorPosto[parseInt(novaAlocacao.postoDestino)]?.map(
+                                        (t) => (
+                                          <SelectItem key={t.id} value={t.id.toString()}>
+                                            {t.codigo} (Saldo: {t.saldo.toLocaleString()} L)
+                                          </SelectItem>
+                                        )
+                                      )}
+                                  </SelectContent>
+                                </Select>
+                              </div>
 
-                        {/* Hora Descarga */}
-                        <div>
-                            <Label htmlFor="hora">Hora Descarga (HH:MM)</Label>
-                            <Input
-                              type="time"
-                              value={novaAlocacao.horaDescarga}
-                              onChange={(e) =>
-                                setNovaAlocacao({
-                                  ...novaAlocacao,
-                                  horaDescarga: e.target.value,
-                                })
-                              }
-                            />
-                        </div>
+                              {/* Data Descarga */}
+                              <div>
+                                <Label htmlFor="data">Data Descarga Real *</Label>
+                                <Input
+                                  type="date"
+                                  value={novaAlocacao.dataDescarga}
+                                  onChange={(e) =>
+                                    setNovaAlocacao({
+                                      ...novaAlocacao,
+                                      dataDescarga: e.target.value,
+                                    })
+                                  }
+                                />
+                              </div>
 
-                        {/* Volume Alocado */}
-                        <div>
-                            <Label htmlFor="volume">Volume Alocado (L) *</Label>
-                            <Input
-                              type="number"
-                              placeholder="0.00"
-                              value={novaAlocacao.volumeAlocado}
-                              onChange={(e) =>
-                                setNovaAlocacao({
-                                  ...novaAlocacao,
-                                  volumeAlocado: e.target.value,
-                                })
-                              }
-                              max={nfe.quantidadePendente}
-                            />
-                            <p className="text-xs text-gray-600 mt-1">
-                              Máximo: {nfe.quantidadePendente.toLocaleString()} L
-                            </p>
-                        </div>
-                      </div>
+                              {/* Hora Descarga */}
+                              <div>
+                                <Label htmlFor="hora">Hora Descarga (HH:MM)</Label>
+                                <Input
+                                  type="time"
+                                  value={novaAlocacao.horaDescarga}
+                                  onChange={(e) =>
+                                    setNovaAlocacao({
+                                      ...novaAlocacao,
+                                      horaDescarga: e.target.value,
+                                    })
+                                  }
+                                />
+                              </div>
 
-                      {/* Justificativa */}
-                      <div>
-                        <Label htmlFor="justificativa">Justificativa (opcional)</Label>
-                        <Input
-                          placeholder="Ex: Compra com CNPJ Aracati, descarga em Fortaleza"
-                          value={novaAlocacao.justificativa}
-                          onChange={(e) =>
-                            setNovaAlocacao({
-                              ...novaAlocacao,
-                              justificativa: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
+                              {/* Volume Alocado */}
+                              <div>
+                                <Label htmlFor="volume">Volume Alocado (L) *</Label>
+                                <Input
+                                  type="number"
+                                  placeholder="0.00"
+                                  value={novaAlocacao.volumeAlocado}
+                                  onChange={(e) =>
+                                    setNovaAlocacao({
+                                      ...novaAlocacao,
+                                      volumeAlocado: e.target.value,
+                                    })
+                                  }
+                                  max={nfe.quantidadePendente}
+                                />
+                                <p className="text-xs text-gray-600 mt-1">
+                                  Máximo: {nfe.quantidadePendente.toLocaleString()} L
+                                </p>
+                              </div>
+                            </div>
 
-                      {/* Botões */}
-                      <div className="flex gap-2 justify-end pt-4">
-                        <Button variant="outline">Cancelar</Button>
-                        <Button onClick={handleAlocar} className="bg-green-600 hover:bg-green-700">
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          Confirmar Alocação
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </CardContent>
-            </Card>
-              );
-            })}
+                            {/* Justificativa */}
+                            <div>
+                              <Label htmlFor="justificativa">Justificativa (opcional)</Label>
+                              <Input
+                                placeholder="Ex: Compra com CNPJ Aracati, descarga em Fortaleza"
+                                value={novaAlocacao.justificativa}
+                                onChange={(e) =>
+                                  setNovaAlocacao({
+                                    ...novaAlocacao,
+                                    justificativa: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+
+                            {/* Botões */}
+                            <div className="flex gap-2 justify-end pt-4">
+                              <Button variant="outline">Cancelar</Button>
+                              <Button 
+                                onClick={handleAlocar} 
+                                disabled={criadoAlocacao || recalculandoCMV}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                {criadoAlocacao ? "Criando..." : recalculandoCMV ? "Recalculando CMV..." : "Confirmar Alocação"}
+                              </Button>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                Nenhuma NFe pendente de alocação
+              </div>
+            )}
           </div>
         </TabsContent>
 
         {/* TAB 2: Alocações Realizadas */}
         <TabsContent value="alocacoes" className="space-y-4">
           <div className="grid gap-4">
-            {alocacoesRealizadas.map((alocacao) => (
-              <Card key={alocacao.id} className="border-green-200 bg-green-50">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">NF {alocacao.numeroNf}</CardTitle>
-                      <CardDescription className="text-xs font-mono mt-1">
-                        {alocacao.chaveNfe}
-                      </CardDescription>
+            {alocacoesRealizadas && alocacoesRealizadas.length > 0 ? (
+              alocacoesRealizadas.map((alocacao: any) => (
+                <Card key={alocacao.id} className="border-green-200 bg-green-50">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">NF {alocacao.numeroNf}</CardTitle>
+                        <CardDescription className="text-xs font-mono mt-1">
+                          {alocacao.chaveNfe}
+                        </CardDescription>
+                      </div>
+                      <Badge variant="default" className="bg-green-600">
+                        ✓ Confirmado
+                      </Badge>
                     </div>
-                    <Badge variant="default" className="bg-green-600">
-                      ✓ Confirmado
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div>
-                      <p className="text-sm text-gray-600">Data Emissão</p>
-                      <p className="font-semibold">
-                        {new Date(alocacao.dataEmissao).toLocaleDateString("pt-BR")}
-                      </p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                      <div>
+                        <p className="text-sm text-gray-600">Data Emissão</p>
+                        <p className="font-semibold">
+                          {new Date(alocacao.dataEmissao).toLocaleDateString("pt-BR")}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Posto Fiscal</p>
+                        <p className="font-semibold">{alocacao.postoFiscal}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Posto Destino</p>
+                        <p className="font-semibold text-green-700">{alocacao.postoDestino}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Tanque Destino</p>
+                        <p className="font-semibold">{alocacao.tanqueDestino}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Posto Fiscal</p>
-                      <p className="font-semibold">{alocacao.postoFiscal}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Posto Destino</p>
-                      <p className="font-semibold text-green-700">{alocacao.postoDestino}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Tanque Destino</p>
-                      <p className="font-semibold">{alocacao.tanqueDestino}</p>
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 pb-4 border-b">
-                    <div>
-                      <p className="text-sm text-gray-600">Data Descarga Real</p>
-                      <p className="font-semibold">
-                        {new Date(alocacao.dataDescarga).toLocaleDateString("pt-BR")}
-                      </p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 pb-4 border-b">
+                      <div>
+                        <p className="text-sm text-gray-600">Data Descarga Real</p>
+                        <p className="font-semibold">
+                          {new Date(alocacao.dataDescarga).toLocaleDateString("pt-BR")}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Hora Descarga</p>
+                        <p className="font-semibold">{alocacao.horaDescarga}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Volume Alocado</p>
+                        <p className="font-semibold">{alocacao.volumeAlocado.toLocaleString()} L</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Usuário</p>
+                        <p className="font-semibold text-sm">{alocacao.usuarioAlocacao}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Hora Descarga</p>
-                      <p className="font-semibold">{alocacao.horaDescarga}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Volume Alocado</p>
-                      <p className="font-semibold">{alocacao.volumeAlocado.toLocaleString()} L</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Usuário</p>
-                      <p className="font-semibold text-sm">{alocacao.usuarioAlocacao}</p>
-                    </div>
-                  </div>
 
-                  {alocacao.justificativa && (
-                    <div className="bg-white p-3 rounded border border-gray-200">
-                      <p className="text-sm text-gray-600">Justificativa</p>
-                      <p className="text-sm">{alocacao.justificativa}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                    {alocacao.justificativa && (
+                      <div className="bg-white p-3 rounded border border-gray-200">
+                        <p className="text-sm text-gray-600">Justificativa</p>
+                        <p className="text-sm">{alocacao.justificativa}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                Nenhuma alocação realizada
+              </div>
+            )}
           </div>
         </TabsContent>
 
@@ -577,28 +587,27 @@ export default function AlocacoesFisicas() {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr className="border-b hover:bg-gray-50">
-                      <td className="py-2 px-2 font-mono text-xs">LOT-001</td>
-                      <td className="py-2 px-2">Fortaleza Centro</td>
-                      <td className="py-2 px-2">Gasolina 1</td>
-                      <td className="py-2 px-2">13/02/2026</td>
-                      <td className="py-2 px-2 text-right">4.500 L</td>
-                      <td className="py-2 px-2 text-right font-semibold">1</td>
-                      <td className="py-2 px-2">
-                        <Badge variant="default">Ativo</Badge>
-                      </td>
-                    </tr>
-                    <tr className="border-b hover:bg-gray-50">
-                      <td className="py-2 px-2 font-mono text-xs">LOT-002</td>
-                      <td className="py-2 px-2">Fortaleza Bairro</td>
-                      <td className="py-2 px-2">Diesel 1</td>
-                      <td className="py-2 px-2">14/02/2026</td>
-                      <td className="py-2 px-2 text-right">3.000 L</td>
-                      <td className="py-2 px-2 text-right font-semibold">2</td>
-                      <td className="py-2 px-2">
-                        <Badge variant="default">Ativo</Badge>
-                      </td>
-                    </tr>
+                    {lotesFisicos && lotesFisicos.length > 0 ? (
+                      lotesFisicos.map((lote: any) => (
+                        <tr key={lote.id} className="border-b hover:bg-gray-50">
+                          <td className="py-2 px-2 font-mono text-xs">{lote.id}</td>
+                          <td className="py-2 px-2">{lote.postoDestino}</td>
+                          <td className="py-2 px-2">{lote.tanque}</td>
+                          <td className="py-2 px-2">{new Date(lote.dataDescargaReal).toLocaleDateString("pt-BR")}</td>
+                          <td className="py-2 px-2 text-right">{lote.volume.toLocaleString()} L</td>
+                          <td className="py-2 px-2 text-right font-semibold">{lote.ordemPEPS}</td>
+                          <td className="py-2 px-2">
+                            <Badge variant="default">{lote.status}</Badge>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr className="border-b hover:bg-gray-50">
+                        <td colSpan={7} className="py-2 px-2 text-center text-gray-500">
+                          Nenhum lote físico criado
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

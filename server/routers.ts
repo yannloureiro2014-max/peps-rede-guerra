@@ -14,9 +14,11 @@ import {
   sincronizarComprasACS,
   verificarMedicoesFaltantes
 } from "./etl-acs";
+import { alocacoesFisicasRouter } from "./routers/alocacoes-fisicas";
 
 export const appRouter = router({
   system: systemRouter,
+  alocacoesFisicas: alocacoesFisicasRouter,
   
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
