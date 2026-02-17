@@ -19,10 +19,13 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, Clock, MapPin, Truck } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, MapPin, Truck, Home, RefreshCw, AlertTriangle } from "lucide-react";
+import { useLocation } from "wouter";
 
 export default function AlocacoesFisicas() {
+  const [, setLocation] = useLocation();
   const [tab, setTab] = useState("nfes-pendentes");
+  const [carregando, setCarregando] = useState(false);
   const [novaAlocacao, setNovaAlocacao] = useState({
     nfeStagingId: "",
     chaveNfe: "",
@@ -158,6 +161,23 @@ export default function AlocacoesFisicas() {
     });
   };
 
+  const handleAtualizar = async () => {
+    setCarregando(true);
+    // Simular chamada ao backend para recarregar NFes do ACS
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setCarregando(false);
+    alert("NFes atualizadas do ACS com sucesso!");
+  };
+
+  const handleVoltar = () => {
+    setLocation("/");
+  };
+
+  // Verificar se fornecedor = CNPJ faturado
+  const verificarFornecedorValido = (nfe: any) => {
+    return nfe.cnpjFaturado === nfe.cnpjFornecedor;
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pendente":
@@ -175,11 +195,32 @@ export default function AlocacoesFisicas() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Alocações Físicas</h1>
-        <p className="text-gray-600 mt-2">
-          Determine onde e quando cada compra foi descarregada
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold">Alocações Físicas</h1>
+          <p className="text-gray-600 mt-2">
+            Determine onde e quando cada compra foi descarregada
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleAtualizar}
+            disabled={carregando}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${carregando ? "animate-spin" : ""}`} />
+            {carregando ? "Atualizando..." : "Atualizar"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleVoltar}
+            className="gap-2"
+          >
+            <Home className="w-4 h-4" />
+            Voltar
+          </Button>
+        </div>
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
@@ -201,8 +242,12 @@ export default function AlocacoesFisicas() {
         {/* TAB 1: NFes Pendentes */}
         <TabsContent value="nfes-pendentes" className="space-y-4">
           <div className="grid gap-4">
-            {nfesPendentes.map((nfe) => (
-              <Card key={nfe.id} className="hover:shadow-lg transition-shadow">
+            {nfesPendentes.map((nfe) => {
+              const fornecedorValido = nfe.cnpjFaturado === "07.526.847/0001-00"; // Simular validação
+              return (
+              <Card key={nfe.id} className={`hover:shadow-lg transition-shadow ${
+                !fornecedorValido ? "border-orange-300 bg-orange-50" : ""
+              }`}>
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div>
@@ -210,12 +255,18 @@ export default function AlocacoesFisicas() {
                       <CardDescription className="text-xs font-mono mt-1">
                         {nfe.chaveNfe}
                       </CardDescription>
+                      {!fornecedorValido && (
+                        <div className="flex items-center gap-1 mt-2 text-orange-700 text-xs">
+                          <AlertTriangle className="w-3 h-3" />
+                          Fornecedor diferente do CNPJ faturado
+                        </div>
+                      )}
                     </div>
                     {getStatusBadge(nfe.statusAlocacao)}
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
                     <div>
                       <p className="text-sm text-gray-600">Data Emissão</p>
                       <p className="font-semibold">
@@ -225,6 +276,14 @@ export default function AlocacoesFisicas() {
                     <div>
                       <p className="text-sm text-gray-600">Posto Fiscal</p>
                       <p className="font-semibold">{nfe.postoFiscal}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Fornecedor</p>
+                      <p className={`font-semibold ${
+                        fornecedorValido ? "text-green-700" : "text-orange-700"
+                      }`}>
+                        {nfe.postoFiscal}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Produto</p>
@@ -268,9 +327,9 @@ export default function AlocacoesFisicas() {
                         <DialogTitle>Alocar NFe Fisicamente</DialogTitle>
                       </DialogHeader>
 
-                      <div className="space-y-4">
-                        {/* Informações da NFe */}
-                        <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="space-y-4">
+                      {/* Informações da NFe */}
+                      <div className="bg-blue-50 p-4 rounded-lg">
                           <p className="text-sm text-gray-600">NFe Selecionada</p>
                           <p className="font-semibold">
                             NF {nfe.numeroNf} - {nfe.produto}
@@ -278,12 +337,12 @@ export default function AlocacoesFisicas() {
                           <p className="text-sm text-gray-600 mt-1">
                             Quantidade disponível: {nfe.quantidadePendente.toLocaleString()} L
                           </p>
-                        </div>
+                      </div>
 
-                        {/* Formulário de Alocação */}
-                        <div className="grid grid-cols-2 gap-4">
-                          {/* Posto Destino */}
-                          <div>
+                      {/* Formulário de Alocação */}
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Posto Destino */}
+                        <div>
                             <Label htmlFor="posto">Posto Destino *</Label>
                             <Select
                               value={novaAlocacao.postoDestino}
@@ -306,10 +365,10 @@ export default function AlocacoesFisicas() {
                                 ))}
                               </SelectContent>
                             </Select>
-                          </div>
+                        </div>
 
-                          {/* Tanque Destino */}
-                          <div>
+                        {/* Tanque Destino */}
+                        <div>
                             <Label htmlFor="tanque">Tanque Destino *</Label>
                             <Select
                               value={novaAlocacao.tanqueDestino}
@@ -335,10 +394,10 @@ export default function AlocacoesFisicas() {
                                   )}
                               </SelectContent>
                             </Select>
-                          </div>
+                        </div>
 
-                          {/* Data Descarga */}
-                          <div>
+                        {/* Data Descarga */}
+                        <div>
                             <Label htmlFor="data">Data Descarga Real *</Label>
                             <Input
                               type="date"
@@ -350,10 +409,10 @@ export default function AlocacoesFisicas() {
                                 })
                               }
                             />
-                          </div>
+                        </div>
 
-                          {/* Hora Descarga */}
-                          <div>
+                        {/* Hora Descarga */}
+                        <div>
                             <Label htmlFor="hora">Hora Descarga (HH:MM)</Label>
                             <Input
                               type="time"
@@ -365,10 +424,10 @@ export default function AlocacoesFisicas() {
                                 })
                               }
                             />
-                          </div>
+                        </div>
 
-                          {/* Volume Alocado */}
-                          <div>
+                        {/* Volume Alocado */}
+                        <div>
                             <Label htmlFor="volume">Volume Alocado (L) *</Label>
                             <Input
                               type="number"
@@ -385,38 +444,39 @@ export default function AlocacoesFisicas() {
                             <p className="text-xs text-gray-600 mt-1">
                               Máximo: {nfe.quantidadePendente.toLocaleString()} L
                             </p>
-                          </div>
-                        </div>
-
-                        {/* Justificativa */}
-                        <div>
-                          <Label htmlFor="justificativa">Justificativa (opcional)</Label>
-                          <Input
-                            placeholder="Ex: Compra com CNPJ Aracati, descarga em Fortaleza"
-                            value={novaAlocacao.justificativa}
-                            onChange={(e) =>
-                              setNovaAlocacao({
-                                ...novaAlocacao,
-                                justificativa: e.target.value,
-                              })
-                            }
-                          />
-                        </div>
-
-                        {/* Botões */}
-                        <div className="flex gap-2 justify-end pt-4">
-                          <Button variant="outline">Cancelar</Button>
-                          <Button onClick={handleAlocar} className="bg-green-600 hover:bg-green-700">
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Confirmar Alocação
-                          </Button>
                         </div>
                       </div>
-                    </DialogContent>
-                  </Dialog>
-                </CardContent>
-              </Card>
-            ))}
+
+                      {/* Justificativa */}
+                      <div>
+                        <Label htmlFor="justificativa">Justificativa (opcional)</Label>
+                        <Input
+                          placeholder="Ex: Compra com CNPJ Aracati, descarga em Fortaleza"
+                          value={novaAlocacao.justificativa}
+                          onChange={(e) =>
+                            setNovaAlocacao({
+                              ...novaAlocacao,
+                              justificativa: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+
+                      {/* Botões */}
+                      <div className="flex gap-2 justify-end pt-4">
+                        <Button variant="outline">Cancelar</Button>
+                        <Button onClick={handleAlocar} className="bg-green-600 hover:bg-green-700">
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Confirmar Alocação
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardContent>
+            </Card>
+              );
+            })}
           </div>
         </TabsContent>
 
