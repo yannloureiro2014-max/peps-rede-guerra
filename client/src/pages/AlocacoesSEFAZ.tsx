@@ -12,7 +12,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
 
-
 interface NFe {
   id: string;
   chaveNfe: string;
@@ -45,12 +44,37 @@ interface Alocacao {
   dataAlocacao: string;
 }
 
+const POSTOS = [
+  { id: "1", nome: "Fotim" },
+  { id: "2", nome: "Palhano" },
+  { id: "3", nome: "Itaiçaba (Novo Guerra)" },
+  { id: "4", nome: "Pai Tereza" },
+  { id: "5", nome: "Rede Super Petróleo (Mãe e Filho)" },
+  { id: "6", nome: "Jaguaruana (Novo Jaguaruana)" },
+];
+
+const TANQUES: Record<string, Array<{ id: string; nome: string }>> = {
+  "1": [{ id: "1", nome: "Tanque 1" }, { id: "2", nome: "Tanque 2" }],
+  "2": [{ id: "3", nome: "Tanque 1" }, { id: "4", nome: "Tanque 2" }],
+  "3": [{ id: "5", nome: "Tanque 1" }],
+  "4": [{ id: "6", nome: "Tanque 1" }, { id: "7", nome: "Tanque 2" }],
+  "5": [{ id: "8", nome: "Tanque 1" }, { id: "9", nome: "Tanque 2" }],
+  "6": [{ id: "10", nome: "Tanque 1" }],
+};
+
 export default function AlocacoesSEFAZ() {
   const [nfes, setNfes] = useState<NFe[]>([]);
   const [alocacoes, setAlocacoes] = useState<Alocacao[]>([]);
   const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedNfe, setSelectedNfe] = useState<NFe | null>(null);
+
+  // Filtros
+  const [filtros, setFiltros] = useState({
+    postoId: "",
+    dataInicio: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    dataFim: new Date().toISOString().split("T")[0],
+  });
 
   // Formulário de alocação
   const [novaAlocacao, setNovaAlocacao] = useState({
@@ -83,21 +107,34 @@ export default function AlocacoesSEFAZ() {
     },
   });
 
-  const recalcularCMVMutation = trpc.alocacoesFisicas.recalcularCMVComAlocacoes.useMutation({
-    onSuccess: (data: any) => {
-      alert(`CMV Recalculado: ${data?.dados?.totalAlocacoes || 0} alocações processadas`);
-    },
-  });
-
   const buscarNfes = async () => {
     setLoading(true);
     try {
-      const response = await trpc.alocacoesFisicas.listarNfesPendentes.useQuery({});
-      if (response.data?.sucesso) {
-        setNfes(response.data.dados);
+      const response = await trpc.alocacoesFisicas.listarNfesPendentes.useQuery({
+        dataInicio: filtros.dataInicio,
+        dataFim: filtros.dataFim,
+      }).data;
+
+      if (response?.sucesso) {
+        let nfesFiltered = response.dados || [];
+
+        // Filtrar por posto se selecionado
+        if (filtros.postoId) {
+          const postoSelecionado = POSTOS.find((p) => p.id === filtros.postoId);
+          if (postoSelecionado) {
+            nfesFiltered = nfesFiltered.filter(
+              (nfe) => nfe.postoDestino.toLowerCase() === postoSelecionado.nome.toLowerCase()
+            );
+          }
+        }
+
+        setNfes(nfesFiltered);
+      } else {
+        alert("Erro ao buscar NFes: " + response?.erro);
       }
     } catch (error) {
-      alert("Erro ao buscar NFes");
+      console.error("Erro ao buscar NFes:", error);
+      alert("Erro ao buscar NFes: " + (error instanceof Error ? error.message : "Erro desconhecido"));
     } finally {
       setLoading(false);
     }
@@ -123,12 +160,6 @@ export default function AlocacoesSEFAZ() {
         custoUnitarioAplicado: selectedNfe.custoUnitario,
         justificativa: novaAlocacao.justificativa,
       });
-
-      // Recalcular CMV automaticamente
-      await recalcularCMVMutation.mutateAsync({
-        dataInicio: novaAlocacao.dataDescarga,
-        dataFim: novaAlocacao.dataDescarga,
-      });
     } catch (error) {
       console.error("Erro ao alocar:", error);
     }
@@ -142,6 +173,8 @@ export default function AlocacoesSEFAZ() {
     };
     return colors[status] || "bg-gray-100 text-gray-800";
   };
+
+  const tanquesSelecionados = novaAlocacao.postoDestino ? TANQUES[novaAlocacao.postoDestino] || [] : [];
 
   return (
     <DashboardLayout>
@@ -175,73 +208,104 @@ export default function AlocacoesSEFAZ() {
             <TabsContent value="pendentes" className="space-y-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>Buscar NFes</CardTitle>
+                  <CardTitle>Filtros de Busca</CardTitle>
                   <CardDescription>
-                    Clique em "Buscar NFes" para carregar as notas fiscais da SEFAZ
+                    Selecione o período e o posto para buscar NFes não alocadas
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Filtro: Posto */}
+                    <div>
+                      <Label htmlFor="posto">Posto</Label>
+                      <Select value={filtros.postoId} onValueChange={(value) => setFiltros({ ...filtros, postoId: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um posto" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Todos os postos</SelectItem>
+                          {POSTOS.map((posto) => (
+                            <SelectItem key={posto.id} value={posto.id}>
+                              {posto.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Filtro: Data Início */}
+                    <div>
+                      <Label htmlFor="dataInicio">Data Inicial</Label>
+                      <Input
+                        type="date"
+                        value={filtros.dataInicio}
+                        onChange={(e) => setFiltros({ ...filtros, dataInicio: e.target.value })}
+                      />
+                    </div>
+
+                    {/* Filtro: Data Fim */}
+                    <div>
+                      <Label htmlFor="dataFim">Data Final</Label>
+                      <Input
+                        type="date"
+                        value={filtros.dataFim}
+                        onChange={(e) => setFiltros({ ...filtros, dataFim: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
                   <Button onClick={buscarNfes} disabled={loading} className="w-full">
                     <Search className="mr-2 h-4 w-4" />
-                    {loading ? "Buscando..." : "Buscar NFes da SEFAZ"}
+                    {loading ? "Buscando..." : "Buscar NFes"}
                   </Button>
                 </CardContent>
               </Card>
 
               {nfes.length > 0 && (
                 <div className="space-y-4">
-                  {nfes.map((nfe) => (
+                  <div className="text-sm text-slate-600">
+                    {nfes.length} NFe(s) encontrada(s) - {nfes.filter((n) => n.statusAlocacao === "pendente").length} pendente(s)
+                  </div>
+
+                  {nfes.map((nfe: NFe) => (
                     <Card key={nfe.id} className="hover:shadow-md transition-shadow">
                       <CardContent className="pt-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                           <div>
-                            <Label className="text-xs text-slate-500">Chave NFe</Label>
-                            <p className="font-mono text-sm">{nfe.chaveNfe.slice(0, 20)}...</p>
+                            <Label className="text-xs text-slate-500">Número NF</Label>
+                            <p className="font-mono text-sm">{nfe.numeroNf}</p>
                           </div>
                           <div>
-                            <Label className="text-xs text-slate-500">Produto</Label>
-                            <p className="font-medium">{nfe.produto}</p>
+                            <Label className="text-xs text-slate-500">Data Emissão</Label>
+                            <p className="text-sm">{new Date(nfe.dataEmissao).toLocaleDateString("pt-BR")}</p>
                           </div>
                           <div>
-                            <Label className="text-xs text-slate-500">Quantidade</Label>
-                            <p className="font-medium">{nfe.quantidade.toLocaleString("pt-BR")} L</p>
+                            <Label className="text-xs text-slate-500">Quantidade (L)</Label>
+                            <p className="text-sm font-semibold">{nfe.quantidade.toLocaleString("pt-BR")}</p>
                           </div>
                           <div>
                             <Label className="text-xs text-slate-500">Status</Label>
-                            <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${statusBadge(nfe.statusAlocacao)}`}>
+                            <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${statusBadge(nfe.statusAlocacao)}`}>
                               {nfe.statusAlocacao}
                             </span>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4 text-sm">
-                          <div>
-                            <Label className="text-xs text-slate-500">Custo Unitário</Label>
-                            <p>R$ {nfe.custoUnitario.toFixed(2)}</p>
-                          </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm">
                           <div>
                             <Label className="text-xs text-slate-500">Custo Total</Label>
-                            <p className="font-medium">R$ {nfe.custoTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                            <p className="font-semibold">R$ {nfe.custoTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
                           </div>
                           <div>
-                            <Label className="text-xs text-slate-500">Pendente</Label>
-                            <p className="text-orange-600 font-medium">{nfe.quantidadePendente.toLocaleString("pt-BR")} L</p>
-                          </div>
-                          <div>
-                            <Label className="text-xs text-slate-500">Data Emissão</Label>
-                            <p>{new Date(nfe.dataEmissao).toLocaleDateString("pt-BR")}</p>
+                            <Label className="text-xs text-slate-500">Custo Unitário</Label>
+                            <p className="font-semibold">R$ {nfe.custoUnitario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
                           </div>
                         </div>
 
-                        <Dialog open={openDialog && selectedNfe?.id === nfe.id} onOpenChange={(open) => {
-                          if (!open) {
-                            setOpenDialog(false);
-                            setSelectedNfe(null);
-                          }
-                        }}>
+                        <Dialog open={openDialog && selectedNfe?.id === nfe.id} onOpenChange={setOpenDialog}>
                           <DialogTrigger asChild>
                             <Button
-                              variant="default"
+                              variant="outline"
                               size="sm"
                               onClick={() => {
                                 setSelectedNfe(nfe);
@@ -253,107 +317,97 @@ export default function AlocacoesSEFAZ() {
                               Alocar
                             </Button>
                           </DialogTrigger>
+
                           <DialogContent className="max-w-md">
                             <DialogHeader>
                               <DialogTitle>Alocar NFe</DialogTitle>
                               <DialogDescription>
-                                Aloque a NFe {nfe.numeroNf} para um tanque específico
+                                NF {nfe.numeroNf} - {nfe.quantidade.toLocaleString("pt-BR")} L
                               </DialogDescription>
                             </DialogHeader>
 
                             <div className="space-y-4">
+                              {/* Volume */}
                               <div>
-                                <Label htmlFor="volume">Volume a Alocar (L)*</Label>
+                                <Label>Volume a Alocar (L) *</Label>
                                 <Input
-                                  id="volume"
                                   type="number"
-                                  placeholder="Ex: 1000"
+                                  placeholder="0"
                                   value={novaAlocacao.volumeAlocado}
-                                  onChange={(e) =>
-                                    setNovaAlocacao({ ...novaAlocacao, volumeAlocado: e.target.value })
-                                  }
+                                  onChange={(e) => setNovaAlocacao({ ...novaAlocacao, volumeAlocado: e.target.value })}
                                   max={nfe.quantidadePendente}
                                 />
-                                <p className="text-xs text-slate-500 mt-1">
-                                  Máximo: {nfe.quantidadePendente.toLocaleString("pt-BR")} L
-                                </p>
+                                <p className="text-xs text-slate-500 mt-1">Máximo: {nfe.quantidadePendente.toLocaleString("pt-BR")} L</p>
                               </div>
 
+                              {/* Posto */}
                               <div>
-                                <Label htmlFor="posto">Posto de Destino*</Label>
-                                <Select value={novaAlocacao.postoDestino} onValueChange={(value) =>
-                                  setNovaAlocacao({ ...novaAlocacao, postoDestino: value })
-                                }>
-                                  <SelectTrigger id="posto">
+                                <Label>Posto de Destino *</Label>
+                                <Select value={novaAlocacao.postoDestino} onValueChange={(value) => setNovaAlocacao({ ...novaAlocacao, postoDestino: value, tanqueDestino: "" })}>
+                                  <SelectTrigger>
                                     <SelectValue placeholder="Selecione um posto" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="1">Fotim</SelectItem>
-                                    <SelectItem value="2">Palhano</SelectItem>
-                                    <SelectItem value="3">Itaiçaba (Novo Guerra)</SelectItem>
-                                    <SelectItem value="4">Pai Tereza</SelectItem>
-                                    <SelectItem value="5">Rede Super Petróleo (Mãe e Filho)</SelectItem>
-                                    <SelectItem value="6">Jaguaruana (Novo Jaguaruana)</SelectItem>
+                                    {POSTOS.map((posto) => (
+                                      <SelectItem key={posto.id} value={posto.id}>
+                                        {posto.nome}
+                                      </SelectItem>
+                                    ))}
                                   </SelectContent>
                                 </Select>
                               </div>
 
+                              {/* Tanque */}
                               <div>
-                                <Label htmlFor="tanque">Tanque de Destino*</Label>
-                                <Select value={novaAlocacao.tanqueDestino} onValueChange={(value) =>
-                                  setNovaAlocacao({ ...novaAlocacao, tanqueDestino: value })
-                                }>
-                                  <SelectTrigger id="tanque">
+                                <Label>Tanque de Destino *</Label>
+                                <Select value={novaAlocacao.tanqueDestino} onValueChange={(value) => setNovaAlocacao({ ...novaAlocacao, tanqueDestino: value })}>
+                                  <SelectTrigger disabled={!novaAlocacao.postoDestino}>
                                     <SelectValue placeholder="Selecione um tanque" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="1">Tanque 1</SelectItem>
-                                    <SelectItem value="2">Tanque 2</SelectItem>
-                                    <SelectItem value="3">Tanque 3</SelectItem>
-                                    <SelectItem value="4">Tanque 4</SelectItem>
+                                    {tanquesSelecionados.map((tanque) => (
+                                      <SelectItem key={tanque.id} value={tanque.id}>
+                                        {tanque.nome}
+                                      </SelectItem>
+                                    ))}
                                   </SelectContent>
                                 </Select>
                               </div>
 
+                              {/* Data de Descarga */}
                               <div>
-                                <Label htmlFor="data">Data de Descarga Real*</Label>
+                                <Label>Data de Descarga Real *</Label>
                                 <Input
-                                  id="data"
                                   type="date"
                                   value={novaAlocacao.dataDescarga}
-                                  onChange={(e) =>
-                                    setNovaAlocacao({ ...novaAlocacao, dataDescarga: e.target.value })
-                                  }
+                                  onChange={(e) => setNovaAlocacao({ ...novaAlocacao, dataDescarga: e.target.value })}
                                 />
                               </div>
 
+                              {/* Hora de Descarga */}
                               <div>
-                                <Label htmlFor="hora">Hora de Descarga (opcional)</Label>
+                                <Label>Hora de Descarga (opcional)</Label>
                                 <Input
-                                  id="hora"
                                   type="time"
                                   value={novaAlocacao.horaDescarga}
-                                  onChange={(e) =>
-                                    setNovaAlocacao({ ...novaAlocacao, horaDescarga: e.target.value })
-                                  }
+                                  onChange={(e) => setNovaAlocacao({ ...novaAlocacao, horaDescarga: e.target.value })}
                                 />
                               </div>
 
+                              {/* Justificativa */}
                               <div>
-                                <Label htmlFor="justificativa">Justificativa (se necessário)</Label>
+                                <Label>Justificativa (se CNPJ diferente)</Label>
                                 <Textarea
-                                  id="justificativa"
                                   placeholder="Ex: Compra com CNPJ X, descarga em Y"
                                   value={novaAlocacao.justificativa}
-                                  onChange={(e) =>
-                                    setNovaAlocacao({ ...novaAlocacao, justificativa: e.target.value })
-                                  }
+                                  onChange={(e) => setNovaAlocacao({ ...novaAlocacao, justificativa: e.target.value })}
                                   rows={3}
                                 />
                               </div>
 
-                              <Button onClick={handleAlocar} disabled={criarAlocacaoMutation.isPending} className="w-full">
-                                {criarAlocacaoMutation.isPending ? "Alocando..." : "Confirmar Alocação"}
+                              <Button onClick={handleAlocar} className="w-full">
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Confirmar Alocação
                               </Button>
                             </div>
                           </DialogContent>
@@ -365,45 +419,28 @@ export default function AlocacoesSEFAZ() {
               )}
 
               {!loading && nfes.length === 0 && (
-                <Card className="text-center py-12">
-                  <AlertCircle className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                  <p className="text-slate-500">Nenhuma NFe encontrada. Clique em "Buscar NFes" para carregar.</p>
+                <Card>
+                  <CardContent className="pt-6 text-center text-slate-500">
+                    <p>Nenhuma NFe encontrada com os filtros selecionados</p>
+                  </CardContent>
                 </Card>
               )}
             </TabsContent>
 
             {/* Tab: NFes Alocadas */}
-            <TabsContent value="alocadas">
+            <TabsContent value="alocadas" className="space-y-4">
               <Card>
-                <CardHeader>
-                  <CardTitle>NFes Alocadas</CardTitle>
-                  <CardDescription>
-                    Notas fiscais que foram alocadas para postos e tanques
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-12">
-                    <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                    <p className="text-slate-600">As NFes alocadas aparecem aqui</p>
-                  </div>
+                <CardContent className="pt-6 text-center text-slate-500">
+                  <p>Funcionalidade em desenvolvimento</p>
                 </CardContent>
               </Card>
             </TabsContent>
 
             {/* Tab: Alocações Realizadas */}
-            <TabsContent value="realizadas">
+            <TabsContent value="realizadas" className="space-y-4">
               <Card>
-                <CardHeader>
-                  <CardTitle>Histórico de Alocações</CardTitle>
-                  <CardDescription>
-                    Todas as alocações realizadas com data e detalhes
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-12">
-                    <Clock className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-                    <p className="text-slate-600">O histórico de alocações aparece aqui</p>
-                  </div>
+                <CardContent className="pt-6 text-center text-slate-500">
+                  <p>Funcionalidade em desenvolvimento</p>
                 </CardContent>
               </Card>
             </TabsContent>

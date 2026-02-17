@@ -4,7 +4,7 @@ import {
   LayoutDashboard, 
   LogOut, 
   Fuel, 
-  ShoppingCart, 
+ 
   Ruler, 
   BarChart3, 
   FileText, 
@@ -37,7 +37,6 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: Fuel, label: "Estoque", path: "/estoque" },
-  { icon: ShoppingCart, label: "Compras", path: "/compras" },
   { icon: Ruler, label: "Medições", path: "/medicoes" },
   { icon: BarChart3, label: "Vendas", path: "/vendas" },
   { icon: Calculator, label: "DRE", path: "/dre" },
@@ -45,9 +44,6 @@ const menuItems: MenuItem[] = [
   { icon: Bell, label: "Alertas", path: "/alertas" },
   { icon: Building2, label: "Postos", path: "/postos" },
   { icon: FileCheck, label: "Alocações SEFAZ", path: "/alocacoes-sefaz", adminOnly: true },
-  { icon: Truck, label: "Alocações Físicas", path: "/alocacoes-fisicas", adminOnly: true },
-  { icon: AlertCircle, label: "Reconciliação", path: "/reconciliacao", adminOnly: true },
-  { icon: RefreshCw, label: "Recalcular CMV", path: "/recalcular-cmv", adminOnly: true },
   { icon: Users, label: "Usuários", path: "/usuarios", adminOnly: true },
   { icon: Sparkles, label: "Assistente IA", path: "/assistente-ia" },
   { icon: Settings, label: "Configurações", path: "/configuracoes" },
