@@ -27,8 +27,24 @@ const MAPEAMENTO_COMBUSTIVEL: Record<string, string> = {
 
 async function getAcsClient(): Promise<pg.Client | null> {
   try {
-    const client = new pg.Client(ACS_CONFIG);
-    await client.connect();
+    const client = new pg.Client({
+      ...ACS_CONFIG,
+      connectionTimeoutMillis: 10000,
+    });
+    
+    // Adicionar timeout de 10 segundos
+    await Promise.race([
+      client.connect(),
+      new Promise<void>((_, reject) => 
+        setTimeout(() => reject(new Error("Timeout ao conectar ao ACS")), 10000)
+      )
+    ]);
+    
+    // Tratar desconexões inesperadas
+    client.on('error', (err) => {
+      console.error("[ETL] Erro de conexão ACS:", err);
+    });
+    
     return client;
   } catch (error) {
     console.error("[ETL] Erro ao conectar ao ACS:", error);
@@ -425,21 +441,33 @@ export async function sincronizarMedicoesACS(diasAtras: number = 90) {
     const dataInicioFinal = dataInicioStr > DATA_CORTE ? dataInicioStr : DATA_CORTE;
     console.log(`[ETL] Data início medições: ${dataInicioFinal}`);
 
-    // Buscar medições da tabela aberturas do ACS
+    // Buscar medições da tabela aberturas do ACS com timeout
     // A tabela aberturas contém as medições físicas diárias de cada tanque (abertura do dia)
-    const result = await acsClient.query(`
-      SELECT 
-        a.cod_empresa,
-        a.cod_tanque,
-        a.data as data_lmc,
-        a.volume as volume_medido,
-        t.saldo as estoque_sistema,
-        t.capacidade
-      FROM aberturas a
-      LEFT JOIN tanques t ON a.cod_empresa = t.cod_empresa AND a.cod_tanque = t.codigo
-      WHERE a.data >= $1
-      ORDER BY a.data DESC, a.cod_empresa, a.cod_tanque
-    `, [dataInicioFinal]);
+    let result: any;
+    try {
+      result = await Promise.race([
+        acsClient.query(`
+          SELECT 
+            a.cod_empresa,
+            a.cod_tanque,
+            a.data as data_lmc,
+            a.volume as volume_medido,
+            t.saldo as estoque_sistema,
+            t.capacidade
+          FROM aberturas a
+          LEFT JOIN tanques t ON a.cod_empresa = t.cod_empresa AND a.cod_tanque = t.codigo
+          WHERE a.data >= $1
+          ORDER BY a.data DESC, a.cod_empresa, a.cod_tanque
+          LIMIT 100000
+        `, [dataInicioFinal]),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Timeout ao buscar medições do ACS")), 30000)
+        )
+      ]);
+    } catch (queryError) {
+      console.error("[ETL] Erro ao buscar medições, usando fallback:", queryError);
+      return { success: false, error: String(queryError), inseridos: 0, atualizados: 0, ignorados: 0, total: 0 };
+    }
 
     // Buscar postos ATIVOS e tanques do PEPS
     const postosDb = await db.select().from(postos).where(eq(postos.ativo, 1));
