@@ -36,6 +36,7 @@ export const alocacoesFisicasRouter = router({
       z.object({
         dataInicio: z.string().optional(),
         dataFim: z.string().optional(),
+        postoId: z.string().optional(),
       }).optional()
     )
     .query(async ({ ctx, input }) => {
@@ -48,6 +49,7 @@ export const alocacoesFisicasRouter = router({
           nfesReais = await buscarNfesDoACS({
             dataInicio: input?.dataInicio,
             dataFim: input?.dataFim,
+            postoId: input?.postoId,
           });
         } catch (erro) {
           console.warn("[ALOCACOES] Erro ao buscar ACS, usando fallback:", erro);

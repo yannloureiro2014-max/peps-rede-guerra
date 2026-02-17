@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,7 +66,7 @@ export default function AlocacoesSEFAZ() {
 
   // ========== tRPC Query: Alocações realizadas ==========
   const alocacoesQuery = trpc.alocacoesFisicas.listarAlocacoesRealizadas.useQuery(
-    {},
+    { postoId: filtroPostoId !== "todos" ? parseInt(filtroPostoId) : undefined },
     { enabled: true }
   );
 
@@ -106,6 +106,11 @@ export default function AlocacoesSEFAZ() {
   const selectedNfe = useMemo(() => {
     return nfesFiltradas.find((n: any) => n.id === selectedNfeId) || null;
   }, [nfesFiltradas, selectedNfeId]);
+
+  // Refetch alocações quando filtro de posto muda
+  useEffect(() => {
+    alocacoesQuery.refetch();
+  }, [filtroPostoId]);
 
   const handleBuscarNfes = () => {
     setSearchParams({ 

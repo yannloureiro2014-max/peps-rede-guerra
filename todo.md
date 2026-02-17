@@ -486,3 +486,11 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [x] Implementar filtro por posto no dropdown para buscar apenas NFes daquele cod_empresa - implementado com estado postoId
 - [x] Implementar persistência de alocações no banco PEPS e atualizar estoque do tanque - procedure criarAlocacao funcional
 - [x] Testar fluxo completo de alocação - SUCESSO: NFe 000772850 alocada com 2.500L em REDE SUPER PETROLEO, Tanque 01
+
+
+## Limpeza e Correção de Filtros - DRE 01/2026
+
+- [ ] Limpar todas as alocações existentes (começar do zero)
+- [ ] Corrigir filtro de NFes Pendentes: mostrar apenas NFes emitidas PARA o posto selecionado (não alocadas)
+- [ ] Corrigir filtro de NFes Alocadas: mostrar todas as alocadas PARA o posto, independente de faturamento
+- [ ] Testar filtros com dados reais
