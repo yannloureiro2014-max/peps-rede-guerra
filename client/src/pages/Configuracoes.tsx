@@ -1,4 +1,3 @@
-import React from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,26 +24,21 @@ export default function Configuracoes() {
       utils.configuracoes.list.invalidate();
       setTimeout(() => setMensagem(null), 3000);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       setMensagem("Erro ao salvar: " + error.message);
       setTimeout(() => setMensagem(null), 5000);
     }
   });
 
-  const sincronizarTudo = trpc.sync.sincronizarTudo.useMutation({
+  const sincronizarMedicoes = trpc.sync.sincronizarMedicoes.useMutation({
     onMutate: () => {
       setSyncStatus("syncing");
-      setMensagem("Sincronizando com ACS...");
+      setMensagem("Sincronizando medições com ACS...");
     },
-    onSuccess: (result) => {
+    onSuccess: (result: any) => {
       if (result.success) {
         setSyncStatus("success");
         setMensagem("Sincronização concluída com sucesso!");
-        utils.postos.list.invalidate();
-        utils.produtos.list.invalidate();
-        utils.tanques.list.invalidate();
-        utils.vendas.resumo.invalidate();
-        utils.dashboard.stats.invalidate();
         refetchSync();
       } else {
         setSyncStatus("error");
@@ -55,7 +49,7 @@ export default function Configuracoes() {
         setSyncStatus("idle");
       }, 5000);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       setSyncStatus("error");
       setMensagem("Erro na sincronização: " + error.message);
       setTimeout(() => {
@@ -65,40 +59,36 @@ export default function Configuracoes() {
     }
   });
 
+  const handleSincronizar = () => {
+    sincronizarMedicoes.mutate({});
+  };
+
   const salvarConfiguracoes = () => {
     setConfiguracao.mutate({
-      chave: "estoque_minimo_padrao",
-      valor: estoqueMinimo,
-      descricao: "Estoque mínimo padrão para novos tanques (litros)"
+      chave: "estoque_minimo",
+      valor: estoqueMinimo
     });
     setConfiguracao.mutate({
       chave: "tolerancia_diferenca",
-      valor: toleranciaDiferenca,
-      descricao: "Tolerância para diferenças em medições (%)"
+      valor: toleranciaDiferenca
     });
-  };
-
-  const handleSincronizar = () => {
-    sincronizarTudo.mutate({ diasVendas: 90 });
   };
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Configurações</h1>
-          <p className="text-muted-foreground">Parâmetros e configurações do sistema</p>
+          <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
+          <p className="text-muted-foreground mt-2">Gerencie as configurações do sistema</p>
         </div>
 
-        {/* Mensagem de feedback */}
         {mensagem && (
           <div className={`p-4 rounded-lg ${
-            mensagem.includes("Erro") 
-              ? "bg-red-50 border border-red-200 text-red-800" 
-              : mensagem.includes("sucesso") || mensagem.includes("concluída")
-                ? "bg-green-50 border border-green-200 text-green-800"
-                : "bg-blue-50 border border-blue-200 text-blue-800"
+            syncStatus === "success" 
+              ? "bg-green-50 border border-green-200 text-green-800"
+              : syncStatus === "error"
+              ? "bg-red-50 border border-red-200 text-red-800"
+              : "bg-blue-50 border border-blue-200 text-blue-800"
           }`}>
             {mensagem}
           </div>
@@ -224,8 +214,7 @@ export default function Configuracoes() {
 
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  <strong>Sincronização:</strong> Importa postos, produtos, tanques e vendas 
-                  diretamente do banco de dados ACS. Vendas dos últimos 90 dias serão carregadas.
+                  <strong>Sincronização:</strong> Importa medições físicas diárias do banco de dados ACS em lotes de 7 dias para melhor performance.
                 </p>
               </div>
             </CardContent>
@@ -250,13 +239,8 @@ export default function Configuracoes() {
                     <div key={config.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                       <div>
                         <p className="font-medium text-sm">{config.chave}</p>
-                        {config.descricao && (
-                          <p className="text-xs text-muted-foreground">{config.descricao}</p>
-                        )}
+                        <p className="text-xs text-muted-foreground">{config.valor}</p>
                       </div>
-                      <span className="font-mono text-sm bg-background px-2 py-1 rounded border">
-                        {config.valor}
-                      </span>
                     </div>
                   ))}
                 </div>

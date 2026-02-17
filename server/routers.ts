@@ -5,11 +5,6 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
 import { 
-  sincronizarTudo, 
-  sincronizarPostosACS, 
-  sincronizarProdutosACS, 
-  sincronizarTanquesACS, 
-  sincronizarVendasACS,
   sincronizarMedicoesACS,
   sincronizarComprasACS,
   verificarMedicoesFaltantes
@@ -19,7 +14,7 @@ import { alocacoesFisicasRouter } from "./routers/alocacoes-fisicas";
 export const appRouter = router({
   system: systemRouter,
   alocacoesFisicas: alocacoesFisicasRouter,
-  
+
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -440,25 +435,7 @@ export const appRouter = router({
 
   // ==================== SYNC ====================
   sync: router({
-    sincronizarTudo: protectedProcedure
-      .input(z.object({ diasVendas: z.number().optional() }).optional())
-      .mutation(async ({ input }) => {
-        return sincronizarTudo(input?.diasVendas || 90);
-      }),
-    sincronizarPostos: protectedProcedure.mutation(async () => {
-      return sincronizarPostosACS();
-    }),
-    sincronizarProdutos: protectedProcedure.mutation(async () => {
-      return sincronizarProdutosACS();
-    }),
-    sincronizarTanques: protectedProcedure.mutation(async () => {
-      return sincronizarTanquesACS();
-    }),
-    sincronizarVendas: protectedProcedure
-      .input(z.object({ dias: z.number().optional() }).optional())
-      .mutation(async ({ input }) => {
-        return sincronizarVendasACS(input?.dias || 90);
-      }),
+
     sincronizarMedicoes: protectedProcedure
       .input(z.object({ dias: z.number().optional() }).optional())
       .mutation(async ({ input }) => {
@@ -467,12 +444,12 @@ export const appRouter = router({
     sincronizarCompras: protectedProcedure
       .input(z.object({ dias: z.number().optional() }).optional())
       .mutation(async ({ input }) => {
-        return sincronizarComprasACS(input?.dias || 180);
+        return sincronizarComprasACS();
       }),
     verificarMedicoesFaltantes: protectedProcedure
       .input(z.object({ dias: z.number().optional() }).optional())
       .mutation(async ({ input }) => {
-        return verificarMedicoesFaltantes(input?.dias || 30);
+        return verificarMedicoesFaltantes();
       }),
   }),
 

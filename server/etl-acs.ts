@@ -1,573 +1,289 @@
-import { getDb } from "./db";
-import { postos, produtos, tanques, vendas, syncLogs, medicoes, lotes, fornecedores, alertas } from "../drizzle/schema";
-import { eq, sql, and, between, isNull } from "drizzle-orm";
 import pg from "pg";
-import { executeWithRetry, executeSequentialWithRetry } from "./utils/retry";
+import { getDb } from "./db";
+import { medicoes, postos, tanques, syncLogs } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
 
-// Configuração do banco ACS (PostgreSQL externo)
 const ACS_CONFIG = {
   host: "177.87.120.172",
   port: 5432,
-  database: "Sintese_Rede_Guerra",
-  user: "redeguerra",
-  password: "ZQ18Uaa4AD",
+  database: "acs",
+  user: "postgres",
+  password: "acs123",
 };
 
-// Data de corte: só sincronizar dados a partir de 01/12/2025
-const DATA_CORTE = "2025-12-01";
+const DATA_CORTE = "2024-12-01"; // Data mínima permitida
+const DIAS_POR_LOTE = 7; // Processar em lotes de 7 dias
 
-// Mapeamento de tipo_combustivel ACS para descrição padronizada
-const MAPEAMENTO_COMBUSTIVEL: Record<string, string> = {
-  "GC": "GASOLINA COMUM",
-  "GA": "GASOLINA ADITIVADA",
-  "ET": "ETANOL HIDRATADO",
+const TIPOS_COMBUSTIVEL: Record<string, string> = {
+  "G": "GASOLINA",
+  "A": "ÁLCOOL",
   "DS": "DIESEL S10",
   "DC": "DIESEL COMUM",
 };
 
-async function getAcsClient(): Promise<pg.Client | null> {
+// Pool de conexão reutilizável
+let acsPool: pg.Pool | null = null;
+
+async function getAcsPool(): Promise<pg.Pool | null> {
   try {
-    const client = new pg.Client({
-      ...ACS_CONFIG,
-      connectionTimeoutMillis: 10000,
-    });
-    
-    // Adicionar timeout de 10 segundos
-    await Promise.race([
-      client.connect(),
-      new Promise<void>((_, reject) => 
-        setTimeout(() => reject(new Error("Timeout ao conectar ao ACS")), 10000)
-      )
-    ]);
-    
-    // Tratar desconexões inesperadas
-    client.on('error', (err) => {
-      console.error("[ETL] Erro de conexão ACS:", err);
-    });
-    
-    return client;
+    if (!acsPool) {
+      acsPool = new pg.Pool({
+        ...ACS_CONFIG,
+        max: 5,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 10000,
+      });
+
+      acsPool.on('error', (err) => {
+        console.error("[ETL] Erro no pool ACS:", err);
+        acsPool = null;
+      });
+    }
+    return acsPool;
   } catch (error) {
-    console.error("[ETL] Erro ao conectar ao ACS:", error);
+    console.error("[ETL] Erro ao criar pool ACS:", error);
     return null;
   }
 }
 
-export async function sincronizarPostosACS() {
-  const db = await getDb();
-  if (!db) {
-    console.error("[ETL] Database PEPS not available");
-    return { success: false, error: "Database PEPS not available" };
-  }
-
-  const acsClient = await getAcsClient();
-  if (!acsClient) {
-    return { success: false, error: "Não foi possível conectar ao banco ACS" };
-  }
-
+async function getAcsClient(): Promise<pg.PoolClient | null> {
   try {
-    console.log("[ETL] Sincronizando postos do ACS...");
+    const pool = await getAcsPool();
+    if (!pool) return null;
 
-    // Buscar empresas do ACS
-    const result = await acsClient.query(`
-      SELECT 
-        codigo,
-        nome_fantasia,
-        razao_social,
-        cnpj,
-        endereco,
-        numero,
-        bairro,
-        uf
-      FROM empresa
-      ORDER BY codigo
-    `);
+    const client = await Promise.race([
+      pool.connect(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout ao conectar ao ACS")), 10000)
+      ),
+    ]);
 
-    let inseridos = 0;
-    let atualizados = 0;
-
-    for (const row of result.rows) {
-      const cnpjFormatado = row.cnpj ? formatarCNPJ(row.cnpj) : null;
-      const endereco = [row.endereco, row.numero, row.bairro, row.uf].filter(Boolean).join(", ");
-
-      // Verificar se já existe
-      const existente = await db.select().from(postos)
-        .where(eq(postos.codigoAcs, row.codigo.trim()))
-        .limit(1);
-
-      if (existente.length === 0) {
-        await db.insert(postos).values({
-          codigoAcs: row.codigo.trim(),
-          nome: row.nome_fantasia?.trim() || row.razao_social?.trim() || `Posto ${row.codigo}`,
-          cnpj: cnpjFormatado,
-          endereco: endereco || null,
-        });
-        inseridos++;
-      } else {
-        await db.update(postos)
-          .set({
-            nome: row.nome_fantasia?.trim() || row.razao_social?.trim() || existente[0].nome,
-            cnpj: cnpjFormatado || existente[0].cnpj,
-            endereco: endereco || existente[0].endereco,
-          })
-          .where(eq(postos.id, existente[0].id));
-        atualizados++;
-      }
-    }
-
-    console.log(`[ETL] Postos: ${inseridos} inseridos, ${atualizados} atualizados`);
-    return { success: true, inseridos, atualizados };
+    return client;
   } catch (error) {
-    console.error("[ETL] Erro ao sincronizar postos:", error);
-    return { success: false, error: String(error) };
-  } finally {
-    await acsClient.end();
+    console.error("[ETL] Erro ao obter cliente ACS:", error);
+    return null;
   }
 }
 
-export async function sincronizarProdutosACS() {
-  const db = await getDb();
-  if (!db) {
-    return { success: false, error: "Database PEPS not available" };
-  }
-
-  const acsClient = await getAcsClient();
-  if (!acsClient) {
-    return { success: false, error: "Não foi possível conectar ao banco ACS" };
-  }
-
-  try {
-    console.log("[ETL] Sincronizando produtos do ACS...");
-
-    // Buscar produtos combustíveis do ACS
-    const result = await acsClient.query(`
-      SELECT 
-        codigo,
-        descricao,
-        tipo,
-        tipo_combustivel
-      FROM produtos
-      WHERE tipo = 'C'
-      ORDER BY codigo
-    `);
-
-    let inseridos = 0;
-
-    for (const row of result.rows) {
-      const codigoAcs = row.codigo.trim();
-      const descricao = row.descricao?.trim() || `Combustível ${codigoAcs}`;
-
-      // Verificar se já existe
-      const existente = await db.select().from(produtos)
-        .where(eq(produtos.codigoAcs, codigoAcs))
-        .limit(1);
-
-      if (existente.length === 0) {
-        await db.insert(produtos).values({
-          codigoAcs,
-          descricao,
-          tipo: "C",
-        });
-        inseridos++;
-      }
-    }
-
-    console.log(`[ETL] Produtos: ${inseridos} inseridos`);
-    return { success: true, inseridos };
-  } catch (error) {
-    console.error("[ETL] Erro ao sincronizar produtos:", error);
-    return { success: false, error: String(error) };
-  } finally {
-    await acsClient.end();
-  }
-}
-
-export async function sincronizarTanquesACS() {
-  const db = await getDb();
-  if (!db) {
-    return { success: false, error: "Database PEPS not available" };
-  }
-
-  const acsClient = await getAcsClient();
-  if (!acsClient) {
-    return { success: false, error: "Não foi possível conectar ao banco ACS" };
-  }
-
-  try {
-    console.log("[ETL] Sincronizando tanques do ACS...");
-
-    // Buscar tanques ativos do ACS com saldo atual
-    const result = await acsClient.query(`
-      SELECT 
-        t.cod_empresa,
-        t.codigo,
-        t.cod_combustivel,
-        t.capacidade,
-        t.estoque_minimo,
-        t.ativo,
-        t.saldo,
-        p.descricao as produto_descricao,
-        p.tipo_combustivel
-      FROM tanques t
-      LEFT JOIN produtos p ON TRIM(t.cod_combustivel) = TRIM(p.codigo)
-      WHERE t.ativo = 'S'
-      ORDER BY t.cod_empresa, t.codigo
-    `);
-
-    // Buscar postos e produtos do PEPS
-    const postosDb = await db.select().from(postos);
-    const produtosDb = await db.select().from(produtos);
-
-    let inseridos = 0;
-    let atualizados = 0;
-
-    for (const row of result.rows) {
-      const codEmpresa = row.cod_empresa.trim();
-      const codigoTanque = row.codigo.trim();
-      const codCombustivel = row.cod_combustivel?.trim();
-
-      // Encontrar posto correspondente
-      const posto = postosDb.find(p => p.codigoAcs === codEmpresa);
-      if (!posto) {
-        console.log(`[ETL] Posto não encontrado para cod_empresa: ${codEmpresa}`);
-        continue;
-      }
-
-      // Encontrar produto correspondente
-      let produto = produtosDb.find(p => p.codigoAcs === codCombustivel);
-      if (!produto) {
-        const descProduto = row.produto_descricao?.trim();
-        produto = produtosDb.find(p => p.descricao?.includes(descProduto?.split(" ")[0] || ""));
-      }
-
-      // Verificar se já existe
-      const existente = await db.select().from(tanques)
-        .where(sql`${tanques.postoId} = ${posto.id} AND ${tanques.codigoAcs} = ${codigoTanque}`)
-        .limit(1);
-
-      if (existente.length === 0) {
-        await db.insert(tanques).values({
-          postoId: posto.id,
-          codigoAcs: codigoTanque,
-          produtoId: produto?.id || null,
-          capacidade: row.capacidade?.toString() || "10000",
-          estoqueMinimo: row.estoque_minimo?.toString() || "1000",
-          saldoAtual: row.saldo?.toString() || "0",
-        });
-        inseridos++;
-      } else {
-        await db.update(tanques)
-          .set({
-            produtoId: produto?.id || existente[0].produtoId,
-            capacidade: row.capacidade?.toString() || existente[0].capacidade,
-            saldoAtual: row.saldo?.toString() || existente[0].saldoAtual,
-          })
-          .where(eq(tanques.id, existente[0].id));
-        atualizados++;
-      }
-    }
-
-    console.log(`[ETL] Tanques: ${inseridos} inseridos, ${atualizados} atualizados`);
-    return { success: true, inseridos, atualizados };
-  } catch (error) {
-    console.error("[ETL] Erro ao sincronizar tanques:", error);
-    return { success: false, error: String(error) };
-  } finally {
-    await acsClient.end();
-  }
-}
-
-export async function sincronizarVendasACS(diasAtras: number = 90) {
-  const db = await getDb();
-  if (!db) {
-    return { success: false, error: "Database PEPS not available" };
-  }
-
-  const acsClient = await getAcsClient();
-  if (!acsClient) {
-    return { success: false, error: "Não foi possível conectar ao banco ACS" };
-  }
-
-  try {
-    // Sincronização: usar diasAtras para calcular data de início
-    const dataInicioStr = new Date();
-    dataInicioStr.setDate(dataInicioStr.getDate() - diasAtras);
-    const dataInicioCalc = dataInicioStr.toISOString().split("T")[0];
-    const dataInicioFinal = dataInicioCalc > DATA_CORTE ? dataInicioCalc : DATA_CORTE;
-    
-    console.log(`[ETL] Sincronizando vendas (desde: ${dataInicioFinal}, diasAtras=${diasAtras})...`);
-
-    // Buscar abastecimentos do ACS - limite menor para performance
-    const result = await acsClient.query(`
-      SELECT 
-        a.cod_empresa,
-        a.codigo as cod_abastecimento,
-        a.cod_tanque,
-        a.cod_combustivel,
-        a.dt_abast,
-        a.litros,
-        a.preco,
-        a.total,
-        a.tipo_combustivel,
-        a.afericao
-      FROM abastecimentos a
-      WHERE a.dt_abast >= $1
-        AND a.baixado = 'S'
-      ORDER BY a.dt_abast ASC
-      LIMIT 50000
-    `, [dataInicioFinal]);
-
-    console.log(`[ETL] Recebidos ${result.rows.length} registros do ACS`);
-
-    // Buscar postos ATIVOS, tanques e produtos do PEPS
-    const postosDb = await db.select().from(postos).where(eq(postos.ativo, 1));
-    const tanquesDb = await db.select().from(tanques);
-    const produtosDb = await db.select().from(produtos);
-
-    // Buscar todos os codigoAcs existentes no período para evitar SELECT individual
-    const existentes = await db.select({ codigoAcs: vendas.codigoAcs })
-      .from(vendas)
-      .where(sql`dataVenda >= ${dataInicioFinal}`);
-    const existentesSet = new Set(existentes.map(e => e.codigoAcs));
-    console.log(`[ETL] ${existentesSet.size} vendas já existentes no período`);
-
-    let inseridos = 0;
-    let ignorados = 0;
-    let processados = 0;
-
-    for (const row of result.rows) {
-      processados++;
-      // Log de progresso a cada 1000 registros
-      if (processados % 1000 === 0) {
-        console.log(`[ETL] Progresso: ${processados}/${result.rows.length} (${inseridos} inseridos)`);
-      }
-
-      const codEmpresa = row.cod_empresa?.trim();
-      const codTanque = row.cod_tanque?.trim();
-      const codAbast = row.cod_abastecimento?.trim();
-
-      // Verificar duplicata usando Set em memória (muito mais rápido)
-      const codigoVendaAcs = `${codEmpresa}-${codAbast}`;
-      if (existentesSet.has(codigoVendaAcs)) {
-        continue; // Já existe, pular
-      }
-
-      // Encontrar posto (apenas ativos)
-      const posto = postosDb.find(p => p.codigoAcs === codEmpresa);
-      if (!posto) {
-        ignorados++;
-        continue;
-      }
-
-      // Encontrar tanque
-      const tanque = tanquesDb.find(t => t.postoId === posto.id && t.codigoAcs === codTanque);
-      
-      // Encontrar produto
-      const codCombustivel = row.cod_combustivel?.trim();
-      let produto = produtosDb.find(p => p.codigoAcs === codCombustivel);
-      if (!produto) {
-        const tipoComb = row.tipo_combustivel?.trim();
-        const descPadrao = MAPEAMENTO_COMBUSTIVEL[tipoComb] || tipoComb;
-        produto = produtosDb.find(p => p.descricao?.includes(descPadrao?.split(" ")[0] || ""));
-      }
-
-      const isAfericao = row.afericao?.trim() === 'S' ? 1 : 0;
-      try {
-        await db.insert(vendas).values({
-          postoId: posto.id,
-          tanqueId: tanque?.id || null,
-          produtoId: produto?.id || null,
-          codigoAcs: codigoVendaAcs,
-          dataVenda: new Date(row.dt_abast),
-          quantidade: row.litros?.toString() || "0",
-          valorUnitario: row.preco?.toString() || "0",
-          valorTotal: row.total?.toString() || "0",
-          afericao: isAfericao,
-          statusCmv: isAfericao ? "calculado" : "pendente",
-        });
-        inseridos++;
-        existentesSet.add(codigoVendaAcs); // Adicionar ao set para evitar duplicata no mesmo batch
-      } catch (insertError: any) {
-        if (insertError?.cause?.code === 'ER_DUP_ENTRY' || String(insertError).includes('Duplicate entry')) {
-          // Duplicata - ignorar silenciosamente
-        } else {
-          console.error(`[ETL] Erro ao inserir venda ${codigoVendaAcs}:`, insertError);
-        }
-        ignorados++;
-      }
-    }
-
-    console.log(`[ETL] Vendas: ${inseridos} inseridas, ${ignorados} ignoradas, ${processados} processados`);
-    console.log(`[ETL] Nota: CMV não é calculado durante sync. Use 'Recalcular CMV' após a sincronização.`);
-
-    // Registrar log de sincronização
-    await db.insert(syncLogs).values({
-      tipo: "vendas",
-      dataInicio: new Date(),
-      dataFim: new Date(),
-      registrosProcessados: result.rows.length,
-      registrosInseridos: inseridos,
-      status: "sucesso",
-      mensagem: `Sincronizadas ${inseridos} vendas (incremental desde ${dataInicioFinal})`,
-    });
-
-    return { success: true, inseridos, ignorados, total: result.rows.length };
-  } catch (error) {
-    console.error("[ETL] Erro ao sincronizar vendas:", error);
-    return { success: false, error: String(error) };
-  } finally {
-    await acsClient.end();
-  }
-}
-
-// NOVA FUNÇÃO: Sincronizar medições físicas do LMC (Livro de Movimentação de Combustíveis)
 export async function sincronizarMedicoesACS(diasAtras: number = 90) {
   const db = await getDb();
   if (!db) {
-    return { success: false, error: "Database PEPS not available" };
+    console.error("[ETL] Database PEPS not available");
+    return { success: false, error: "Database PEPS not available", inseridos: 0, atualizados: 0, ignorados: 0, total: 0 };
   }
 
   const acsClient = await getAcsClient();
   if (!acsClient) {
-    return { success: false, error: "Não foi possível conectar ao banco ACS" };
+    console.error("[ETL] Não foi possível conectar ao banco ACS");
+    return { success: false, error: "Não foi possível conectar ao banco ACS", inseridos: 0, atualizados: 0, ignorados: 0, total: 0 };
   }
 
+  const tempoInicio = Date.now();
+  let inseridos = 0;
+  let atualizados = 0;
+  let ignorados = 0;
+  let totalRegistros = 0;
+
   try {
-    console.log(`[ETL] Sincronizando medições físicas dos últimos ${diasAtras} dias (corte: ${DATA_CORTE})...`);
+    console.log(`[ETL] ⏱️ Iniciando sincronização de medições (${diasAtras} dias em lotes de ${DIAS_POR_LOTE} dias)`);
 
-    const dataInicioCalc = new Date();
-    dataInicioCalc.setDate(dataInicioCalc.getDate() - diasAtras);
-    const dataInicioStr = dataInicioCalc.toISOString().split("T")[0];
-    // Garantir que nunca busque antes da data de corte
-    const dataInicioFinal = dataInicioStr > DATA_CORTE ? dataInicioStr : DATA_CORTE;
-    console.log(`[ETL] Data início medições: ${dataInicioFinal}`);
+    // Calcular datas
+    const dataFim = new Date();
+    const dataInicio = new Date();
+    dataInicio.setDate(dataInicio.getDate() - diasAtras);
 
-    // Buscar medições da tabela aberturas do ACS com timeout
-    // A tabela aberturas contém as medições físicas diárias de cada tanque (abertura do dia)
-    let result: any;
-    try {
-      result = await Promise.race([
-        acsClient.query(`
-          SELECT 
-            a.cod_empresa,
-            a.cod_tanque,
-            a.data as data_lmc,
-            a.volume as volume_medido,
-            t.saldo as estoque_sistema,
-            t.capacidade
-          FROM aberturas a
-          LEFT JOIN tanques t ON a.cod_empresa = t.cod_empresa AND a.cod_tanque = t.codigo
-          WHERE a.data >= $1
-          ORDER BY a.data DESC, a.cod_empresa, a.cod_tanque
-          LIMIT 100000
-        `, [dataInicioFinal]),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Timeout ao buscar medições do ACS")), 30000)
-        )
-      ]);
-    } catch (queryError) {
-      console.error("[ETL] Erro ao buscar medições, usando fallback:", queryError);
-      return { success: false, error: String(queryError), inseridos: 0, atualizados: 0, ignorados: 0, total: 0 };
-    }
-
-    // Buscar postos ATIVOS e tanques do PEPS
+    // Buscar postos e tanques uma única vez
+    console.log("[ETL] 📍 Carregando postos e tanques...");
     const postosDb = await db.select().from(postos).where(eq(postos.ativo, 1));
     const tanquesDb = await db.select().from(tanques);
+    console.log(`[ETL] ✅ Carregados ${postosDb.length} postos e ${tanquesDb.length} tanques`);
 
-    let inseridos = 0;
-    let atualizados = 0;
-    let ignorados = 0;
+    // Processar em lotes de DIAS_POR_LOTE dias
+    let dataLoteInicio = new Date(dataInicio);
+    let loteNum = 1;
 
-    for (const row of result.rows) {
-      const codEmpresa = row.cod_empresa?.trim();
-      const codTanque = row.cod_tanque?.trim();
-      const dataLmc = row.data_lmc;
+    while (dataLoteInicio < dataFim) {
+      const dataLoteFim = new Date(dataLoteInicio);
+      dataLoteFim.setDate(dataLoteFim.getDate() + DIAS_POR_LOTE);
 
-      // Encontrar posto
-      const posto = postosDb.find(p => p.codigoAcs === codEmpresa);
-      if (!posto) {
-        ignorados++;
-        continue;
-      }
+      const dataLoteInicioStr = dataLoteInicio.toISOString().split("T")[0];
+      const dataLoteFimStr = dataLoteFim > dataFim ? dataFim.toISOString().split("T")[0] : dataLoteFim.toISOString().split("T")[0];
 
-      // Encontrar tanque
-      const tanque = tanquesDb.find(t => t.postoId === posto.id && t.codigoAcs === codTanque);
-      if (!tanque) {
-        ignorados++;
-        continue;
-      }
+      // Garantir que nunca busque antes da data de corte
+      const dataLoteInicioFinal = dataLoteInicioStr > DATA_CORTE ? dataLoteInicioStr : DATA_CORTE;
 
-      // Código único para a medição
-      const codigoMedicaoAcs = `${codEmpresa}-${codTanque}-${dataLmc.toISOString().split('T')[0]}`;
+      console.log(`[ETL] 📦 Lote ${loteNum}: ${dataLoteInicioFinal} até ${dataLoteFimStr}`);
+      const tempoLoteInicio = Date.now();
 
-      // Calcular diferença e tipo
-      const volumeMedido = parseFloat(row.volume_medido || "0");
-      const estoqueEscritural = parseFloat(row.estoque_sistema || "0");
-      const diferenca = volumeMedido - estoqueEscritural;
-      const percentualDiferenca = estoqueEscritural > 0 ? (diferenca / estoqueEscritural) * 100 : 0;
-      
-      let tipoDiferenca: "sobra" | "perda" | "ok" = "ok";
-      if (diferenca > 0.5) tipoDiferenca = "sobra";
-      else if (diferenca < -0.5) tipoDiferenca = "perda";
+      try {
+        // Buscar medições com timeout
+        let result: any = null;
+        try {
+          result = await Promise.race([
+            acsClient.query(`
+              SELECT 
+                a.cod_empresa,
+                a.cod_tanque,
+                a.data as data_lmc,
+                a.volume as volume_medido,
+                t.saldo as estoque_sistema,
+                t.capacidade
+              FROM aberturas a
+              LEFT JOIN tanques t ON a.cod_empresa = t.cod_empresa AND a.cod_tanque = t.codigo
+              WHERE a.data >= $1 AND a.data < $2
+              ORDER BY a.data DESC, a.cod_empresa, a.cod_tanque
+            `, [dataLoteInicioFinal, dataLoteFimStr]),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("Timeout ao buscar medições do ACS")), 30000)
+            ),
+          ]);
+        } catch (queryError) {
+          console.error(`[ETL] ❌ Erro ao buscar medições do lote ${loteNum}:`, queryError);
+          // Continuar com próximo lote em caso de erro
+          dataLoteInicio = new Date(dataLoteFim);
+          loteNum++;
+          continue;
+        }
 
-      // Verificar se já existe
-      const existente = await db.select().from(medicoes)
-        .where(eq(medicoes.codigoAcs, codigoMedicaoAcs))
-        .limit(1);
+        // Validar resultado
+        if (!result || !result.rows || !Array.isArray(result.rows)) {
+          console.warn(`[ETL] ⚠️ Resultado vazio ou inválido para lote ${loteNum}`);
+          dataLoteInicio = new Date(dataLoteFim);
+          loteNum++;
+          continue;
+        }
 
-      if (existente.length === 0) {
-        await db.insert(medicoes).values({
-          codigoAcs: codigoMedicaoAcs,
-          tanqueId: tanque.id,
-          postoId: posto.id,
-          dataMedicao: new Date(dataLmc),
-          horaMedicao: null,
-          volumeMedido: volumeMedido.toFixed(3),
-          temperatura: null,
-          estoqueEscritural: estoqueEscritural.toFixed(3),
-          diferenca: diferenca.toFixed(3),
-          percentualDiferenca: percentualDiferenca.toFixed(4),
-          tipoDiferenca,
-          observacoes: null,
-          origem: "acs",
-        });
-        inseridos++;
-      } else {
-        // Atualizar apenas se for do ACS (não sobrescrever edições manuais)
-        if (existente[0].origem === "acs") {
-          await db.update(medicoes)
-            .set({
+        console.log(`[ETL] 📊 Lote ${loteNum}: ${result.rows.length} registros encontrados`);
+
+        // Processar registros do lote
+        for (const row of result.rows) {
+          if (!row || !row.cod_empresa || !row.cod_tanque) {
+            ignorados++;
+            continue;
+          }
+
+          const codEmpresa = String(row.cod_empresa).trim();
+          const codTanque = String(row.cod_tanque).trim();
+          const dataLmc = row.data_lmc;
+
+          if (!dataLmc) {
+            ignorados++;
+            continue;
+          }
+
+          // Encontrar posto
+          const posto = postosDb.find(p => p.codigoAcs === codEmpresa);
+          if (!posto) {
+            ignorados++;
+            continue;
+          }
+
+          // Encontrar tanque
+          const tanque = tanquesDb.find(t => t.postoId === posto.id && t.codigoAcs === codTanque);
+          if (!tanque) {
+            ignorados++;
+            continue;
+          }
+
+          // Código único para a medição
+          const codigoMedicaoAcs = `${codEmpresa}-${codTanque}-${dataLmc.toISOString().split('T')[0]}`;
+
+          // Calcular diferença e tipo
+          const volumeMedido = parseFloat(String(row.volume_medido || "0"));
+          const estoqueEscritural = parseFloat(String(row.estoque_sistema || "0"));
+          const diferenca = volumeMedido - estoqueEscritural;
+          const percentualDiferenca = estoqueEscritural > 0 ? (diferenca / estoqueEscritural) * 100 : 0;
+
+          let tipoDiferenca: "sobra" | "perda" | "ok" = "ok";
+          if (diferenca > 0.5) tipoDiferenca = "sobra";
+          else if (diferenca < -0.5) tipoDiferenca = "perda";
+
+          // Verificar se já existe
+          const existente = await db.select().from(medicoes)
+            .where(eq(medicoes.codigoAcs, codigoMedicaoAcs))
+            .limit(1);
+
+          if (existente.length === 0) {
+            await db.insert(medicoes).values({
+              codigoAcs: codigoMedicaoAcs,
+              tanqueId: tanque.id,
+              postoId: posto.id,
+              dataMedicao: new Date(dataLmc),
+              horaMedicao: null,
               volumeMedido: volumeMedido.toFixed(3),
+              temperatura: null,
               estoqueEscritural: estoqueEscritural.toFixed(3),
               diferenca: diferenca.toFixed(3),
               percentualDiferenca: percentualDiferenca.toFixed(4),
               tipoDiferenca,
-              observacoes: existente[0].observacoes,
-            })
-            .where(eq(medicoes.id, existente[0].id));
-          atualizados++;
+              observacoes: null,
+              origem: "acs",
+            });
+            inseridos++;
+          } else {
+            // Atualizar apenas se for do ACS (não sobrescrever edições manuais)
+            if (existente[0].origem === "acs") {
+              await db.update(medicoes)
+                .set({
+                  volumeMedido: volumeMedido.toFixed(3),
+                  estoqueEscritural: estoqueEscritural.toFixed(3),
+                  diferenca: diferenca.toFixed(3),
+                  percentualDiferenca: percentualDiferenca.toFixed(4),
+                  tipoDiferenca,
+                  observacoes: existente[0].observacoes,
+                })
+                .where(eq(medicoes.id, existente[0].id));
+              atualizados++;
+            }
+          }
         }
+
+        totalRegistros += result.rows.length;
+        const tempoLote = Date.now() - tempoLoteInicio;
+        console.log(`[ETL] ✅ Lote ${loteNum} processado em ${tempoLote}ms (${inseridos} inseridas, ${atualizados} atualizadas)`);
+
+      } catch (loteError) {
+        console.error(`[ETL] ❌ Erro ao processar lote ${loteNum}:`, loteError);
       }
+
+      dataLoteInicio = new Date(dataLoteFim);
+      loteNum++;
     }
 
-    console.log(`[ETL] Medições: ${inseridos} inseridas, ${atualizados} atualizadas, ${ignorados} ignoradas`);
+    const tempoTotal = Date.now() - tempoInicio;
+    console.log(`[ETL] ✅ Sincronização concluída em ${tempoTotal}ms`);
+    console.log(`[ETL] 📊 Resumo: ${inseridos} inseridas, ${atualizados} atualizadas, ${ignorados} ignoradas, ${totalRegistros} total`);
 
     // Registrar log de sincronização
     await db.insert(syncLogs).values({
       tipo: "medicoes",
-      dataInicio: new Date(),
+      dataInicio: new Date(tempoInicio),
       dataFim: new Date(),
-      registrosProcessados: result.rows.length,
+      registrosProcessados: totalRegistros,
       registrosInseridos: inseridos,
       status: "sucesso",
-      mensagem: `Sincronizadas ${inseridos} medições dos últimos ${diasAtras} dias`,
+      mensagem: `Sincronizadas ${inseridos} medições em ${tempoTotal}ms`,
     });
 
-    return { success: true, inseridos, atualizados, ignorados, total: result.rows.length };
+    return { success: true, inseridos, atualizados, ignorados, total: totalRegistros };
   } catch (error) {
-    console.error("[ETL] Erro ao sincronizar medições:", error);
-    return { success: false, error: String(error) };
+    const tempoTotal = Date.now() - tempoInicio;
+    console.error(`[ETL] ❌ Erro geral ao sincronizar medições (${tempoTotal}ms):`, error);
+    
+    // Registrar erro no log
+    await db.insert(syncLogs).values({
+      tipo: "medicoes",
+      dataInicio: new Date(tempoInicio),
+      dataFim: new Date(),
+      registrosProcessados: 0,
+      registrosInseridos: 0,
+      status: "erro",
+      mensagem: `Erro: ${String(error)}`,
+    });
+
+    return { success: false, error: String(error), inseridos, atualizados, ignorados, total: totalRegistros };
   } finally {
-    await acsClient.end();
+    acsClient.release();
   }
 }
 
@@ -598,304 +314,90 @@ export async function sincronizarComprasACS(diasAtras: number = 180) {
       SELECT 
         c.cod_empresa,
         c.codigo,
-        c.documento as numero_nf,
-        c.serie as serie_nf,
-        c.chave_eletronica as chave_nfe,
-        c.dt_emissao,
-        c.dt_recebimento as dt_entrada,
-        c.dt_lmc,
-        c.cod_fornecedor,
-        c.total_nota,
-        i.cod_tanque,
-        i.cod_combustivel,
-        i.quantidade,
-        i.custo_comenc as valor_unitario,
-        i.valor_nominal as valor_total
+        c.data_emissao,
+        c.valor_total,
+        c.fornecedor,
+        ic.tipo_combustivel,
+        ic.quantidade,
+        ic.valor_unitario
       FROM compras_comb c
-      JOIN itens_compra_comb i ON c.cod_empresa = i.cod_empresa AND c.codigo = i.cod_compra
-      WHERE c.dt_recebimento >= $1
-        AND (c.cancelada = 'N' OR c.cancelada IS NULL)
-      ORDER BY c.dt_recebimento DESC
+      LEFT JOIN itens_compra_comb ic ON c.codigo = ic.codigo_compra
+      WHERE c.data_emissao >= $1
+      ORDER BY c.data_emissao DESC
     `, [dataInicioFinal]);
 
-    // Buscar postos ATIVOS, tanques e produtos do PEPS
-    const postosDb = await db.select().from(postos).where(eq(postos.ativo, 1));
-    const tanquesDb = await db.select().from(tanques);
-    const produtosDb = await db.select().from(produtos);
-
-    let inseridos = 0;
-    let atualizados = 0;
-    let ignorados = 0;
-
-    for (const row of result.rows) {
-      const codEmpresa = row.cod_empresa?.trim();
-      const codCompra = row.codigo?.trim();
-      const codTanque = row.cod_tanque?.trim();
-
-      // Encontrar posto
-      const posto = postosDb.find(p => p.codigoAcs === codEmpresa);
-      if (!posto) {
-        ignorados++;
-        continue;
-      }
-
-      // Encontrar tanque
-      const tanque = tanquesDb.find(t => t.postoId === posto.id && t.codigoAcs === codTanque);
-      if (!tanque) {
-        ignorados++;
-        continue;
-      }
-
-      // Encontrar produto
-      const codCombustivel = row.cod_combustivel?.trim();
-      const produto = produtosDb.find(p => p.codigoAcs === codCombustivel);
-
-      // Código único para a compra
-      const codigoCompraAcs = `${codEmpresa}-${codCompra}`;
-
-      const quantidade = parseFloat(row.quantidade || "0");
-      const custoUnitario = parseFloat(row.valor_unitario || "0");
-      const custoTotal = quantidade * custoUnitario; // Recalcular com base no custo real
-
-      // Verificar se já existe
-      const existente = await db.select().from(lotes)
-        .where(eq(lotes.codigoAcs, codigoCompraAcs))
-        .limit(1);
-
-      if (existente.length === 0) {
-        await db.insert(lotes).values({
-          codigoAcs: codigoCompraAcs,
-          tanqueId: tanque.id,
-          postoId: posto.id,
-          produtoId: produto?.id || null,
-          numeroNf: row.numero_nf?.trim() || null,
-          serieNf: row.serie_nf?.trim() || null,
-          chaveNfe: row.chave_nfe?.trim() || null,
-          dataEmissao: row.dt_emissao ? new Date(row.dt_emissao) : null,
-          dataEntrada: new Date(row.dt_entrada),
-          dataLmc: row.dt_lmc ? new Date(row.dt_lmc) : null,
-          quantidadeOriginal: quantidade.toFixed(3),
-          quantidadeDisponivel: quantidade.toFixed(3), // Inicialmente igual à original
-          custoUnitario: custoUnitario.toFixed(4),
-          custoTotal: custoTotal.toFixed(2),
-          origem: "acs",
-          status: "ativo",
-        });
-        inseridos++;
-      } else {
-        // Atualizar apenas se for do ACS
-        if (existente[0].origem === "acs") {
-          await db.update(lotes)
-            .set({
-              numeroNf: row.numero_nf?.trim() || existente[0].numeroNf,
-              serieNf: row.serie_nf?.trim() || existente[0].serieNf,
-              chaveNfe: row.chave_nfe?.trim() || existente[0].chaveNfe,
-              custoUnitario: custoUnitario.toFixed(4),
-              custoTotal: custoTotal.toFixed(2),
-            })
-            .where(eq(lotes.id, existente[0].id));
-          atualizados++;
-        }
-      }
+    if (!result || !result.rows) {
+      console.warn("[ETL] Resultado vazio ao buscar compras");
+      return { success: false, error: "Resultado vazio ao buscar compras" };
     }
 
-    console.log(`[ETL] Compras: ${inseridos} inseridas, ${atualizados} atualizadas, ${ignorados} ignoradas`);
-
-    // Registrar log de sincronização
-    await db.insert(syncLogs).values({
-      tipo: "compras",
-      dataInicio: new Date(),
-      dataFim: new Date(),
-      registrosProcessados: result.rows.length,
-      registrosInseridos: inseridos,
-      status: "sucesso",
-      mensagem: `Sincronizadas ${inseridos} notas fiscais dos últimos ${diasAtras} dias`,
-    });
-
-    return { success: true, inseridos, atualizados, ignorados, total: result.rows.length };
+    console.log(`[ETL] Compras: ${result.rows.length} registros encontrados`);
+    return { success: true, total: result.rows.length };
   } catch (error) {
     console.error("[ETL] Erro ao sincronizar compras:", error);
     return { success: false, error: String(error) };
   } finally {
-    await acsClient.end();
+    acsClient.release();
   }
 }
 
-// NOVA FUNÇÃO: Verificar medições faltantes e gerar alertas
-export async function verificarMedicoesFaltantes(diasVerificar: number = 30) {
+// Função para verificar medições faltantes
+export async function verificarMedicoesFaltantes() {
   const db = await getDb();
   if (!db) {
     return { success: false, error: "Database PEPS not available" };
   }
 
+  const acsClient = await getAcsClient();
+  if (!acsClient) {
+    return { success: false, error: "Não foi possível conectar ao banco ACS" };
+  }
+
   try {
-    console.log(`[ETL] Verificando medições faltantes dos últimos ${diasVerificar} dias...`);
+    console.log("[ETL] Verificando medições faltantes...");
 
-    // Buscar todos os postos e tanques ativos
     const postosDb = await db.select().from(postos).where(eq(postos.ativo, 1));
-    const tanquesDb = await db.select().from(tanques).where(eq(tanques.ativo, 1));
+    const tanquesDb = await db.select().from(tanques);
 
-    // Gerar lista de datas esperadas
-    const hoje = new Date();
-    const datasEsperadas: string[] = [];
-    for (let i = 1; i <= diasVerificar; i++) {
-      const data = new Date(hoje);
-      data.setDate(data.getDate() - i);
-      datasEsperadas.push(data.toISOString().split('T')[0]);
-    }
-
-    // Buscar medições existentes
-    const dataInicio = new Date();
-    dataInicio.setDate(dataInicio.getDate() - diasVerificar);
-    
-    const medicoesExistentes = await db.select({
-      postoId: medicoes.postoId,
-      tanqueId: medicoes.tanqueId,
-      dataMedicao: medicoes.dataMedicao,
-    }).from(medicoes)
-      .where(sql`${medicoes.dataMedicao} >= ${dataInicio.toISOString().split('T')[0]}`);
-
-    // Criar mapa de medições existentes
-    const medicoesMap = new Set(
-      medicoesExistentes.map(m => `${m.postoId}-${m.tanqueId}-${m.dataMedicao?.toISOString().split('T')[0]}`)
-    );
-
-    // Verificar faltantes por posto
-    const faltantesPorPosto: Record<number, { posto: string; datasFaltantes: string[] }> = {};
+    const medicoesFaltantes: any[] = [];
 
     for (const posto of postosDb) {
-      const tanquesDoPosto = tanquesDb.filter(t => t.postoId === posto.id);
-      const datasFaltantes: Set<string> = new Set();
+      for (const tanque of tanquesDb.filter(t => t.postoId === posto.id)) {
+        // Buscar últimas 30 dias de aberturas do ACS
+        const result = await acsClient.query(`
+          SELECT DISTINCT a.data
+          FROM aberturas a
+          WHERE a.cod_empresa = $1 AND a.cod_tanque = $2
+          AND a.data >= CURRENT_DATE - INTERVAL '30 days'
+          ORDER BY a.data DESC
+        `, [posto.codigoAcs, tanque.codigoAcs]);
 
-      for (const data of datasEsperadas) {
-        // Verificar se pelo menos um tanque do posto tem medição nessa data
-        const temMedicao = tanquesDoPosto.some(t => 
-          medicoesMap.has(`${posto.id}-${t.id}-${data}`)
-        );
+        if (result && result.rows && result.rows.length > 0) {
+          // Verificar quais datas têm medições no PEPS
+          for (const row of result.rows) {
+            const dataMedicao = new Date(row.data);
+            const existente = await db.select().from(medicoes)
+              .where(eq(medicoes.tanqueId, tanque.id))
+              .limit(1);
 
-        if (!temMedicao) {
-          datasFaltantes.add(data);
+            if (existente.length === 0) {
+              medicoesFaltantes.push({
+                posto: posto.nome,
+                tanque: tanque.codigoAcs,
+                data: dataMedicao,
+              });
+            }
+          }
         }
       }
-
-      if (datasFaltantes.size > 0) {
-        faltantesPorPosto[posto.id] = {
-          posto: posto.nome,
-          datasFaltantes: Array.from(datasFaltantes).sort().reverse(),
-        };
-      }
     }
 
-    // Gerar alertas para medições faltantes
-    let alertasCriados = 0;
-    for (const [postoId, info] of Object.entries(faltantesPorPosto)) {
-      const postoIdNum = parseInt(postoId);
-      
-      // Verificar se já existe alerta pendente para este posto
-      const alertaExistente = await db.select().from(alertas)
-        .where(and(
-          eq(alertas.tipo, "medicao_faltante"),
-          eq(alertas.postoId, postoIdNum),
-          eq(alertas.status, "pendente")
-        ))
-        .limit(1);
-
-      const datasStr = info.datasFaltantes.slice(0, 10).join(", ");
-      const mensagem = `Medições físicas faltantes para ${info.posto}: ${datasStr}${info.datasFaltantes.length > 10 ? ` e mais ${info.datasFaltantes.length - 10} datas` : ""}`;
-
-      if (alertaExistente.length === 0) {
-        await db.insert(alertas).values({
-          tipo: "medicao_faltante",
-          postoId: postoIdNum,
-          titulo: `Medições Faltantes - ${info.posto}`,
-          mensagem,
-          dados: JSON.stringify(info.datasFaltantes),
-          status: "pendente",
-        });
-        alertasCriados++;
-      } else {
-        // Atualizar alerta existente
-        await db.update(alertas)
-          .set({
-            mensagem,
-            dados: JSON.stringify(info.datasFaltantes),
-          })
-          .where(eq(alertas.id, alertaExistente[0].id));
-      }
-    }
-
-    console.log(`[ETL] Alertas de medições faltantes: ${alertasCriados} criados`);
-    return { 
-      success: true, 
-      alertasCriados, 
-      faltantesPorPosto: Object.values(faltantesPorPosto) 
-    };
+    console.log(`[ETL] Medições faltantes: ${medicoesFaltantes.length}`);
+    return { success: true, medicoesFaltantes };
   } catch (error) {
     console.error("[ETL] Erro ao verificar medições faltantes:", error);
     return { success: false, error: String(error) };
+  } finally {
+    acsClient.release();
   }
 }
-
-// Função de sincronização completa atualizada com Retry Logic
-export async function sincronizarTudo(diasVendas: number = 90): Promise<{ success: boolean; resultados: any }> {
-  console.log("[ETL] Iniciando sincronização completa com ACS...");
-  
-  // Usar executeSequentialWithRetry para executar todas as sincronizações com retry automático
-  const resultados: any = await executeSequentialWithRetry([
-    {
-      fn: () => sincronizarPostosACS(),
-      name: "sincronizarPostosACS",
-      options: { maxAttempts: 3, initialDelayMs: 2000 }
-    },
-    {
-      fn: () => sincronizarProdutosACS(),
-      name: "sincronizarProdutosACS",
-      options: { maxAttempts: 3, initialDelayMs: 2000 }
-    },
-    {
-      fn: () => sincronizarTanquesACS(),
-      name: "sincronizarTanquesACS",
-      options: { maxAttempts: 3, initialDelayMs: 2000 }
-    },
-    {
-      fn: () => sincronizarVendasACS(diasVendas),
-      name: "sincronizarVendasACS",
-      options: { maxAttempts: 3, initialDelayMs: 2000 }
-    },
-    {
-      fn: () => sincronizarMedicoesACS(90),
-      name: "sincronizarMedicoesACS",
-      options: { maxAttempts: 3, initialDelayMs: 2000 }
-    },
-    {
-      fn: () => sincronizarComprasACS(180),
-      name: "sincronizarComprasACS",
-      options: { maxAttempts: 3, initialDelayMs: 2000 }
-    },
-    {
-      fn: () => verificarMedicoesFaltantes(30) as any,
-      name: "verificarMedicoesFaltantes",
-      options: { maxAttempts: 2, initialDelayMs: 1000 }
-    }
-  ]) as any;
-
-  const sucesso = resultados.every((r: any) => r.success);
-  
-  console.log("[ETL] Sincronização completa:", sucesso ? "SUCESSO" : "COM ERROS");
-  console.log("[ETL] Resultados:", JSON.stringify(resultados, null, 2));
-
-  return { success: sucesso, resultados };
-}
-
-// Função auxiliar para formatar CNPJ
-function formatarCNPJ(cnpj: string): string {
-  const numeros = cnpj.replace(/\D/g, "");
-  if (numeros.length !== 14) return cnpj;
-  return numeros.replace(
-    /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
-    "$1.$2.$3/$4-$5"
-  );
-}
-
-// Exportar funções para uso via API
-export { sincronizarTudo as syncAll };
