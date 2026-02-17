@@ -44,6 +44,7 @@ export default function AlocacoesFisicas() {
   const { data: lotesFisicosData } = trpc.alocacoesFisicas.listarLotesFisicos.useQuery();
   const criarAlocacaoMutation = trpc.alocacoesFisicas.criarAlocacao.useMutation();
   const recalcularCMVMutation = trpc.alocacoesFisicas.recalcularCMVComAlocacoes.useMutation();
+  const [impactoCMV, setImpactoCMV] = useState<any>(null);
 
   // Usar dados do backend ou fallback para dados simulados
   const nfesPendentes = nfesData?.dados || [];
@@ -99,10 +100,15 @@ export default function AlocacoesFisicas() {
       });
 
       // Recalcular CMV automaticamente
-      await recalcularCMVMutation.mutateAsync({
+      const resultadoCMV = await recalcularCMVMutation.mutateAsync({
         dataInicio: novaAlocacao.dataDescarga,
         dataFim: novaAlocacao.dataDescarga,
       });
+      
+      // Armazenar impacto CMV para exibição
+      if (resultadoCMV.dados) {
+        setImpactoCMV(resultadoCMV.dados);
+      }
 
       alert("Alocação criada e CMV recalculado com sucesso!");
       
@@ -218,18 +224,22 @@ export default function AlocacoesFisicas() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="nfes-pendentes">
             <AlertCircle className="w-4 h-4 mr-2" />
-            NFes Pendentes
+            NFes
           </TabsTrigger>
           <TabsTrigger value="alocacoes">
             <CheckCircle className="w-4 h-4 mr-2" />
-            Alocações Realizadas
+            Alocações
+          </TabsTrigger>
+          <TabsTrigger value="impacto-cmv">
+            <Truck className="w-4 h-4 mr-2" />
+            Impacto CMV
           </TabsTrigger>
           <TabsTrigger value="lotes">
-            <Truck className="w-4 h-4 mr-2" />
-            Lotes Físicos
+            <MapPin className="w-4 h-4 mr-2" />
+            Lotes
           </TabsTrigger>
         </TabsList>
 
@@ -563,7 +573,106 @@ export default function AlocacoesFisicas() {
           </div>
         </TabsContent>
 
-        {/* TAB 3: Lotes Físicos */}
+        {/* TAB 3: Impacto CMV */}
+        <TabsContent value="impacto-cmv" className="space-y-4">
+          {impactoCMV ? (
+            <div className="space-y-4">
+              <Card className="border-blue-200 bg-blue-50">
+                <CardHeader>
+                  <CardTitle className="text-lg">Impacto da Alocação no CMV</CardTitle>
+                  <CardDescription>
+                    Resultado do recalcular CMV com PEPS baseado em data de descarga real
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div className="bg-white p-4 rounded border">
+                      <p className="text-sm text-gray-600">Vendas Processadas</p>
+                      <p className="text-2xl font-bold text-blue-600">
+                        {impactoCMV.vendasProcessadas}
+                      </p>
+                    </div>
+                    <div className="bg-white p-4 rounded border">
+                      <p className="text-sm text-gray-600">Lotes Reordenados</p>
+                      <p className="text-2xl font-bold text-orange-600">
+                        {impactoCMV.lotesPEPSReordenados}
+                      </p>
+                    </div>
+                    <div className="bg-white p-4 rounded border">
+                      <p className="text-sm text-gray-600">CMV Anterior</p>
+                      <p className="text-lg font-semibold">
+                        R$ {impactoCMV.cmvAnterior.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </p>
+                    </div>
+                    <div className="bg-white p-4 rounded border">
+                      <p className="text-sm text-gray-600">CMV Novo</p>
+                      <p className="text-lg font-semibold text-green-700">
+                        R$ {impactoCMV.cmvNovo.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 rounded border mb-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-600">Diferença CMV</p>
+                        <p className={`text-2xl font-bold ${
+                          impactoCMV.diferenca > 0 ? "text-red-600" : "text-green-600"
+                        }`}>
+                          {impactoCMV.diferenca > 0 ? "+" : ""}
+                          R$ {impactoCMV.diferenca.toLocaleString("pt-BR", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Percentual de Mudança</p>
+                        <p className={`text-2xl font-bold ${
+                          impactoCMV.percentualMudanca > 0 ? "text-red-600" : "text-green-600"
+                        }`}>
+                          {impactoCMV.percentualMudanca > 0 ? "+" : ""}
+                          {impactoCMV.percentualMudanca.toFixed(2)}%
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-yellow-50 border border-yellow-200 p-4 rounded">
+                    <p className="text-sm font-semibold text-yellow-800 mb-2">
+                      ℹ️ Análise da Reordenação PEPS
+                    </p>
+                    <ul className="text-sm text-yellow-700 space-y-1">
+                      <li>
+                        • {impactoCMV.lotesPEPSReordenados} lote(s) teve(m) sua ordem PEPS
+                        alterada
+                      </li>
+                      <li>
+                        • CMV {impactoCMV.diferenca > 0 ? "aumentou" : "diminuiu"} em R$
+                        {Math.abs(impactoCMV.diferenca).toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </li>
+                      <li>
+                        • Percentual de impacto:{" "}
+                        {Math.abs(impactoCMV.percentualMudanca).toFixed(2)}% do CMV anterior
+                      </li>
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              Nenhuma alocação realizada. Realize uma alocação para ver o impacto no CMV.
+            </div>
+          )}
+        </TabsContent>
+
+        {/* TAB 4: Lotes Físicos */}
         <TabsContent value="lotes" className="space-y-4">
           <Card>
             <CardHeader>

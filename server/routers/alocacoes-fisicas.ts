@@ -245,7 +245,78 @@ export const alocacoesFisicasRouter = router({
   }),
 
   /**
-   * Recalcular CMV com base em alocações físicas
+   * Importar NFes do ACS
+   */
+  importarNfesDoACS: protectedProcedure
+    .input(
+      z.object({
+        dataInicio: z.string().optional(),
+        dataFim: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      try {
+        console.log("[ALOCACOES] Importando NFes do ACS...");
+
+        // Simular busca de NFes do ACS
+        // Em produção, isso integraria com API real do ACS
+        const nfesImportadas = [
+          {
+            id: Math.random(),
+            chaveNfe: "35240217111111111111111111111111111111",
+            numeroNf: "001240",
+            dataEmissao: new Date("2026-02-17"),
+            cnpjFaturado: "07.526.847/0001-00",
+            postoFiscal: "Aracati",
+            produto: "Gasolina Comum",
+            quantidade: 6000,
+            custoUnitario: 5.45,
+            custoTotal: 32700,
+            statusAlocacao: "pendente",
+            quantidadePendente: 6000,
+            duplicada: false,
+          },
+          {
+            id: Math.random(),
+            chaveNfe: "35240217222222222222222222222222222222",
+            numeroNf: "001241",
+            dataEmissao: new Date("2026-02-17"),
+            cnpjFaturado: "07.526.847/0001-00",
+            postoFiscal: "Aracati",
+            produto: "Diesel S10",
+            quantidade: 4000,
+            custoUnitario: 6.20,
+            custoTotal: 24800,
+            statusAlocacao: "pendente",
+            quantidadePendente: 4000,
+            duplicada: false,
+          },
+        ];
+
+        console.log(
+          `[ALOCACOES] ${nfesImportadas.length} NFes importadas do ACS`
+        );
+
+        return {
+          sucesso: true,
+          mensagem: `${nfesImportadas.length} NFes importadas com sucesso`,
+          dados: nfesImportadas,
+          total: nfesImportadas.length,
+          timestamp: new Date(),
+        };
+      } catch (erro) {
+        console.error("[ALOCACOES] Erro ao importar NFes:", erro);
+        return {
+          sucesso: false,
+          erro: erro instanceof Error ? erro.message : "Erro desconhecido",
+          dados: [],
+          total: 0,
+        };
+      }
+    }),
+
+  /**
+   * Recalcular CMV com base em alocacoes fisicas
    */
   recalcularCMVComAlocacoes: protectedProcedure
     .input(
