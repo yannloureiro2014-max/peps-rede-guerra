@@ -32,8 +32,14 @@ interface Compra {
 
 async function getAcsClient(): Promise<pg.Client | null> {
   try {
-    const client = new pg.Client(ACS_CONFIG);
-    await client.connect();
+    const client = new pg.Client({
+      ...ACS_CONFIG,
+      connectionTimeoutMillis: 5000,
+    });
+    await Promise.race([
+      client.connect(),
+      new Promise<void>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000))
+    ]);
     return client;
   } catch (error) {
     console.error("[ACS-COMPRAS] Erro ao conectar ao ACS:", error);
