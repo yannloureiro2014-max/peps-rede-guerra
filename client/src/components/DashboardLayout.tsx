@@ -19,7 +19,8 @@ import {
   Shield,
   RefreshCw,
   Sparkles,
-  Truck
+  Truck,
+  AlertCircle
 } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -43,6 +44,7 @@ const menuItems: MenuItem[] = [
   { icon: Bell, label: "Alertas", path: "/alertas" },
   { icon: Building2, label: "Postos", path: "/postos" },
   { icon: Truck, label: "Alocações Físicas", path: "/alocacoes-fisicas", adminOnly: true },
+  { icon: AlertCircle, label: "Reconciliação", path: "/reconciliacao", adminOnly: true },
   { icon: RefreshCw, label: "Recalcular CMV", path: "/recalcular-cmv", adminOnly: true },
   { icon: Users, label: "Usuários", path: "/usuarios", adminOnly: true },
   { icon: Sparkles, label: "Assistente IA", path: "/assistente-ia" },
