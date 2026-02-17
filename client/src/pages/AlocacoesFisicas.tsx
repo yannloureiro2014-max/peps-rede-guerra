@@ -27,6 +27,7 @@ export default function AlocacoesFisicas() {
   const [, setLocation] = useLocation();
   const [tab, setTab] = useState("nfes-pendentes");
   const [carregando, setCarregando] = useState(false);
+  const [filtroPostoNfes, setFiltroPostoNfes] = useState("");
   const [novaAlocacao, setNovaAlocacao] = useState({
     nfeStagingId: "",
     chaveNfe: "",
@@ -47,9 +48,14 @@ export default function AlocacoesFisicas() {
   const [impactoCMV, setImpactoCMV] = useState<any>(null);
 
   // Usar dados do backend ou fallback para dados simulados
-  const nfesPendentes = nfesData?.dados || [];
+  let nfesPendentes = nfesData?.dados || [];
   const alocacoesRealizadas = alocacoesData?.dados || [];
   const lotesFisicos = lotesFisicosData?.dados || [];
+
+  // Filtrar NFes por Posto se selecionado
+  if (filtroPostoNfes) {
+    nfesPendentes = nfesPendentes.filter((nfe: any) => nfe.postoDestino === filtroPostoNfes);
+  }
 
   // Dados simulados - Postos e tanques (em produção viriam do backend)
   const postos = [
@@ -224,14 +230,14 @@ export default function AlocacoesFisicas() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="nfes-pendentes">
             <AlertCircle className="w-4 h-4 mr-2" />
             NFes
           </TabsTrigger>
           <TabsTrigger value="alocacoes">
             <CheckCircle className="w-4 h-4 mr-2" />
-            Alocações
+            Alocacoes
           </TabsTrigger>
           <TabsTrigger value="impacto-cmv">
             <Truck className="w-4 h-4 mr-2" />
@@ -241,10 +247,32 @@ export default function AlocacoesFisicas() {
             <MapPin className="w-4 h-4 mr-2" />
             Lotes
           </TabsTrigger>
+          <TabsTrigger value="compras">
+            <Truck className="w-4 h-4 mr-2" />
+            Compras
+          </TabsTrigger>
         </TabsList>
 
         {/* TAB 1: NFes Pendentes */}
         <TabsContent value="nfes-pendentes" className="space-y-4">
+          <div className="flex gap-4 mb-4">
+            <div className="flex-1 max-w-xs">
+              <Label className="text-sm font-medium">Filtrar por Posto</Label>
+              <Select value={filtroPostoNfes} onValueChange={setFiltroPostoNfes}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos os postos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todos os postos</SelectItem>
+                  {postos.map((posto) => (
+                    <SelectItem key={posto.id} value={posto.nome}>
+                      {posto.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <div className="grid gap-4">
             {nfesPendentes && nfesPendentes.length > 0 ? (
               nfesPendentes.map((nfe: any) => {
@@ -714,6 +742,56 @@ export default function AlocacoesFisicas() {
                       <tr className="border-b hover:bg-gray-50">
                         <td colSpan={7} className="py-2 px-2 text-center text-gray-500">
                           Nenhum lote físico criado
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* TAB 5: Compras */}
+        <TabsContent value="compras" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Compras Realizadas</CardTitle>
+              <CardDescription>
+                Histórico de todas as compras (NFes) importadas do ACS
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b">
+                    <tr>
+                      <th className="text-left py-2 px-2">NF</th>
+                      <th className="text-left py-2 px-2">Série</th>
+                      <th className="text-left py-2 px-2">Data Emissão</th>
+                      <th className="text-left py-2 px-2">Fornecedor</th>
+                      <th className="text-left py-2 px-2">Posto Fiscal</th>
+                      <th className="text-right py-2 px-2">Valor Total</th>
+                      <th className="text-left py-2 px-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {nfesPendentes && nfesPendentes.length > 0 ? (
+                      nfesPendentes.map((nfe: any) => (
+                        <tr key={nfe.id} className="border-b hover:bg-gray-50">
+                          <td className="py-2 px-2 font-mono text-xs">{nfe.numeroNf}</td>
+                          <td className="py-2 px-2">{nfe.serieNf}</td>
+                          <td className="py-2 px-2">{new Date(nfe.dataEmissao).toLocaleDateString("pt-BR")}</td>
+                          <td className="py-2 px-2 text-sm">{nfe.fornecedor || "N/A"}</td>
+                          <td className="py-2 px-2">{nfe.postoDestino}</td>
+                          <td className="py-2 px-2 text-right font-semibold">R$ {(nfe.custoTotal || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
+                          <td className="py-2 px-2">{getStatusBadge(nfe.statusAlocacao)}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr className="border-b hover:bg-gray-50">
+                        <td colSpan={7} className="py-2 px-2 text-center text-gray-500">
+                          Nenhuma compra registrada
                         </td>
                       </tr>
                     )}
