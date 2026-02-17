@@ -1,6 +1,6 @@
 /**
- * Serviço para buscar NFes reais do banco ACS
- * Conecta ao PostgreSQL externo e retorna NFes de entrada (compras)
+ * Serviço para buscar Compras reais do banco ACS
+ * Conecta ao PostgreSQL externo e retorna compras da tabela compras_comb
  */
 
 import pg from "pg";
@@ -14,20 +14,19 @@ const ACS_CONFIG = {
   password: "ZQ18Uaa4AD",
 };
 
-interface NFe {
+interface Compra {
   id: string;
-  chaveNfe: string;
-  numeroNf: string;
-  serieNf: string;
+  codEmpresa: string;
+  codigo: string;
+  documento: string;
+  serie: string;
   dataEmissao: Date;
-  cnpjFaturado: string;
-  cnpjFornecedor: string;
-  postoDestino: string;
-  produto: string;
-  quantidade: number;
-  custoUnitario: number;
-  custoTotal: number;
-  statusAlocacao: string;
+  dataLmc: Date;
+  codFornecedor: string;
+  totalNota: number;
+  totalProdutos: number;
+  totalItens: number;
+  totalLitros: number;
   quantidadePendente: number;
 }
 
@@ -37,24 +36,23 @@ async function getAcsClient(): Promise<pg.Client | null> {
     await client.connect();
     return client;
   } catch (error) {
-    console.error("[ACS-NFES] Erro ao conectar ao ACS:", error);
+    console.error("[ACS-COMPRAS] Erro ao conectar ao ACS:", error);
     return null;
   }
 }
 
 /**
- * Buscar NFes de entrada (compras) do ACS
+ * Buscar compras do ACS do período especificado
  */
-export async function buscarNfesDoACS(filtros?: {
+export async function buscarComprasDoACS(filtros?: {
   dataInicio?: string;
   dataFim?: string;
-  postoId?: string;
-  status?: string;
-}): Promise<NFe[]> {
+  codEmpresa?: string;
+}): Promise<Compra[]> {
   try {
-    console.log("[ACS-NFES] Buscando NFes do ACS...");
+    console.log("[ACS-COMPRAS] Buscando compras do ACS...");
 
-    const nfes = await executeWithRetry(
+    const compras = await executeWithRetry(
       async () => {
         const acsClient = await getAcsClient();
         if (!acsClient) {
@@ -62,87 +60,96 @@ export async function buscarNfesDoACS(filtros?: {
         }
 
         try {
-          // Query para buscar NFes de entrada (compras)
+          // Query para buscar compras com itens
           let query = `
             SELECT 
-              nf.id,
-              nf.chave_nfe as chaveNfe,
-              nf.numero_nf as numeroNf,
-              nf.serie_nf as serieNf,
-              nf.data_emissao as dataEmissao,
-              nf.cnpj_faturado as cnpjFaturado,
-              nf.cnpj_fornecedor as cnpjFornecedor,
-              nf.cod_empresa as postoDestino,
-              nf.descricao_produto as produto,
-              nf.quantidade,
-              nf.valor_unitario as custoUnitario,
-              nf.valor_total as custoTotal,
-              nf.status,
-              COALESCE(nf.quantidade - nf.quantidade_alocada, nf.quantidade) as quantidadePendente
-            FROM nf_entrada nf
-            WHERE nf.tipo_documento = 'NF'
-              AND nf.data_emissao >= '2025-12-01'
+              c.cod_empresa,
+              c.codigo,
+              c.documento,
+              c.serie,
+              c.dt_emissao,
+              c.dt_lmc,
+              c.cod_fornecedor,
+              c.total_nota,
+              c.total_produtos,
+              COUNT(i.numero) as total_itens,
+              SUM(i.quantidade::numeric) as total_litros
+            FROM compras_comb c
+            LEFT JOIN itens_compra_comb i ON c.codigo = i.cod_compra AND c.cod_empresa = i.cod_empresa
+            WHERE c.dt_emissao >= '2025-12-16'::date
+              AND c.dt_emissao <= '2026-02-16'::date
           `;
 
           const params: any[] = [];
 
           if (filtros?.dataInicio) {
-            query += ` AND nf.data_emissao >= $${params.length + 1}`;
+            query = query.replace("'2025-12-16'::date", `$${params.length + 1}::date`);
             params.push(filtros.dataInicio);
           }
 
           if (filtros?.dataFim) {
-            query += ` AND nf.data_emissao <= $${params.length + 1}`;
+            query = query.replace("'2026-02-16'::date", `$${params.length + 1}::date`);
             params.push(filtros.dataFim);
           }
 
-          query += ` ORDER BY nf.data_emissao DESC LIMIT 1000`;
+          if (filtros?.codEmpresa) {
+            query += ` AND c.cod_empresa = $${params.length + 1}`;
+            params.push(filtros.codEmpresa);
+          }
 
-          console.log("[ACS-NFES] Executando query:", query);
+          query += ` GROUP BY c.cod_empresa, c.codigo, c.documento, c.serie, c.dt_emissao, c.dt_lmc, c.cod_fornecedor, c.total_nota, c.total_produtos
+            ORDER BY c.dt_emissao DESC
+            LIMIT 500`;
+
+          console.log("[ACS-COMPRAS] Executando query para buscar compras");
           const result = await acsClient.query(query, params);
 
           // Transformar resultados
-          const nfesTransformadas: NFe[] = result.rows.map((row: any) => ({
-            id: String(row.id),
-            chaveNfe: row.chavenfe || "",
-            numeroNf: row.numeronf || "",
-            serieNf: row.serienf || "",
-            dataEmissao: new Date(row.dataemissao),
-            cnpjFaturado: row.cnpjfaturado || "",
-            cnpjFornecedor: row.cnpjfornecedor || "",
-            postoDestino: row.postodestino || "",
-            produto: row.produto || "",
-            quantidade: Number(row.quantidade) || 0,
-            custoUnitario: Number(row.custunitario) || 0,
-            custoTotal: Number(row.custotal) || 0,
-            statusAlocacao: row.status || "pendente",
-            quantidadePendente: Number(row.quantidadependente) || 0,
+          const comprasTransformadas: Compra[] = result.rows.map((row: any) => ({
+            id: `${row.cod_empresa}-${row.codigo}`,
+            codEmpresa: row.cod_empresa,
+            codigo: row.codigo,
+            documento: row.documento,
+            serie: row.serie,
+            dataEmissao: new Date(row.dt_emissao),
+            dataLmc: new Date(row.dt_lmc),
+            codFornecedor: row.cod_fornecedor,
+            totalNota: Number(row.total_nota) || 0,
+            totalProdutos: Number(row.total_produtos) || 0,
+            totalItens: Number(row.total_itens) || 0,
+            totalLitros: Number(row.total_litros) || 0,
+            quantidadePendente: Number(row.total_litros) || 0,
           }));
 
-          console.log(`[ACS-NFES] ${nfesTransformadas.length} NFes buscadas com sucesso`);
-          return nfesTransformadas;
+          console.log(
+            `[ACS-COMPRAS] ${comprasTransformadas.length} compras buscadas com sucesso`
+          );
+          return comprasTransformadas;
         } finally {
           await acsClient.end();
         }
       },
-      "buscarNfesDoACS"
+      "buscarComprasDoACS"
     );
 
-    return nfes;
+    return compras;
   } catch (erro) {
-    console.error("[ACS-NFES] Erro ao buscar NFes:", erro);
+    console.error("[ACS-COMPRAS] Erro ao buscar compras:", erro);
     return [];
   }
 }
 
 /**
- * Buscar uma NFe específica por chave
+ * Buscar uma compra específica
  */
-export async function buscarNfePorChave(chaveNfe: string): Promise<NFe | null> {
+export async function buscarCompraPorCodigo(
+  codEmpresa: string,
+  codigo: string
+): Promise<Compra | null> {
   try {
-    console.log(`[ACS-NFES] Buscando NFe ${chaveNfe}...`);
+    console.log(`[ACS-COMPRAS] Buscando compra ${codEmpresa}-${codigo}...`);
 
-    const nfe = await executeWithRetry(
+    const compra = await executeWithRetry(
       async () => {
         const acsClient = await getAcsClient();
         if (!acsClient) {
@@ -153,25 +160,24 @@ export async function buscarNfePorChave(chaveNfe: string): Promise<NFe | null> {
           const result = await acsClient.query(
             `
             SELECT 
-              nf.id,
-              nf.chave_nfe as chaveNfe,
-              nf.numero_nf as numeroNf,
-              nf.serie_nf as serieNf,
-              nf.data_emissao as dataEmissao,
-              nf.cnpj_faturado as cnpjFaturado,
-              nf.cnpj_fornecedor as cnpjFornecedor,
-              nf.cod_empresa as postoDestino,
-              nf.descricao_produto as produto,
-              nf.quantidade,
-              nf.valor_unitario as custoUnitario,
-              nf.valor_total as custoTotal,
-              nf.status,
-              COALESCE(nf.quantidade - nf.quantidade_alocada, nf.quantidade) as quantidadePendente
-            FROM nf_entrada nf
-            WHERE nf.chave_nfe = $1
+              c.cod_empresa,
+              c.codigo,
+              c.documento,
+              c.serie,
+              c.dt_emissao,
+              c.dt_lmc,
+              c.cod_fornecedor,
+              c.total_nota,
+              c.total_produtos,
+              COUNT(i.numero) as total_itens,
+              SUM(i.quantidade::numeric) as total_litros
+            FROM compras_comb c
+            LEFT JOIN itens_compra_comb i ON c.codigo = i.cod_compra AND c.cod_empresa = i.cod_empresa
+            WHERE c.cod_empresa = $1 AND c.codigo = $2
+            GROUP BY c.cod_empresa, c.codigo, c.documento, c.serie, c.dt_emissao, c.dt_lmc, c.cod_fornecedor, c.total_nota, c.total_produtos
             LIMIT 1
             `,
-            [chaveNfe]
+            [codEmpresa, codigo]
           );
 
           if (result.rows.length === 0) {
@@ -180,39 +186,38 @@ export async function buscarNfePorChave(chaveNfe: string): Promise<NFe | null> {
 
           const row = result.rows[0];
           return {
-            id: String(row.id),
-            chaveNfe: row.chavenfe || "",
-            numeroNf: row.numeronf || "",
-            serieNf: row.serienf || "",
-            dataEmissao: new Date(row.dataemissao),
-            cnpjFaturado: row.cnpjfaturado || "",
-            cnpjFornecedor: row.cnpjfornecedor || "",
-            postoDestino: row.postodestino || "",
-            produto: row.produto || "",
-            quantidade: Number(row.quantidade) || 0,
-            custoUnitario: Number(row.custunitario) || 0,
-            custoTotal: Number(row.custotal) || 0,
-            statusAlocacao: row.status || "pendente",
-            quantidadePendente: Number(row.quantidadependente) || 0,
+            id: `${row.cod_empresa}-${row.codigo}`,
+            codEmpresa: row.cod_empresa,
+            codigo: row.codigo,
+            documento: row.documento,
+            serie: row.serie,
+            dataEmissao: new Date(row.dt_emissao),
+            dataLmc: new Date(row.dt_lmc),
+            codFornecedor: row.cod_fornecedor,
+            totalNota: Number(row.total_nota) || 0,
+            totalProdutos: Number(row.total_produtos) || 0,
+            totalItens: Number(row.total_itens) || 0,
+            totalLitros: Number(row.total_litros) || 0,
+            quantidadePendente: Number(row.total_litros) || 0,
           };
         } finally {
           await acsClient.end();
         }
       },
-      "buscarNfePorChave"
+      "buscarCompraPorCodigo"
     );
 
-    return nfe;
+    return compra;
   } catch (erro) {
-    console.error("[ACS-NFES] Erro ao buscar NFe:", erro);
+    console.error("[ACS-COMPRAS] Erro ao buscar compra:", erro);
     return null;
   }
 }
 
 /**
- * Contar NFes não alocadas
+ * Contar compras não alocadas
  */
-export async function contarNfesNaoAlocadas(): Promise<number> {
+export async function contarComprasNaoAlocadas(): Promise<number> {
   try {
     const acsClient = await getAcsClient();
     if (!acsClient) {
@@ -222,11 +227,10 @@ export async function contarNfesNaoAlocadas(): Promise<number> {
     try {
       const result = await acsClient.query(
         `
-        SELECT COUNT(*) as total
-        FROM nf_entrada nf
-        WHERE nf.tipo_documento = 'NF'
-          AND nf.data_emissao >= '2025-12-01'
-          AND (nf.quantidade_alocada IS NULL OR nf.quantidade_alocada < nf.quantidade)
+        SELECT COUNT(DISTINCT c.codigo) as total
+        FROM compras_comb c
+        WHERE c.dt_emissao >= '2025-12-16'::date
+          AND c.dt_emissao <= '2026-02-16'::date
         `
       );
 
@@ -235,7 +239,23 @@ export async function contarNfesNaoAlocadas(): Promise<number> {
       await acsClient.end();
     }
   } catch (erro) {
-    console.error("[ACS-NFES] Erro ao contar NFes:", erro);
+    console.error("[ACS-COMPRAS] Erro ao contar compras:", erro);
     return 0;
   }
+}
+
+/**
+ * Buscar NFes (para compatibilidade com interface anterior)
+ */
+export async function buscarNfesDoACS(filtros?: {
+  dataInicio?: string;
+  dataFim?: string;
+  postoId?: string;
+  status?: string;
+}): Promise<any[]> {
+  // Redirecionar para buscarComprasDoACS
+  return buscarComprasDoACS({
+    dataInicio: filtros?.dataInicio,
+    dataFim: filtros?.dataFim,
+  });
 }
