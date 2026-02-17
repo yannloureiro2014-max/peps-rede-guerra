@@ -15,6 +15,7 @@ import {
   obterEstatisticasAlocacoes as dbObterEstatisticasAlocacoes,
 } from "../db-fuel-engine";
 import { buscarNfesDoACS } from "../services/acs-nfes";
+import { buscarNfesReaisDoACS, sincronizarNfesAutomaticamente, obterEstatisticasSincronizacao } from "../services/sefaz-real";
 import {
   criarLoteDoSEFAZ,
   listarNfesAlocadas,
@@ -269,6 +270,49 @@ export const alocacoesFisicasRouter = router({
         };
       }
     }),
+
+  /**
+   * Sincronizar NFes com SEFAZ real
+   */
+  sincronizarNfes: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      console.log("[ALOCACOES] Sincronizando NFes...");
+      const resultado = await sincronizarNfesAutomaticamente();
+      return {
+        sucesso: true,
+        dados: resultado,
+        timestamp: new Date(),
+      };
+    } catch (erro) {
+      console.error("[ALOCACOES] Erro ao sincronizar:", erro);
+      return {
+        sucesso: false,
+        erro: erro instanceof Error ? erro.message : "Erro desconhecido",
+        timestamp: new Date(),
+      };
+    }
+  }),
+
+  /**
+   * Obter estatisticas de sincronizacao
+   */
+  obterEstatisticasSincronizacao: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      const stats = await obterEstatisticasSincronizacao();
+      return {
+        sucesso: true,
+        dados: stats,
+        timestamp: new Date(),
+      };
+    } catch (erro) {
+      console.error("[ALOCACOES] Erro ao obter estatisticas:", erro);
+      return {
+        sucesso: false,
+        erro: erro instanceof Error ? erro.message : "Erro desconhecido",
+        timestamp: new Date(),
+      };
+    }
+  }),
 
   /**
    * Importar NFes do ACS
