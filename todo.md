@@ -463,3 +463,11 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [x] Mover Dialog para fora do loop de NFes (evitar re-render desnecessário)
 - [x] Estabilizar referências com useMemo para evitar re-renders infinitos
 - [x] Build de produção testado sem erros
+
+## Atualização de Credenciais ACS
+
+- [x] Atualizar credenciais do banco ACS: novo banco Sintese_Rede_Guerra, usuário redeguerra
+- [x] Atualizar etl-acs.ts com novas credenciais
+- [x] Verificar acs-nfes.ts (já estava atualizado)
+- [x] Testar conexão direta ao banco - OK
+- [x] Reiniciar servidor e verificar sincronização automática - SUCESSO (147 registros, 119 atualizadas)

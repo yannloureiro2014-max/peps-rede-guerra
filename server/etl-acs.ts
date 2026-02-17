@@ -6,9 +6,9 @@ import { eq } from "drizzle-orm";
 const ACS_CONFIG = {
   host: "177.87.120.172",
   port: 5432,
-  database: "acs",
-  user: "postgres",
-  password: "acs123",
+  database: "Sintese_Rede_Guerra",
+  user: "redeguerra",
+  password: "ZQ18Uaa4AD",
 };
 
 const DATA_CORTE = "2024-12-01"; // Data mínima permitida
