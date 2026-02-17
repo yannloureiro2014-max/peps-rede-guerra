@@ -15,6 +15,16 @@ import {
   obterEstatisticasAlocacoes as dbObterEstatisticasAlocacoes,
 } from "../db-fuel-engine";
 import { buscarNfesDoACS } from "../services/acs-nfes";
+import {
+  criarLoteDoSEFAZ,
+  listarNfesAlocadas,
+  obterEstatisticasAlocacoes,
+  registrarConsumoLote,
+  atualizarDisponibilidadeLote,
+  obterLotesDisponiveisPEPS,
+  cancelarAlocacao,
+} from "../db-sefaz-alocacoes";
+
 
 export const alocacoesFisicasRouter = router({
   /**
@@ -99,10 +109,13 @@ export const alocacoesFisicasRouter = router({
   criarAlocacao: protectedProcedure
     .input(
       z.object({
-        nfeStagingId: z.string(),
         chaveNfe: z.string(),
+        numeroNf: z.string(),
+        serieNf: z.string(),
+        dataEmissao: z.string(),
         postoDestinoId: z.number(),
         tanqueDestinoId: z.number(),
+        produtoId: z.number().default(1),
         dataDescargaReal: z.string(),
         horaDescargaReal: z.string().optional(),
         volumeAlocado: z.number().positive(),
@@ -112,54 +125,28 @@ export const alocacoesFisicasRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        const custoTotalAlocado = input.volumeAlocado * input.custoUnitarioAplicado;
-
-        // Criar alocação no banco
-        const alocacao = await dbCriarAlocacaoFisica({
-          nfeStagingId: parseInt(input.nfeStagingId),
-          postoDestinoId: input.postoDestinoId,
-          tanqueDestinoId: input.tanqueDestinoId,
+        // Criar lote no banco de dados com persistencia
+        const loteId = await criarLoteDoSEFAZ({
+          chaveNfe: input.chaveNfe,
+          numeroNf: input.numeroNf,
+          serieNf: input.serieNf,
+          dataEmissao: new Date(input.dataEmissao),
           dataDescargaReal: new Date(input.dataDescargaReal),
-          horaDescargaReal: input.horaDescargaReal,
-          volumeAlocado: input.volumeAlocado.toString(),
-          custoUnitarioAplicado: input.custoUnitarioAplicado.toString(),
-          custoTotalAlocado: custoTotalAlocado.toString(),
-          statusAlocacao: "confirmada",
-          usuarioId: ctx.user.id,
+          postoId: input.postoDestinoId,
+          tanqueId: input.tanqueDestinoId,
+          produtoId: input.produtoId,
+          volumeAlocado: input.volumeAlocado,
+          custoUnitario: input.custoUnitarioAplicado,
           justificativa: input.justificativa,
-        });
-
-        // Criar lote físico automaticamente
-        const alocacaoId = (alocacao as any).insertId || 1;
-        await dbCriarLoteFisico({
-          alocacaoFisicaId: alocacaoId as number,
-          postoId: input.postoDestinoId,
-          tanqueId: input.tanqueDestinoId,
-          produtoId: 1, // TODO: obter do NFe
-          dataDescargaReal: new Date(input.dataDescargaReal),
-          volumeTotal: input.volumeAlocado.toString(),
-          custoUnitario: input.custoUnitarioAplicado.toString(),
-          custoTotal: custoTotalAlocado.toString(),
-          ordemPEPS: 0, // Será calculado automaticamente
-          quantidadeDisponivel: input.volumeAlocado.toString(),
-          statusLote: "ativo",
-        });
-
-        // Registrar auditoria
-        await dbRegistrarAuditoria({
-          operacao: "criar_alocacao",
-          alocacaoFisicaId: alocacaoId,
-          postoId: input.postoDestinoId,
-          tanqueId: input.tanqueDestinoId,
           usuarioId: ctx.user.id,
-          descricao: `Alocação criada: ${input.volumeAlocado}L em ${new Date(input.dataDescargaReal).toLocaleDateString()}`,
-          statusOperacao: "sucesso",
         });
+
+        const custoTotalAlocado = input.volumeAlocado * input.custoUnitarioAplicado;
 
         return {
           sucesso: true,
           dados: {
-            id: alocacaoId,
+            id: loteId,
             volumeAlocado: input.volumeAlocado,
             custoTotalAlocado,
             statusAlocacao: "confirmada",
@@ -176,7 +163,7 @@ export const alocacoesFisicasRouter = router({
     }),
 
   /**
-   * Listar alocações realizadas
+   * Listar alocacoes realizadas
    */
   listarAlocacoesRealizadas: protectedProcedure
     .input(
@@ -188,16 +175,18 @@ export const alocacoesFisicasRouter = router({
     )
     .query(async ({ input }) => {
       try {
-        const alocacoes = await dbListarAlocacoesRealizadas(
-          input?.postoId,
-          input?.dataInicio,
-          input?.dataFim
-        );
+        const alocacoes = await listarNfesAlocadas({
+          postoId: input?.postoId,
+          dataInicio: input?.dataInicio ? new Date(input.dataInicio) : undefined,
+          dataFim: input?.dataFim ? new Date(input.dataFim) : undefined,
+          status: "ativo",
+        });
 
         return {
           sucesso: true,
           dados: alocacoes,
           total: alocacoes.length,
+          timestamp: new Date(),
         };
       } catch (erro) {
         console.error("[ALOCACOES] Erro ao listar alocações:", erro);
@@ -257,19 +246,18 @@ export const alocacoesFisicasRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        const stats = await dbObterEstatisticasAlocacoes(
-          input.dataInicio,
-          input.dataFim
-        );
+        const stats = await obterEstatisticasAlocacoes({
+          dataInicio: new Date(input.dataInicio),
+          dataFim: new Date(input.dataFim),
+        });
 
         return {
           sucesso: true,
           dados: {
-            vendasProcessadas: stats.totalAlocacoes,
-            lotesReordenados: stats.totalReordenacoes,
+            totalAlocacoes: stats.totalAlocacoes,
             totalVolume: stats.totalVolume,
             custoMedio: stats.custoMedio,
-            impactoFinanceiro: stats.impactoFinanceiro,
+            lotesPorStatus: stats.lotesPorStatus,
             timestamp: new Date(),
           },
         };

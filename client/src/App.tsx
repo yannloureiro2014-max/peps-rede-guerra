@@ -18,6 +18,7 @@ import InicializacaoMensal from "./pages/InicializacaoMensal";
 import RecalcularCMV from "./pages/RecalcularCMV";
 import AssistenteIA from "./pages/AssistenteIA";
 import AlocacoesFisicas from "./pages/AlocacoesFisicas";
+import AlocacoesSEFAZ from "./pages/AlocacoesSEFAZ";
 import Reconciliacao from "./pages/Reconciliacao";
 
 function Router() {
@@ -38,6 +39,7 @@ function Router() {
       <Route path={"/recalcular-cmv"} component={RecalcularCMV} />
       <Route path={"/assistente-ia"} component={AssistenteIA} />
       <Route path={"/alocacoes-fisicas"} component={AlocacoesFisicas} />
+      <Route path={"/alocacoes-sefaz"} component={AlocacoesSEFAZ} />
       <Route path={"/reconciliacao"} component={Reconciliacao} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />

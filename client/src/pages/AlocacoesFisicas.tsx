@@ -92,10 +92,12 @@ export default function AlocacoesFisicas() {
     }
 
     try {
-      // Chamar tRPC para criar alocação
+      // Chamar tRPC para criar alocacao
       await criarAlocacaoMutation.mutateAsync({
-        nfeStagingId: novaAlocacao.nfeStagingId,
         chaveNfe: novaAlocacao.chaveNfe,
+        numeroNf: "001234", // TODO: obter do NFe
+        serieNf: "1", // TODO: obter do NFe
+        dataEmissao: new Date().toISOString().split('T')[0],
         postoDestinoId: parseInt(novaAlocacao.postoDestino),
         tanqueDestinoId: parseInt(novaAlocacao.tanqueDestino),
         dataDescargaReal: novaAlocacao.dataDescarga,
@@ -107,7 +109,7 @@ export default function AlocacoesFisicas() {
 
       // Recalcular CMV automaticamente
       const resultadoCMV = await recalcularCMVMutation.mutateAsync({
-        dataInicio: novaAlocacao.dataDescarga,
+        dataInicio: new Date(novaAlocacao.dataDescarga).toISOString().split('T')[0],
         dataFim: novaAlocacao.dataDescarga,
       });
       

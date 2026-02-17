@@ -20,7 +20,8 @@ import {
   RefreshCw,
   Sparkles,
   Truck,
-  AlertCircle
+  AlertCircle,
+  FileCheck
 } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -43,6 +44,7 @@ const menuItems: MenuItem[] = [
   { icon: FileText, label: "Relatórios", path: "/relatorios" },
   { icon: Bell, label: "Alertas", path: "/alertas" },
   { icon: Building2, label: "Postos", path: "/postos" },
+  { icon: FileCheck, label: "Alocações SEFAZ", path: "/alocacoes-sefaz", adminOnly: true },
   { icon: Truck, label: "Alocações Físicas", path: "/alocacoes-fisicas", adminOnly: true },
   { icon: AlertCircle, label: "Reconciliação", path: "/reconciliacao", adminOnly: true },
   { icon: RefreshCw, label: "Recalcular CMV", path: "/recalcular-cmv", adminOnly: true },
@@ -128,7 +130,7 @@ export default function DashboardLayout({
         {/* Menu */}
         <nav className="flex-1 py-4 overflow-y-auto">
           {menuItems
-            .filter(item => !item.adminOnly || user?.role === 'admin_geral')
+            .filter(item => !item.adminOnly || (user?.role as string)?.includes('admin'))
             .map((item) => {
               const isActive = location === item.path;
               return (
