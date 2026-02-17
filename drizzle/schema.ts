@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, date, datetime, uniqueIndex } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, date, datetime, uniqueIndex, index } from "drizzle-orm/mysql-core";
 
 // Tabela de usuários (autenticação)
 export const users = mysqlTable("users", {
@@ -251,3 +251,156 @@ export const inicializacaoMensalLotes = mysqlTable("inicializacaoMensalLotes", {
 
 export type InicializacaoMensalLote = typeof inicializacaoMensalLotes.$inferSelect;
 export type InsertInicializacaoMensalLote = typeof inicializacaoMensalLotes.$inferInsert;
+
+
+// ============================================
+// TABELAS PARA FUEL PHYSICAL ALLOCATION ENGINE
+// ============================================
+
+// Tabela de NFes em Staging (importadas do ACS)
+export const nfeStaging = mysqlTable("nfeStaging", {
+  id: int("id").autoincrement().primaryKey(),
+  chaveNfe: varchar("chaveNfe", { length: 44 }).notNull().unique(),
+  numeroNf: varchar("numeroNf", { length: 20 }).notNull(),
+  serieNf: varchar("serieNf", { length: 10 }).notNull(),
+  dataEmissao: date("dataEmissao").notNull(),
+  cnpjFaturado: varchar("cnpjFaturado", { length: 20 }).notNull(),
+  cnpjFornecedor: varchar("cnpjFornecedor", { length: 20 }).notNull(),
+  postoFiscalId: int("postoFiscalId"), // FK para postos (onde foi faturado)
+  produtoId: int("produtoId"), // FK para produtos
+  quantidade: decimal("quantidade", { precision: 12, scale: 3 }).notNull(),
+  custoUnitario: decimal("custoUnitario", { precision: 10, scale: 4 }).notNull(),
+  custoTotal: decimal("custoTotal", { precision: 14, scale: 2 }).notNull(),
+  statusAlocacao: mysqlEnum("statusAlocacao", ["pendente", "parcialmente_alocado", "totalmente_alocado"]).default("pendente").notNull(),
+  quantidadeAlocada: decimal("quantidadeAlocada", { precision: 12, scale: 3 }).default("0").notNull(),
+  observacoes: text("observacoes"),
+  importadoEm: timestamp("importadoEm").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  chaveNfeIdx: index("chaveNfe_idx").on(table.chaveNfe),
+  statusIdx: index("statusAlocacao_idx").on(table.statusAlocacao),
+  dataEmissaoIdx: index("dataEmissao_idx").on(table.dataEmissao),
+}));
+
+export type NfeStaging = typeof nfeStaging.$inferSelect;
+export type InsertNfeStaging = typeof nfeStaging.$inferInsert;
+
+// Tabela de Alocações Físicas (onde cada compra foi descarregada)
+export const alocacoesFisicas = mysqlTable("alocacoesFisicas", {
+  id: int("id").autoincrement().primaryKey(),
+  nfeStagingId: int("nfeStagingId").notNull(),
+  postoDestinoId: int("postoDestinoId").notNull(), // FK para postos (onde foi descarregado)
+  tanqueDestinoId: int("tanqueDestinoId").notNull(), // FK para tanques
+  dataDescargaReal: date("dataDescargaReal").notNull(), // Data REAL de descarga (pode ser diferente da fiscal)
+  horaDescargaReal: varchar("horaDescargaReal", { length: 5 }), // HH:MM
+  volumeAlocado: decimal("volumeAlocado", { precision: 12, scale: 3 }).notNull(),
+  custoUnitarioAplicado: decimal("custoUnitarioAplicado", { precision: 10, scale: 4 }).notNull(),
+  custoTotalAlocado: decimal("custoTotalAlocado", { precision: 14, scale: 2 }).notNull(),
+  statusAlocacao: mysqlEnum("statusAlocacao", ["confirmada", "cancelada", "reprocessada"]).default("confirmada").notNull(),
+  justificativa: text("justificativa"),
+  usuarioId: int("usuarioId").notNull(), // FK para users (quem fez a alocação)
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  nfeStagingIdx: index("nfeStagingId_idx").on(table.nfeStagingId),
+  postoDestinoIdx: index("postoDestinoId_idx").on(table.postoDestinoId),
+  dataDescargaIdx: index("dataDescargaReal_idx").on(table.dataDescargaReal),
+  statusIdx: index("statusAlocacao_idx").on(table.statusAlocacao),
+}));
+
+export type AlocacaoFisica = typeof alocacoesFisicas.$inferSelect;
+export type InsertAlocacaoFisica = typeof alocacoesFisicas.$inferInsert;
+
+// Tabela de Lotes Físicos (criados automaticamente após alocação)
+export const lotesFisicos = mysqlTable("lotesFisicos", {
+  id: int("id").autoincrement().primaryKey(),
+  alocacaoFisicaId: int("alocacaoFisicaId").notNull(), // FK para alocacoesFisicas
+  postoId: int("postoId").notNull(), // FK para postos
+  tanqueId: int("tanqueId").notNull(), // FK para tanques
+  produtoId: int("produtoId").notNull(), // FK para produtos
+  dataDescargaReal: date("dataDescargaReal").notNull(), // Base para PEPS (não data fiscal)
+  volumeTotal: decimal("volumeTotal", { precision: 12, scale: 3 }).notNull(),
+  custoUnitario: decimal("custoUnitario", { precision: 10, scale: 4 }).notNull(),
+  custoTotal: decimal("custoTotal", { precision: 14, scale: 2 }).notNull(),
+  ordemPEPS: int("ordemPEPS").notNull(), // Ordem de consumo PEPS (1 = primeiro)
+  quantidadeDisponivel: decimal("quantidadeDisponivel", { precision: 12, scale: 3 }).notNull(),
+  statusLote: mysqlEnum("statusLote", ["ativo", "consumido", "cancelado"]).default("ativo").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  alocacaoIdx: index("alocacaoFisicaId_idx").on(table.alocacaoFisicaId),
+  postoTanqueIdx: index("postoId_tanqueId_idx").on(table.postoId, table.tanqueId),
+  ordemPEPSIdx: index("ordemPEPS_idx").on(table.ordemPEPS),
+  statusIdx: index("statusLote_idx").on(table.statusLote),
+}));
+
+export type LoteFisico = typeof lotesFisicos.$inferSelect;
+export type InsertLoteFisico = typeof lotesFisicos.$inferInsert;
+
+// Tabela de Reordenação PEPS (histórico de quando PEPS foi reordenado)
+export const reordenacaoPEPS = mysqlTable("reordenacaoPEPS", {
+  id: int("id").autoincrement().primaryKey(),
+  alocacaoFisicaId: int("alocacaoFisicaId").notNull(), // FK para alocacoesFisicas
+  postoId: int("postoId").notNull(), // FK para postos
+  tanqueId: int("tanqueId").notNull(), // FK para tanques
+  dataDescargaNovaAlocacao: date("dataDescargaNovaAlocacao").notNull(), // Data da alocação que causou reordenação
+  motivo: varchar("motivo", { length: 200 }).notNull(), // "Alocação retroativa" ou similar
+  lotesAfetados: int("lotesAfetados").notNull(), // Quantos lotes foram reordenados
+  impactoFinanceiroCMV: decimal("impactoFinanceiroCMV", { precision: 14, scale: 2 }).notNull(), // Diferença de CMV
+  percentualImpacto: decimal("percentualImpacto", { precision: 8, scale: 4 }).notNull(), // % de mudança
+  usuarioId: int("usuarioId").notNull(), // FK para users (quem causou a reordenação)
+  observacoes: text("observacoes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  alocacaoIdx: index("alocacaoFisicaId_idx").on(table.alocacaoFisicaId),
+  postoTanqueIdx: index("postoId_tanqueId_idx").on(table.postoId, table.tanqueId),
+  dataDescargaIdx: index("dataDescargaNovaAlocacao_idx").on(table.dataDescargaNovaAlocacao),
+}));
+
+export type ReordenacaoPEPS = typeof reordenacaoPEPS.$inferSelect;
+export type InsertReordenacaoPEPS = typeof reordenacaoPEPS.$inferInsert;
+
+// Tabela de Consumo de Lotes Físicos (rastreamento de qual lote foi consumido em cada venda)
+export const consumoLotesFisicos = mysqlTable("consumoLotesFisicos", {
+  id: int("id").autoincrement().primaryKey(),
+  vendaId: int("vendaId").notNull(), // FK para vendas
+  loteFisicoId: int("loteFisicoId").notNull(), // FK para lotesFisicos
+  volumeConsumido: decimal("volumeConsumido", { precision: 12, scale: 3 }).notNull(),
+  custoUnitario: decimal("custoUnitario", { precision: 10, scale: 4 }).notNull(),
+  custoTotalConsumido: decimal("custoTotalConsumido", { precision: 14, scale: 2 }).notNull(),
+  ordemConsumo: int("ordemConsumo").notNull(), // Ordem em que foi consumido (1 = primeiro)
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  vendaIdx: index("vendaId_idx").on(table.vendaId),
+  loteIdx: index("loteFisicoId_idx").on(table.loteFisicoId),
+  ordemIdx: index("ordemConsumo_idx").on(table.ordemConsumo),
+}));
+
+export type ConsumoLoteFisico = typeof consumoLotesFisicos.$inferSelect;
+export type InsertConsumoLoteFisico = typeof consumoLotesFisicos.$inferInsert;
+
+// Tabela de Auditoria do Fuel Engine (log de todas as operações)
+export const auditoriaFuelEngine = mysqlTable("auditoriaFuelEngine", {
+  id: int("id").autoincrement().primaryKey(),
+  operacao: varchar("operacao", { length: 50 }).notNull(), // "criar_alocacao", "reordenar_peps", "recalcular_cmv"
+  alocacaoFisicaId: int("alocacaoFisicaId"), // FK para alocacoesFisicas (pode ser null)
+  postoId: int("postoId"), // FK para postos
+  tanqueId: int("tanqueId"), // FK para tanques
+  usuarioId: int("usuarioId").notNull(), // FK para users
+  descricao: text("descricao").notNull(),
+  dadosAntigos: text("dadosAntigos"), // JSON com dados antes da operação
+  dadosNovos: text("dadosNovos"), // JSON com dados depois da operação
+  impactoFinanceiro: decimal("impactoFinanceiro", { precision: 14, scale: 2 }), // Impacto em reais
+  statusOperacao: mysqlEnum("statusOperacao", ["sucesso", "erro", "cancelada"]).default("sucesso").notNull(),
+  mensagemErro: text("mensagemErro"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  operacaoIdx: index("operacao_idx").on(table.operacao),
+  alocacaoIdx: index("alocacaoFisicaId_idx").on(table.alocacaoFisicaId),
+  postoTanqueIdx: index("postoId_tanqueId_idx").on(table.postoId, table.tanqueId),
+  usuarioIdx: index("usuarioId_idx").on(table.usuarioId),
+}));
+
+export type AuditoriaFuelEngine = typeof auditoriaFuelEngine.$inferSelect;
+export type InsertAuditoriaFuelEngine = typeof auditoriaFuelEngine.$inferInsert;

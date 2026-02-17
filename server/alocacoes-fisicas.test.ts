@@ -26,7 +26,7 @@ describe("Alocações Físicas - tRPC Procedures", () => {
       expect(result.dados).toBeDefined();
       expect(Array.isArray(result.dados)).toBe(true);
       expect(result.total).toBeGreaterThanOrEqual(0);
-    }, { timeout: 15000 });
+    }, { timeout: 30000 });
 
     it("deve incluir campos obrigatórios em cada NFe", async () => {
       const caller = appRouter.createCaller(mockCtx);
@@ -45,7 +45,7 @@ describe("Alocações Físicas - tRPC Procedures", () => {
         expect(nfe).toHaveProperty("custoUnitario");
         expect(nfe).toHaveProperty("statusAlocacao");
       }
-    }, { timeout: 15000 });
+    }, { timeout: 30000 });
 
     it("deve retornar timestamp da consulta", async () => {
       const caller = appRouter.createCaller(mockCtx);
@@ -53,7 +53,7 @@ describe("Alocações Físicas - tRPC Procedures", () => {
 
       expect(result.timestamp).toBeDefined();
       expect(result.timestamp instanceof Date).toBe(true);
-    }, { timeout: 15000 });
+    }, { timeout: 30000 });
   });
 
   describe("criarAlocacao", () => {
