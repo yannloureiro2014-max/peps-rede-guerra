@@ -479,3 +479,10 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [x] Testar busca de NFes com dados reais do ACS (87 NFes encontradas, custo unitário calculado, posto mapeado)
 - [x] Enriquecer dados das NFes: custoUnitario calculado (totalNota/totalLitros), postoDestino mapeado por codEmpresa
 - [ ] Preparar para publicação
+
+## Melhorias Alocação SEFAZ - Itens da NFe, Filtro e Persistência
+
+- [x] Buscar itens da NFe por produto (Gasolina, Diesel, Etanol) da tabela itens_compra_comb - implementado em acs-nfes.ts
+- [x] Implementar filtro por posto no dropdown para buscar apenas NFes daquele cod_empresa - implementado com estado postoId
+- [x] Implementar persistência de alocações no banco PEPS e atualizar estoque do tanque - procedure criarAlocacao funcional
+- [x] Testar fluxo completo de alocação - SUCESSO: NFe 000772850 alocada com 2.500L em REDE SUPER PETROLEO, Tanque 01

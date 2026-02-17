@@ -26,7 +26,7 @@ export default function AlocacoesSEFAZ() {
   const [dataFimInput, setDataFimInput] = useState(() => new Date().toISOString().split("T")[0]);
 
   // Parâmetros de busca estabilizados
-  const [searchParams, setSearchParams] = useState<{ dataInicio: string; dataFim: string } | null>(null);
+  const [searchParams, setSearchParams] = useState<{ dataInicio: string; dataFim: string; postoId?: string } | null>(null);
 
   // Formulário de alocação
   const [novaAlocacao, setNovaAlocacao] = useState({
@@ -56,7 +56,11 @@ export default function AlocacoesSEFAZ() {
 
   // ========== tRPC Query: NFes pendentes ==========
   const nfesQuery = trpc.alocacoesFisicas.listarNfesPendentes.useQuery(
-    searchParams ?? { dataInicio: dataInicioInput, dataFim: dataFimInput },
+    searchParams ?? { 
+      dataInicio: dataInicioInput, 
+      dataFim: dataFimInput,
+      postoId: filtroPostoId !== "todos" ? filtroPostoId : undefined
+    },
     { enabled: searchParams !== null }
   );
 
@@ -103,8 +107,12 @@ export default function AlocacoesSEFAZ() {
     return nfesFiltradas.find((n: any) => n.id === selectedNfeId) || null;
   }, [nfesFiltradas, selectedNfeId]);
 
-  const buscarNfes = () => {
-    setSearchParams({ dataInicio: dataInicioInput, dataFim: dataFimInput });
+  const handleBuscarNfes = () => {
+    setSearchParams({ 
+      dataInicio: dataInicioInput, 
+      dataFim: dataFimInput,
+      postoId: filtroPostoId !== "todos" ? filtroPostoId : undefined
+    });
   };
 
   const handleAlocar = async () => {
@@ -211,9 +219,9 @@ export default function AlocacoesSEFAZ() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="todos">Todos os postos</SelectItem>
-                          {postosReais.map((posto: any) => (
-                            <SelectItem key={posto.id} value={String(posto.id)}>
-                              {posto.nome}
+                          {postosReais.map((p: any) => (
+                            <SelectItem key={p.id} value={String(p.codigoAcs || p.id)}>
+                              {p.nome}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -241,7 +249,7 @@ export default function AlocacoesSEFAZ() {
                     </div>
                   </div>
 
-                  <Button onClick={buscarNfes} disabled={loading} className="w-full">
+                  <Button onClick={handleBuscarNfes} disabled={nfesQuery.isLoading} className="w-full">
                     {loading ? (
                       <>
                         <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
@@ -548,6 +556,9 @@ export default function AlocacoesSEFAZ() {
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-slate-500 mt-1">
+                  Selecione o tanque onde o combustível foi realmente descarregado
+                </p>
               </div>
 
               {/* Data de Descarga */}

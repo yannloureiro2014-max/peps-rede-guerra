@@ -251,8 +251,42 @@ export async function contarComprasNaoAlocadas(): Promise<number> {
 }
 
 /**
+ * Buscar itens da NFe com tipo de combustível específico
+ */
+async function buscarItensNfeComCombustivel(codEmpresa: string, codCompra: string): Promise<any[]> {
+  try {
+    const acsClient = await getAcsClient();
+    if (!acsClient) return [];
+
+    try {
+      const result = await acsClient.query(
+        `
+        SELECT 
+          i.cod_combustivel,
+          COALESCE(a.descricao, 'Combustível') as descricao_combustivel,
+          SUM(i.quantidade::numeric) as quantidade,
+          AVG(i.preco::numeric) as preco_medio
+        FROM itens_compra_comb i
+        LEFT JOIN codigos_anp a ON i.cod_combustivel = a.codigo
+        WHERE i.cod_empresa = $1 AND i.cod_compra = $2 AND i.cancelado = 'N'
+        GROUP BY i.cod_combustivel, a.descricao
+        ORDER BY SUM(i.quantidade::numeric) DESC
+        `,
+        [codEmpresa, codCompra]
+      );
+      return result.rows;
+    } finally {
+      await acsClient.end();
+    }
+  } catch (erro) {
+    console.error("[ACS-NFES] Erro ao buscar itens da NFe:", erro);
+    return [];
+  }
+}
+
+/**
  * Buscar NFes (para compatibilidade com interface anterior)
- * Enriquece dados com custoUnitario calculado e nome do posto
+ * Enriquece dados com custoUnitario calculado, nome do posto e tipo de combustível
  */
 export async function buscarNfesDoACS(filtros?: {
   dataInicio?: string;
@@ -283,22 +317,34 @@ export async function buscarNfesDoACS(filtros?: {
     "13": "HORIZONTE",
   };
 
-  return compras.map((c: any) => {
-    const codEmpTrimmed = (c.codEmpresa || "").trim();
-    const custoUnitario = c.totalLitros > 0 ? c.totalNota / c.totalLitros : 0;
-    return {
-      ...c,
-      quantidade: c.totalLitros,
-      custoUnitario,
-      custoTotal: c.totalNota,
-      postoDestino: MAPA_POSTOS[codEmpTrimmed] || `Empresa ${codEmpTrimmed}`,
-      produto: "Combustível",
-      statusAlocacao: "pendente",
-      quantidadePendente: c.totalLitros,
-      numeroNf: c.documento,
-      serieNf: c.serie,
-      dataEmissao: c.dataEmissao,
-      chaveNfe: `ACS-${codEmpTrimmed}-${c.codigo}`,
-    };
-  });
+  const nfesEnriquecidas = await Promise.all(
+    compras.map(async (c: any) => {
+      const codEmpTrimmed = (c.codEmpresa || "").trim();
+      const custoUnitario = c.totalLitros > 0 ? c.totalNota / c.totalLitros : 0;
+      
+      // Buscar itens da NFe para obter tipo de combustível
+      const itens = await buscarItensNfeComCombustivel(codEmpTrimmed, c.codigo);
+      const produtoDescricao = itens.length > 0 
+        ? itens[0].descricao_combustivel 
+        : "Combustível";
+
+      return {
+        ...c,
+        quantidade: c.totalLitros,
+        custoUnitario,
+        custoTotal: c.totalNota,
+        postoDestino: MAPA_POSTOS[codEmpTrimmed] || `Empresa ${codEmpTrimmed}`,
+        produto: produtoDescricao,
+        statusAlocacao: "pendente",
+        quantidadePendente: c.totalLitros,
+        numeroNf: c.documento,
+        serieNf: c.serie,
+        dataEmissao: c.dataEmissao,
+        chaveNfe: `ACS-${codEmpTrimmed}-${c.codigo}`,
+        itens: itens,
+      };
+    })
+  );
+
+  return nfesEnriquecidas;
 }
