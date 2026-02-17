@@ -178,6 +178,7 @@ export const alocacoesFisicasRouter = router({
     )
     .query(async ({ input }) => {
       try {
+        console.log("[ALOCACOES] Filtro recebido:", input);
         const alocacoes = await listarNfesAlocadas({
           postoId: input?.postoId,
           dataInicio: input?.dataInicio ? new Date(input.dataInicio) : undefined,
