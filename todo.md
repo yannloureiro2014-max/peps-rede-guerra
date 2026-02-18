@@ -520,3 +520,31 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
   - Cálculo FOB sem frete cadastrado
   - Tratamento de divisão por zero
   - Inclusão de despesas
+
+
+## Correções Críticas Alocações NFe - Reportado pelo Usuário
+
+### 1. Alocações fantasmas (dados indevidos)
+- [x] Investigar origem das 31 alocações que aparecem sem ter sido feitas - eram lotes com origem='manual' de testes anteriores
+- [x] Limpar todas as alocações existentes (base limpa para começar do zero) - DELETE FROM lotes WHERE origem='manual'
+- [x] Garantir que não haja cache ou dados fantasmas - verificado, 0 lotes manuais restantes
+
+### 2. Filtro de postos inativos e filtro por posto
+- [x] Remover postos inativos (ex: Guararapes VIP) dos resultados de NFes - query agora filtra por cod_empresa IN (postos ativos)
+- [x] Corrigir filtro por posto: ao selecionar um posto específico, mostrar apenas NFes daquele posto - mapeamento postoId->codEmpresa funcional (68 NFes para MÃE E FILHO)
+- [x] Quando selecionar "Todos os postos", mostrar NFes apenas de postos ATIVOS - 195 NFes de 6 postos ativos
+- [x] Renomear "REDE SUPER PETROLEO" para "MÃE E FILHO" (razão social) - banco atualizado + frontend
+
+### 3. Fluxo de sincronização e alocação
+- [x] Sincronizar TODAS as NFes faturadas para a rede (todos os CNPJs) - busca de todos os postos ativos via codEmpresaList
+- [x] Permitir alocação manual: nota faturada para matriz pode ir para posto específico - botão Alocar em cada NFe
+- [x] Fluxo: selecionar posto/rede -> período -> buscar NFes -> alocar cada nota - implementado e testado
+
+### 4. Informações obrigatórias na tela de alocação
+- [x] Número da nota fiscal - coluna NF
+- [x] Data de emissão - coluna DATA
+- [x] Volume (litros) - coluna VOLUME
+- [x] Fornecedor / emissor da NFe - coluna FORNECEDOR (razao_social da tabela fornecedores)
+- [x] Custo unitário do litro (produto) - coluna CUSTO PRODUTO/L
+- [x] Custo unitário frete (se FOB) - coluna FRETE com badge tipo (C/F/R/T)
+- [x] Custo unitário total (produto + frete) - coluna CUSTO TOTAL/L

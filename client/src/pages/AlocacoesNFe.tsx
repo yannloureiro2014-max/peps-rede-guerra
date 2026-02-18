@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, CheckCircle, Plus, Search, RefreshCw, Fuel } from "lucide-react";
+import { AlertCircle, Plus, Search, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
@@ -19,11 +19,7 @@ export default function AlocacoesNFe() {
 
   // Filtros
   const [filtroPostoId, setFiltroPostoId] = useState("todos");
-  const [dataInicioInput, setDataInicioInput] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return d.toISOString().split("T")[0];
-  });
+  const [dataInicioInput, setDataInicioInput] = useState("2025-12-01");
   const [dataFimInput, setDataFimInput] = useState(() => new Date().toISOString().split("T")[0]);
 
   // Parâmetros de busca estabilizados
@@ -43,7 +39,7 @@ export default function AlocacoesNFe() {
   const postosQuery = trpc.postos.list.useQuery();
   const tanquesQuery = trpc.tanques.list.useQuery();
 
-  // Postos reais do banco
+  // Postos reais do banco (apenas ativos)
   const postosReais = useMemo(() => {
     return postosQuery.data || [];
   }, [postosQuery.data]);
@@ -71,13 +67,29 @@ export default function AlocacoesNFe() {
     { enabled: true }
   );
 
-  // ========== Sincronizar NFes ==========
+  // NFes filtradas (já vem filtradas do backend agora)
+  const nfesFiltradas = useMemo(() => {
+    return nfesQuery.data?.dados || [];
+  }, [nfesQuery.data]);
+
+  // Encontrar NFe selecionada
+  const selectedNfe = useMemo(() => {
+    return nfesFiltradas.find((n: any) => n.id === selectedNfeId) || null;
+  }, [nfesFiltradas, selectedNfeId]);
+
+  const handleBuscarNfes = () => {
+    setSearchParams({ 
+      dataInicio: dataInicioInput, 
+      dataFim: dataFimInput,
+      postoId: filtroPostoId !== "todos" ? filtroPostoId : undefined
+    });
+  };
+
   const handleSincronizar = async () => {
     setSincronizando(true);
     try {
-      const resultado = await trpc.alocacoesFisicas.sincronizarNfes.useQuery().refetch();
+      await nfesQuery.refetch();
       alert("Sincronização concluída com sucesso!");
-      nfesQuery.refetch();
     } catch (error: any) {
       alert("Erro ao sincronizar: " + (error?.message || "Erro desconhecido"));
     } finally {
@@ -107,28 +119,6 @@ export default function AlocacoesNFe() {
     },
   });
 
-  // Filtrar NFes por posto selecionado
-  const nfesFiltradas = useMemo(() => {
-    const dados = nfesQuery.data?.dados || [];
-    if (filtroPostoId === "todos") return dados;
-    const postoSelecionado = postosReais.find((p: any) => String(p.id) === filtroPostoId);
-    if (!postoSelecionado) return dados;
-    return dados.filter((nfe: any) => nfe.postoDestino === postoSelecionado.nome);
-  }, [nfesQuery.data, filtroPostoId, postosReais]);
-
-  // Encontrar NFe selecionada
-  const selectedNfe = useMemo(() => {
-    return nfesFiltradas.find((n: any) => n.id === selectedNfeId) || null;
-  }, [nfesFiltradas, selectedNfeId]);
-
-  const handleBuscarNfes = () => {
-    setSearchParams({ 
-      dataInicio: dataInicioInput, 
-      dataFim: dataFimInput,
-      postoId: filtroPostoId !== "todos" ? filtroPostoId : undefined
-    });
-  };
-
   const handleConfirmarAlocacao = async () => {
     if (!selectedNfe || !novaAlocacao.postoDestino || !novaAlocacao.tanqueDestino || !novaAlocacao.volumeAlocado) {
       alert("Preencha todos os campos obrigatórios!");
@@ -156,22 +146,34 @@ export default function AlocacoesNFe() {
     });
   };
 
+  // Formatar data brasileira
+  const formatDate = (d: any) => {
+    if (!d) return '-';
+    const date = new Date(d);
+    return date.toLocaleDateString('pt-BR');
+  };
+
+  // Formatar moeda
+  const formatCurrency = (v: number, decimals = 2) => {
+    return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold">Alocações NFe</h1>
-          <p className="text-gray-600">Aloque NFes do ACS para postos e tanques específicos, mesmo quando comprado por CNPJ diferente</p>
+          <h1 className="text-3xl font-bold">Alocação NFe</h1>
+          <p className="text-gray-600">Sincronize NFes do ACS e aloque para postos e tanques específicos</p>
         </div>
 
         {/* Info Alert */}
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            As alocações utilizam a data de descarga real (não fiscal) para cálculo de PEPS.
-            <br />
-            <strong>6 postos ativos</strong> e <strong>17 tanques</strong> carregados do banco.
+            Mostrando apenas NFes de <strong>{postosReais.length} postos ativos</strong>.
+            Selecione o período e posto, depois clique em <strong>"Buscar NFes"</strong>.
+            O custo unitário total inclui produto + frete (quando FOB).
           </AlertDescription>
         </Alert>
 
@@ -179,7 +181,7 @@ export default function AlocacoesNFe() {
         <Card>
           <CardHeader>
             <CardTitle>Filtros de Busca</CardTitle>
-            <CardDescription>Selecione o período e o posto para buscar NFes não alocadas</CardDescription>
+            <CardDescription>Selecione o período e o posto para buscar NFes</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -190,7 +192,7 @@ export default function AlocacoesNFe() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="todos">Todos os postos</SelectItem>
+                    <SelectItem value="todos">Todos os postos ativos</SelectItem>
                     {postosReais.map((p: any) => (
                       <SelectItem key={p.id} value={String(p.id)}>
                         {p.nome}
@@ -220,7 +222,7 @@ export default function AlocacoesNFe() {
                 className="flex-1"
               >
                 <RefreshCw className={`w-4 h-4 mr-2 ${sincronizando ? 'animate-spin' : ''}`} />
-                {sincronizando ? 'Sincronizando...' : 'Sincronizar Agora'}
+                {sincronizando ? 'Sincronizando...' : 'Atualizar'}
               </Button>
             </div>
           </CardContent>
@@ -237,65 +239,125 @@ export default function AlocacoesNFe() {
           {/* NFes Pendentes */}
           <TabsContent value="pendentes" className="space-y-4">
             {nfesQuery.isLoading ? (
-              <Card><CardContent className="pt-6">Carregando...</CardContent></Card>
-            ) : nfesFiltradas.length === 0 ? (
+              <Card><CardContent className="pt-6 text-center">Buscando NFes do ACS...</CardContent></Card>
+            ) : nfesQuery.isError ? (
+              <Card><CardContent className="pt-6 text-center text-red-500">Erro ao buscar NFes: {(nfesQuery.error as any)?.message || 'Erro desconhecido'}</CardContent></Card>
+            ) : !searchParams ? (
               <Card><CardContent className="pt-6 text-center text-gray-500">Selecione os filtros e clique em "Buscar NFes" para começar</CardContent></Card>
+            ) : nfesFiltradas.length === 0 ? (
+              <Card><CardContent className="pt-6 text-center text-gray-500">Nenhuma NFe encontrada para o período e posto selecionados</CardContent></Card>
             ) : (
               <div className="space-y-3">
-                <p className="text-sm text-gray-600">{nfesFiltradas.length} NFe(s) encontrada(s)</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-600 font-semibold">{nfesFiltradas.length} NFe(s) encontrada(s)</p>
+                  <p className="text-xs text-gray-400">Origem: {nfesQuery.data?.origem || 'ACS'}</p>
+                </div>
+
+                {/* Cabeçalho da tabela */}
+                <div className="hidden lg:grid grid-cols-9 gap-2 px-4 py-2 bg-gray-100 rounded-lg text-xs font-semibold text-gray-600 uppercase">
+                  <div>NF</div>
+                  <div>Data</div>
+                  <div>Fornecedor</div>
+                  <div>Volume</div>
+                  <div>Custo Produto/L</div>
+                  <div>Frete</div>
+                  <div>Custo Total/L</div>
+                  <div>Posto Faturado</div>
+                  <div>Ação</div>
+                </div>
+
                 {nfesFiltradas.map((nfe: any) => (
-                  <Card key={nfe.id}>
-                    <CardContent className="pt-6">
-                      <div className="grid grid-cols-1 md:grid-cols-8 gap-4 items-center">
+                  <Card key={nfe.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="pt-4 pb-4">
+                      <div className="grid grid-cols-2 lg:grid-cols-9 gap-3 items-center">
+                        {/* NF */}
                         <div>
-                          <p className="text-sm text-gray-500">NF</p>
-                          <p className="font-semibold">{nfe.numeroNf}</p>
+                          <p className="text-xs text-gray-400 lg:hidden">NF</p>
+                          <p className="font-semibold text-sm">{nfe.numeroNf}</p>
+                          <p className="text-xs text-gray-400">Série {nfe.serieNf || '1'}</p>
                         </div>
+
+                        {/* Data */}
                         <div>
-                          <p className="text-sm text-gray-500">Data</p>
-                          <p className="font-semibold">{new Date(nfe.dataEmissao).toLocaleDateString()}</p>
+                          <p className="text-xs text-gray-400 lg:hidden">Data</p>
+                          <p className="text-sm">{formatDate(nfe.dataEmissao)}</p>
                         </div>
+
+                        {/* Fornecedor */}
                         <div>
-                          <p className="text-sm text-gray-500">Volume</p>
-                          <p className="font-semibold">{nfe.quantidade.toLocaleString()} L</p>
+                          <p className="text-xs text-gray-400 lg:hidden">Fornecedor</p>
+                          <p className="text-sm truncate" title={nfe.nomeFornecedor}>
+                            {nfe.nomeFornecedor || `Cód: ${nfe.codFornecedor}`}
+                          </p>
                         </div>
+
+                        {/* Volume */}
                         <div>
-                          <p className="text-sm text-gray-500">Custo Unit.</p>
-                          <p className="font-semibold">R$ {nfe.custoUnitario.toFixed(4)}</p>
+                          <p className="text-xs text-gray-400 lg:hidden">Volume</p>
+                          <p className="font-semibold text-sm">{nfe.quantidade?.toLocaleString('pt-BR')} L</p>
                         </div>
+
+                        {/* Custo Produto/L */}
                         <div>
-                          <p className="text-sm text-gray-500">Tipo Frete</p>
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                          <p className="text-xs text-gray-400 lg:hidden">Custo Produto/L</p>
+                          <p className="text-sm">{formatCurrency(nfe.custoUnitarioProduto || 0, 4)}</p>
+                        </div>
+
+                        {/* Frete */}
+                        <div>
+                          <p className="text-xs text-gray-400 lg:hidden">Frete</p>
+                          <div className="flex flex-col">
+                            <span className={`inline-block w-fit px-2 py-0.5 rounded text-xs font-semibold ${
                               nfe.tipoFrete === 'FOB' 
                                 ? 'bg-blue-100 text-blue-800' 
                                 : 'bg-green-100 text-green-800'
                             }`}>
                               {nfe.tipoFrete || 'CIF'}
                             </span>
-                            {nfe.tipoFrete === 'FOB' && !nfe.frete && (
-                              <span className="text-xs text-red-600 font-semibold">⚠ Sem frete</span>
+                            {nfe.tipoFrete === 'FOB' && nfe.custoUnitarioFrete > 0 && (
+                              <span className="text-xs text-blue-700 mt-0.5">
+                                +{formatCurrency(nfe.custoUnitarioFrete, 4)}/L
+                              </span>
+                            )}
+                            {nfe.tipoFrete === 'FOB' && (!nfe.frete || nfe.frete === 0) && (
+                              <span className="text-xs text-red-600 font-semibold mt-0.5">
+                                ⚠ Sem frete
+                              </span>
                             )}
                           </div>
                         </div>
+
+                        {/* Custo Total/L */}
                         <div>
-                          <p className="text-sm text-gray-500">Valor Frete</p>
-                          <p className="font-semibold">{nfe.frete ? `R$ ${nfe.frete.toFixed(2)}` : '-'}</p>
+                          <p className="text-xs text-gray-400 lg:hidden">Custo Total/L</p>
+                          <p className="font-bold text-sm text-emerald-700">
+                            {formatCurrency(nfe.custoUnitario || 0, 4)}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Total: {formatCurrency(nfe.custoTotal || 0)}
+                          </p>
                         </div>
+
+                        {/* Posto Faturado */}
                         <div>
-                          <p className="text-sm text-gray-500">Posto</p>
-                          <p className="font-semibold">{nfe.postoDestino}</p>
+                          <p className="text-xs text-gray-400 lg:hidden">Posto</p>
+                          <p className="text-sm truncate" title={nfe.postoDestino}>{nfe.postoDestino}</p>
                         </div>
-                        <Button 
-                          onClick={() => {
-                            setSelectedNfeId(nfe.id);
-                            setOpenDialog(true);
-                          }}
-                          size="sm"
-                        >
-                          <Plus className="w-4 h-4 mr-1" />
-                          Alocar
-                        </Button>
+
+                        {/* Ação */}
+                        <div>
+                          <Button 
+                            onClick={() => {
+                              setSelectedNfeId(nfe.id);
+                              setOpenDialog(true);
+                            }}
+                            size="sm"
+                            className="w-full"
+                          >
+                            <Plus className="w-4 h-4 mr-1" />
+                            Alocar
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -309,32 +371,40 @@ export default function AlocacoesNFe() {
             {alocacoesQuery.isLoading ? (
               <Card><CardContent className="pt-6">Carregando...</CardContent></Card>
             ) : alocacoesQuery.data?.total === 0 ? (
-              <Card><CardContent className="pt-6 text-center text-gray-500">Nenhuma alocação encontrada</CardContent></Card>
+              <Card><CardContent className="pt-6 text-center text-gray-500">Nenhuma alocação encontrada. Comece alocando NFes na aba "NFes Pendentes".</CardContent></Card>
             ) : (
               <div className="space-y-3">
-                <p className="text-sm text-gray-600">{alocacoesQuery.data?.total || 0} alocação(ões) encontrada(s)</p>
+                <p className="text-sm text-gray-600 font-semibold">{alocacoesQuery.data?.total || 0} alocação(ões) encontrada(s)</p>
                 {(alocacoesQuery.data?.dados || []).map((alocacao: any) => (
                   <Card key={alocacao.id}>
-                    <CardContent className="pt-6">
-                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+                    <CardContent className="pt-4 pb-4">
+                      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 items-center">
                         <div>
-                          <p className="text-sm text-gray-500">NF</p>
+                          <p className="text-xs text-gray-400">NF</p>
                           <p className="font-semibold">{alocacao.numeroNf}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500">Volume</p>
-                          <p className="font-semibold">{alocacao.volume?.toLocaleString()} L</p>
+                          <p className="text-xs text-gray-400">Data Entrada</p>
+                          <p className="text-sm">{formatDate(alocacao.dataEntrada)}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500">Posto</p>
-                          <p className="font-semibold">{alocacao.postoDestino}</p>
+                          <p className="text-xs text-gray-400">Volume</p>
+                          <p className="font-semibold">{alocacao.volumeAlocado?.toLocaleString('pt-BR')} L</p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500">Data Descarga</p>
-                          <p className="font-semibold">{alocacao.dataDescarga ? new Date(alocacao.dataDescarga).toLocaleDateString() : '-'}</p>
+                          <p className="text-xs text-gray-400">Custo Unit.</p>
+                          <p className="text-sm">{formatCurrency(alocacao.custoUnitario || 0, 4)}</p>
                         </div>
                         <div>
-                          <span className="bg-green-100 text-green-800 text-xs font-semibold px-3 py-1 rounded">Alocada</span>
+                          <p className="text-xs text-gray-400">Custo Total</p>
+                          <p className="font-semibold">{formatCurrency(alocacao.custoTotal || 0)}</p>
+                        </div>
+                        <div>
+                          <span className={`text-xs font-semibold px-3 py-1 rounded ${
+                            alocacao.status === 'ativo' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {alocacao.status === 'ativo' ? 'Ativa' : alocacao.status}
+                          </span>
                         </div>
                       </div>
                     </CardContent>
@@ -349,33 +419,33 @@ export default function AlocacoesNFe() {
             {alocacoesQuery.isLoading ? (
               <Card><CardContent className="pt-6">Carregando...</CardContent></Card>
             ) : alocacoesQuery.data?.total === 0 ? (
-              <Card><CardContent className="pt-6 text-center text-gray-500">Nenhuma alocação realizada</CardContent></Card>
+              <Card><CardContent className="pt-6 text-center text-gray-500">Nenhuma alocação realizada ainda</CardContent></Card>
             ) : (
               <div className="space-y-3">
-                <p className="text-sm text-gray-600">{alocacoesQuery.data?.total || 0} alocação(ões) realizada(s)</p>
+                <p className="text-sm text-gray-600 font-semibold">{alocacoesQuery.data?.total || 0} alocação(ões) realizada(s)</p>
                 {(alocacoesQuery.data?.dados || []).map((alocacao: any) => (
                   <Card key={alocacao.id}>
-                    <CardContent className="pt-6">
-                      <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
+                    <CardContent className="pt-4 pb-4">
+                      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 items-center">
                         <div>
-                          <p className="text-sm text-gray-500">NF</p>
+                          <p className="text-xs text-gray-400">NF</p>
                           <p className="font-semibold">{alocacao.numeroNf}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500">Volume</p>
-                          <p className="font-semibold">{alocacao.volume?.toLocaleString()} L</p>
+                          <p className="text-xs text-gray-400">Volume</p>
+                          <p className="font-semibold">{alocacao.volumeAlocado?.toLocaleString('pt-BR')} L</p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500">Tanque</p>
-                          <p className="font-semibold">{alocacao.tanqueDestino || '-'}</p>
+                          <p className="text-xs text-gray-400">Tanque</p>
+                          <p className="text-sm">{alocacao.tanqueId || '-'}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500">Data Descarga</p>
-                          <p className="font-semibold">{alocacao.dataDescarga ? new Date(alocacao.dataDescarga).toLocaleDateString() : '-'}</p>
+                          <p className="text-xs text-gray-400">Data Entrada</p>
+                          <p className="text-sm">{formatDate(alocacao.dataEntrada)}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500">Custo Total</p>
-                          <p className="font-semibold">R$ {alocacao.custoTotal?.toLocaleString('pt-BR', {minimumFractionDigits: 2}) || '-'}</p>
+                          <p className="text-xs text-gray-400">Custo Total</p>
+                          <p className="font-semibold">{formatCurrency(alocacao.custoTotal || 0)}</p>
                         </div>
                         <div>
                           <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-3 py-1 rounded">Realizada</span>
@@ -395,30 +465,62 @@ export default function AlocacoesNFe() {
             <DialogHeader>
               <DialogTitle>Alocar NFe</DialogTitle>
               <DialogDescription>
-                Preencha os dados para alocar a NFe a um tanque específico
+                Defina o posto e tanque de destino real para esta NFe
               </DialogDescription>
             </DialogHeader>
 
             {selectedNfe && (
               <div className="space-y-6">
                 {/* Info NFe */}
-                <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                  <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                  <h4 className="font-semibold text-sm text-gray-700 uppercase">Dados da NFe</h4>
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <p className="text-sm text-gray-500">NF</p>
-                      <p className="font-semibold">{selectedNfe.numeroNf} - {selectedNfe.quantidade.toLocaleString()} L</p>
+                      <p className="text-xs text-gray-400">Número NF</p>
+                      <p className="font-semibold">{selectedNfe.numeroNf} (Série {selectedNfe.serieNf || '1'})</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Produto</p>
-                      <p className="font-semibold">{selectedNfe.produtoDescricao || 'Combustível'}</p>
+                      <p className="text-xs text-gray-400">Data Emissão</p>
+                      <p className="font-semibold">{formatDate(selectedNfe.dataEmissao)}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Custo Unit.</p>
-                      <p className="font-semibold">R$ {selectedNfe.custoUnitario.toFixed(4)}</p>
+                      <p className="text-xs text-gray-400">Fornecedor</p>
+                      <p className="font-semibold">{selectedNfe.nomeFornecedor || `Cód: ${selectedNfe.codFornecedor}`}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Posto NF</p>
+                      <p className="text-xs text-gray-400">Produto</p>
+                      <p className="font-semibold">{selectedNfe.produto || 'Combustível'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Volume Total</p>
+                      <p className="font-semibold">{selectedNfe.quantidade?.toLocaleString('pt-BR')} L</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Posto Faturado</p>
                       <p className="font-semibold">{selectedNfe.postoDestino}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Custos detalhados */}
+                  <div className="border-t pt-3 mt-3">
+                    <h4 className="font-semibold text-sm text-gray-700 uppercase mb-2">Custos</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <p className="text-xs text-gray-400">Custo Produto/L</p>
+                        <p className="font-semibold">{formatCurrency(selectedNfe.custoUnitarioProduto || 0, 4)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400">Frete ({selectedNfe.tipoFrete || 'CIF'})</p>
+                        <p className="font-semibold">
+                          {selectedNfe.tipoFrete === 'FOB' && selectedNfe.custoUnitarioFrete > 0
+                            ? `+${formatCurrency(selectedNfe.custoUnitarioFrete, 4)}/L`
+                            : selectedNfe.tipoFrete === 'CIF' ? 'Incluso' : 'Sem frete'}
+                        </p>
+                      </div>
+                      <div className="bg-emerald-50 p-2 rounded">
+                        <p className="text-xs text-emerald-600 font-semibold">Custo Total/L</p>
+                        <p className="font-bold text-emerald-700 text-lg">{formatCurrency(selectedNfe.custoUnitario || 0, 4)}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -434,7 +536,7 @@ export default function AlocacoesNFe() {
                       max={selectedNfe.quantidade}
                       placeholder="0"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Máximo: {selectedNfe.quantidade.toLocaleString()} L</p>
+                    <p className="text-xs text-gray-500 mt-1">Máximo: {selectedNfe.quantidade?.toLocaleString('pt-BR')} L</p>
                   </div>
 
                   <div>
@@ -443,7 +545,7 @@ export default function AlocacoesNFe() {
                       setNovaAlocacao({...novaAlocacao, postoDestino: value, tanqueDestino: ""});
                     }}>
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Selecione o posto" />
                       </SelectTrigger>
                       <SelectContent>
                         {postosReais.map((p: any) => (
@@ -459,7 +561,7 @@ export default function AlocacoesNFe() {
                     <Label>Tanque de Destino</Label>
                     <Select value={novaAlocacao.tanqueDestino} onValueChange={(value) => setNovaAlocacao({...novaAlocacao, tanqueDestino: value})} disabled={!novaAlocacao.postoDestino}>
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder={novaAlocacao.postoDestino ? "Selecione o tanque" : "Selecione o posto primeiro"} />
                       </SelectTrigger>
                       <SelectContent>
                         {tanquesDoPosto.map((t: any) => (

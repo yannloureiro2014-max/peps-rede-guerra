@@ -248,7 +248,7 @@ export default function Home() {
                       <SelectValue placeholder="Todos os Postos" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">REDE SUPER PETROLEO</SelectItem>
+                      <SelectItem value="all">REDE GUERRA DE POSTOS</SelectItem>
                       {postosLista?.filter(p => p.ativo).map(p => (
                         <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>
                       ))}
@@ -368,7 +368,7 @@ export default function Home() {
                 {loadingStats ? '...' : stats?.totalPostos || 0}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Rede Super Petroleo
+                Rede Guerra de Postos
               </p>
             </CardContent>
           </Card>

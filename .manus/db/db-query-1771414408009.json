@@ -1,0 +1,46 @@
+{
+  "query": "UPDATE postos SET nome = 'MÃE E FILHO' WHERE nome LIKE '%REDE SUPER%'; SELECT id, nome, codigoAcs, ativo FROM postos WHERE ativo = 1 ORDER BY codigoAcs;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute UPDATE postos SET nome = 'MÃE E FILHO' WHERE nome LIKE '%REDE SUPER%'; SELECT id, nome, codigoAcs, ativo FROM postos WHERE ativo = 1 ORDER BY codigoAcs;",
+  "rows": [
+    {
+      "id": "2",
+      "nome": "POSTO GUERRA FORTIM",
+      "codigoAcs": "01",
+      "ativo": "1"
+    },
+    {
+      "id": "4",
+      "nome": "POSTO GUERRA PALHANO",
+      "codigoAcs": "03",
+      "ativo": "1"
+    },
+    {
+      "id": "5",
+      "nome": "POSTO PAI TEREZA",
+      "codigoAcs": "04",
+      "ativo": "1"
+    },
+    {
+      "id": "1",
+      "nome": "MÃE E FILHO",
+      "codigoAcs": "06",
+      "ativo": "1"
+    },
+    {
+      "id": "8",
+      "nome": "POSTO JAGUARUANA",
+      "codigoAcs": "08",
+      "ativo": "1"
+    },
+    {
+      "id": "9",
+      "nome": "POSTO ITAIÇABA",
+      "codigoAcs": "09",
+      "ativo": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tnome\tcodigoAcs\tativo\n2\tPOSTO GUERRA FORTIM\t01\t1\n4\tPOSTO GUERRA PALHANO\t03\t1\n5\tPOSTO PAI TEREZA\t04\t1\n1\tMÃE E FILHO\t06\t1\n8\tPOSTO JAGUARUANA\t08\t1\n9\tPOSTO ITAIÇABA\t09\t1\n",
+  "stderr": "",
+  "execution_time_ms": 415
+}

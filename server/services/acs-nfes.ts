@@ -1,10 +1,20 @@
 /**
  * Serviço para buscar Compras reais do banco ACS
  * Conecta ao PostgreSQL externo e retorna compras da tabela compras_comb
+ * 
+ * CORREÇÕES:
+ * - Filtra apenas postos ATIVOS (busca do banco PEPS)
+ * - Mapeamento dinâmico de postos via codigoAcs do banco PEPS
+ * - Converte postoId (ID PEPS) para codEmpresa (código ACS) corretamente
+ * - Busca nome do fornecedor do ACS
+ * - Calcula custo unitário produto, custo frete unitário e custo total unitário
  */
 
 import pg from "pg";
 import { executeWithRetry } from "../utils/retry";
+import { getDb } from "../db";
+import { postos } from "../../drizzle/schema";
+import { eq } from "drizzle-orm";
 
 const ACS_CONFIG = {
   host: "177.87.120.172",
@@ -23,14 +33,15 @@ interface Compra {
   dataEmissao: Date;
   dataLmc: Date;
   codFornecedor: string;
+  nomeFornecedor: string;
   totalNota: number;
   totalProdutos: number;
   totalItens: number;
   totalLitros: number;
   quantidadePendente: number;
-  tipoFrete?: string; // FOB ou CIF
-  frete?: number;
-  despesas?: number;
+  tipoFrete: string;
+  frete: number;
+  despesas: number;
 }
 
 async function getAcsClient(): Promise<pg.Client | null> {
@@ -51,15 +62,53 @@ async function getAcsClient(): Promise<pg.Client | null> {
 }
 
 /**
+ * Buscar mapeamento de postos ativos do banco PEPS
+ * Retorna: { codigoAcs -> { id, nome, codigoAcs } }
+ */
+async function getPostosAtivosMap(): Promise<Map<string, { id: number; nome: string; codigoAcs: string }>> {
+  const db = await getDb();
+  if (!db) return new Map();
+  
+  const postosAtivos = await db.select().from(postos).where(eq(postos.ativo, 1));
+  const mapa = new Map<string, { id: number; nome: string; codigoAcs: string }>();
+  
+  for (const p of postosAtivos) {
+    const codTrimmed = (p.codigoAcs || "").trim();
+    mapa.set(codTrimmed, { id: p.id, nome: p.nome, codigoAcs: codTrimmed });
+  }
+  
+  console.log(`[ACS-COMPRAS] ${mapa.size} postos ativos mapeados: ${Array.from(mapa.entries()).map(([k, v]) => `${k}=${v.nome}`).join(', ')}`);
+  return mapa;
+}
+
+/**
+ * Converter postoId (ID do banco PEPS) para codEmpresa (código ACS)
+ */
+async function postoIdToCodEmpresa(postoId: string): Promise<string | null> {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const id = parseInt(postoId);
+  if (isNaN(id)) return null;
+  
+  const result = await db.select().from(postos).where(eq(postos.id, id)).limit(1);
+  if (result.length === 0) return null;
+  
+  return (result[0].codigoAcs || "").trim();
+}
+
+/**
  * Buscar compras do ACS do período especificado
+ * Agora filtra apenas postos ATIVOS e converte postoId corretamente
  */
 export async function buscarComprasDoACS(filtros?: {
   dataInicio?: string;
   dataFim?: string;
   codEmpresa?: string;
+  codEmpresaList?: string[]; // Lista de cod_empresa para filtrar (postos ativos)
 }): Promise<Compra[]> {
   try {
-    console.log("[ACS-COMPRAS] Buscando compras do ACS...");
+    console.log("[ACS-COMPRAS] Buscando compras do ACS...", filtros);
 
     const compras = await executeWithRetry(
       async () => {
@@ -69,7 +118,13 @@ export async function buscarComprasDoACS(filtros?: {
         }
 
         try {
-          // Query para buscar compras com itens
+          const params: any[] = [];
+          let paramIdx = 1;
+
+          // Datas padrão
+          const dataInicio = filtros?.dataInicio || '2025-12-01';
+          const dataFim = filtros?.dataFim || new Date().toISOString().split('T')[0];
+
           let query = `
             SELECT 
               c.cod_empresa,
@@ -79,6 +134,7 @@ export async function buscarComprasDoACS(filtros?: {
               c.dt_emissao,
               c.dt_lmc,
               c.cod_fornecedor,
+              COALESCE(f.razao_social, 'Fornecedor ' || c.cod_fornecedor) as nome_fornecedor,
               c.total_nota,
               c.total_produtos,
               c.tipo_frete,
@@ -88,32 +144,35 @@ export async function buscarComprasDoACS(filtros?: {
               SUM(i.quantidade::numeric) as total_litros
             FROM compras_comb c
             LEFT JOIN itens_compra_comb i ON c.codigo = i.cod_compra AND c.cod_empresa = i.cod_empresa
-            WHERE c.dt_emissao >= '2025-12-16'::date
-              AND c.dt_emissao <= '2026-02-16'::date
+            LEFT JOIN fornecedores f ON c.cod_fornecedor = f.codigo
+            WHERE c.dt_emissao >= $${paramIdx}::date
           `;
+          params.push(dataInicio);
+          paramIdx++;
 
-          const params: any[] = [];
+          query += ` AND c.dt_emissao <= $${paramIdx}::date`;
+          params.push(dataFim);
+          paramIdx++;
 
-          if (filtros?.dataInicio) {
-            query = query.replace("'2025-12-16'::date", `$${params.length + 1}::date`);
-            params.push(filtros.dataInicio);
-          }
-
-          if (filtros?.dataFim) {
-            query = query.replace("'2026-02-16'::date", `$${params.length + 1}::date`);
-            params.push(filtros.dataFim);
-          }
-
+          // Filtro por cod_empresa específico
           if (filtros?.codEmpresa) {
-            query += ` AND c.cod_empresa = $${params.length + 1}`;
+            query += ` AND c.cod_empresa = $${paramIdx}`;
             params.push(filtros.codEmpresa);
+            paramIdx++;
+          }
+          // Filtro por lista de cod_empresa (postos ativos)
+          else if (filtros?.codEmpresaList && filtros.codEmpresaList.length > 0) {
+            const placeholders = filtros.codEmpresaList.map((_, i) => `$${paramIdx + i}`).join(', ');
+            query += ` AND c.cod_empresa IN (${placeholders})`;
+            params.push(...filtros.codEmpresaList);
+            paramIdx += filtros.codEmpresaList.length;
           }
 
-          query += ` GROUP BY c.cod_empresa, c.codigo, c.documento, c.serie, c.dt_emissao, c.dt_lmc, c.cod_fornecedor, c.total_nota, c.total_produtos, c.tipo_frete, c.frete, c.despesas
+          query += ` GROUP BY c.cod_empresa, c.codigo, c.documento, c.serie, c.dt_emissao, c.dt_lmc, c.cod_fornecedor, f.razao_social, c.total_nota, c.total_produtos, c.tipo_frete, c.frete, c.despesas
             ORDER BY c.dt_emissao DESC
             LIMIT 500`;
 
-          console.log("[ACS-COMPRAS] Executando query para buscar compras");
+          console.log(`[ACS-COMPRAS] Executando query com ${params.length} params`);
           const result = await acsClient.query(query, params);
 
           // Transformar resultados
@@ -126,6 +185,7 @@ export async function buscarComprasDoACS(filtros?: {
             dataEmissao: new Date(row.dt_emissao),
             dataLmc: new Date(row.dt_lmc),
             codFornecedor: row.cod_fornecedor,
+            nomeFornecedor: row.nome_fornecedor || `Fornecedor ${row.cod_fornecedor}`,
             totalNota: Number(row.total_nota) || 0,
             totalProdutos: Number(row.total_produtos) || 0,
             totalItens: Number(row.total_itens) || 0,
@@ -182,14 +242,19 @@ export async function buscarCompraPorCodigo(
               c.dt_emissao,
               c.dt_lmc,
               c.cod_fornecedor,
+              COALESCE(f.razao_social, 'Fornecedor ' || c.cod_fornecedor) as nome_fornecedor,
               c.total_nota,
               c.total_produtos,
+              c.tipo_frete,
+              c.frete,
+              c.despesas,
               COUNT(i.numero) as total_itens,
               SUM(i.quantidade::numeric) as total_litros
             FROM compras_comb c
             LEFT JOIN itens_compra_comb i ON c.codigo = i.cod_compra AND c.cod_empresa = i.cod_empresa
+            LEFT JOIN fornecedores f ON c.cod_fornecedor = f.codigo
             WHERE c.cod_empresa = $1 AND c.codigo = $2
-            GROUP BY c.cod_empresa, c.codigo, c.documento, c.serie, c.dt_emissao, c.dt_lmc, c.cod_fornecedor, c.total_nota, c.total_produtos
+            GROUP BY c.cod_empresa, c.codigo, c.documento, c.serie, c.dt_emissao, c.dt_lmc, c.cod_fornecedor, f.razao_social, c.total_nota, c.total_produtos, c.tipo_frete, c.frete, c.despesas
             LIMIT 1
             `,
             [codEmpresa, codigo]
@@ -209,11 +274,15 @@ export async function buscarCompraPorCodigo(
             dataEmissao: new Date(row.dt_emissao),
             dataLmc: new Date(row.dt_lmc),
             codFornecedor: row.cod_fornecedor,
+            nomeFornecedor: row.nome_fornecedor || `Fornecedor ${row.cod_fornecedor}`,
             totalNota: Number(row.total_nota) || 0,
             totalProdutos: Number(row.total_produtos) || 0,
             totalItens: Number(row.total_itens) || 0,
             totalLitros: Number(row.total_litros) || 0,
             quantidadePendente: Number(row.total_litros) || 0,
+            tipoFrete: row.tipo_frete || 'CIF',
+            frete: Number(row.frete) || 0,
+            despesas: Number(row.despesas) || 0,
           };
         } finally {
           await acsClient.end();
@@ -244,8 +313,8 @@ export async function contarComprasNaoAlocadas(): Promise<number> {
         `
         SELECT COUNT(DISTINCT c.codigo) as total
         FROM compras_comb c
-        WHERE c.dt_emissao >= '2025-12-16'::date
-          AND c.dt_emissao <= '2026-02-16'::date
+        WHERE c.dt_emissao >= '2025-12-01'::date
+          AND c.dt_emissao <= CURRENT_DATE
         `
       );
 
@@ -294,48 +363,70 @@ async function buscarItensNfeComCombustivel(codEmpresa: string, codCompra: strin
 }
 
 /**
- * Buscar NFes (para compatibilidade com interface anterior)
- * Enriquece dados com custoUnitario calculado, nome do posto e tipo de combustível
+ * Buscar NFes enriquecidas do ACS
+ * 
+ * FLUXO CORRIGIDO:
+ * 1. Busca postos ATIVOS do banco PEPS (com codigoAcs)
+ * 2. Se postoId informado, converte para codEmpresa do ACS
+ * 3. Se "todos", filtra apenas cod_empresa de postos ATIVOS
+ * 4. Enriquece com: nome do posto, fornecedor, custos unitários separados
  */
 export async function buscarNfesDoACS(filtros?: {
   dataInicio?: string;
   dataFim?: string;
-  postoId?: string;
+  postoId?: string; // ID do banco PEPS (não codEmpresa!)
   status?: string;
 }): Promise<any[]> {
+  // 1. Buscar mapa de postos ativos
+  const postosAtivosMap = await getPostosAtivosMap();
+  const codEmpresasAtivos = Array.from(postosAtivosMap.keys());
+  
+  console.log(`[ACS-NFES] Postos ativos: ${codEmpresasAtivos.join(', ')}`);
+  
+  // 2. Determinar filtro de codEmpresa
+  let codEmpresaFiltro: string | undefined;
+  let codEmpresaListFiltro: string[] | undefined;
+  
+  if (filtros?.postoId && filtros.postoId !== "todos") {
+    // Converter postoId (ID PEPS) para codEmpresa (código ACS)
+    const codEmpresa = await postoIdToCodEmpresa(filtros.postoId);
+    if (codEmpresa) {
+      codEmpresaFiltro = codEmpresa;
+      console.log(`[ACS-NFES] Filtro por posto ID ${filtros.postoId} -> codEmpresa ${codEmpresa}`);
+    } else {
+      console.warn(`[ACS-NFES] Posto ID ${filtros.postoId} não encontrado no banco PEPS`);
+      return [];
+    }
+  } else {
+    // "Todos os postos" -> filtrar apenas postos ATIVOS
+    codEmpresaListFiltro = codEmpresasAtivos;
+    console.log(`[ACS-NFES] Filtro por todos os postos ativos: ${codEmpresasAtivos.join(', ')}`);
+  }
+  
+  // 3. Buscar compras do ACS
   const compras = await buscarComprasDoACS({
     dataInicio: filtros?.dataInicio,
     dataFim: filtros?.dataFim,
-    codEmpresa: filtros?.postoId,
+    codEmpresa: codEmpresaFiltro,
+    codEmpresaList: codEmpresaListFiltro,
   });
 
-  // Mapeamento de cod_empresa para nomes de postos (baseado em codigoAcs do banco PEPS)
-  const MAPA_POSTOS: Record<string, string> = {
-    "01": "POSTO GUERRA FORTIM",
-    "02": "POSTO POTIRETAMA",
-    "03": "POSTO GUERRA PALHANO",
-    "04": "POSTO PAI TEREZA",
-    "05": "POSTO LEITE",
-    "06": "REDE SUPER PETROLEO",
-    "07": "POSTO GUERRA SAO JOAO DO JAGUARIBE",
-    "08": "POSTO JAGUARUANA",
-    "09": "POSTO ITAIÇABA",
-    "10": "SG PETROLEO",
-    "11": "POSTO GUARARAPES VIP",
-    "12": "POSTO ARACATI",
-    "13": "POSTO HORIZONTE",
-  };
-
+  // 4. Enriquecer dados
   const nfesEnriquecidas = await Promise.all(
     compras.map(async (c: any) => {
       const codEmpTrimmed = (c.codEmpresa || "").trim();
       
-      // Calcular custo unitario: produto + frete (se FOB)
-      let custoTotal = c.totalNota;
-      if (c.tipoFrete === 'FOB' && c.frete) {
-        custoTotal += c.frete;
-      }
-      const custoUnitario = c.totalLitros > 0 ? custoTotal / c.totalLitros : 0;
+      // Nome do posto: buscar do mapa de postos ativos (dinâmico, não hardcoded)
+      const postoInfo = postosAtivosMap.get(codEmpTrimmed);
+      const postoNome = postoInfo?.nome || `Empresa ${codEmpTrimmed}`;
+      
+      // Calcular custos unitários separados
+      const custoUnitarioProduto = c.totalLitros > 0 ? c.totalNota / c.totalLitros : 0;
+      const custoUnitarioFrete = (c.tipoFrete === 'FOB' && c.frete && c.totalLitros > 0) 
+        ? c.frete / c.totalLitros 
+        : 0;
+      const custoUnitarioTotal = custoUnitarioProduto + custoUnitarioFrete;
+      const custoTotal = c.totalNota + (c.tipoFrete === 'FOB' ? (c.frete || 0) : 0);
       
       // Buscar itens da NFe para obter tipo de combustível
       const itens = await buscarItensNfeComCombustivel(codEmpTrimmed, c.codigo);
@@ -346,10 +437,14 @@ export async function buscarNfesDoACS(filtros?: {
       return {
         ...c,
         quantidade: c.totalLitros,
-        custoUnitario,
-        custoTotal: custoTotal,
-        postoDestino: MAPA_POSTOS[codEmpTrimmed] || `Empresa ${codEmpTrimmed}`,
+        custoUnitarioProduto,
+        custoUnitarioFrete,
+        custoUnitario: custoUnitarioTotal, // Custo total por litro (produto + frete se FOB)
+        custoTotal,
+        postoDestino: postoNome,
+        postoDestinoId: postoInfo?.id || null,
         produto: produtoDescricao,
+        nomeFornecedor: c.nomeFornecedor || `Fornecedor ${c.codFornecedor}`,
         statusAlocacao: "pendente",
         quantidadePendente: c.totalLitros,
         numeroNf: c.documento,
