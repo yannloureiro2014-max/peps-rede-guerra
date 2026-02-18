@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, Plus, Search, RefreshCw } from "lucide-react";
+import { AlertCircle, Plus, Search, RefreshCw, Undo2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
@@ -25,6 +25,12 @@ export default function AlocacoesNFe() {
 
   // Parâmetros de busca estabilizados
   const [searchParams, setSearchParams] = useState<{ dataInicio: string; dataFim: string; postoId?: string } | null>(null);
+
+  // Dialog de confirmação para desfazer
+  const [desfazerDialog, setDesfazerDialog] = useState(false);
+  const [desfazerLoteId, setDesfazerLoteId] = useState<number | null>(null);
+  const [desfazerNf, setDesfazerNf] = useState("");
+  const [desfazerJustificativa, setDesfazerJustificativa] = useState("");
 
   // Formulário de alocação
   const [novaAlocacao, setNovaAlocacao] = useState({
@@ -131,6 +137,42 @@ export default function AlocacoesNFe() {
       alert("Erro ao criar alocação: " + (error?.message || "Erro desconhecido"));
     },
   });
+
+  // ========== tRPC Mutation: Desfazer alocação ==========
+  const desfazerAlocacaoMutation = trpc.alocacoesFisicas.desfazerAlocacao.useMutation({
+    onSuccess: (result: any) => {
+      if (result.sucesso) {
+        alert(result.dados.mensagem);
+      } else {
+        alert("Erro: " + result.erro);
+      }
+      setDesfazerDialog(false);
+      setDesfazerLoteId(null);
+      setDesfazerNf("");
+      setDesfazerJustificativa("");
+      alocacoesQuery.refetch();
+      // Refetch pendentes também para que a NFe apareça novamente
+      if (searchParams) nfesQuery.refetch();
+    },
+    onError: (error: any) => {
+      alert("Erro ao desfazer alocação: " + (error?.message || "Erro desconhecido"));
+    },
+  });
+
+  const handleDesfazerAlocacao = (loteId: number, numeroNf: string) => {
+    setDesfazerLoteId(loteId);
+    setDesfazerNf(numeroNf);
+    setDesfazerJustificativa("");
+    setDesfazerDialog(true);
+  };
+
+  const confirmarDesfazerAlocacao = async () => {
+    if (!desfazerLoteId) return;
+    await desfazerAlocacaoMutation.mutateAsync({
+      loteId: desfazerLoteId,
+      justificativa: desfazerJustificativa || undefined,
+    });
+  };
 
   const handleConfirmarAlocacao = async () => {
     if (!selectedNfe || !novaAlocacao.postoDestino || !novaAlocacao.tanqueDestino || !novaAlocacao.volumeAlocado) {
@@ -445,7 +487,7 @@ export default function AlocacoesNFe() {
                   <div>Custo Total/L</div>
                   <div>Posto Destino</div>
                   <div>Tanque</div>
-                  <div>Status</div>
+                  <div>Status / Ação</div>
                 </div>
 
                 {(alocacoesQuery.data?.dados || []).map((a: any) => (
@@ -547,13 +589,24 @@ export default function AlocacoesNFe() {
                           <p className="text-xs truncate" title={a.nomeTanque}>{a.nomeTanque}</p>
                         </div>
 
-                        {/* Status */}
-                        <div>
+                        {/* Status + Ação */}
+                        <div className="flex flex-col gap-1 items-start">
                           <span className={`text-xs font-semibold px-3 py-1 rounded ${
                             a.status === 'ativo' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
                           }`}>
                             {a.status === 'ativo' ? 'Ativa' : a.status}
                           </span>
+                          {a.status === 'ativo' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700 text-xs h-7 px-2"
+                              onClick={() => handleDesfazerAlocacao(a.id, a.numeroNf)}
+                            >
+                              <Undo2 className="w-3 h-3 mr-1" />
+                              Desfazer
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </CardContent>
@@ -716,6 +769,52 @@ export default function AlocacoesNFe() {
                 </div>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Confirmação para Desfazer Alocação */}
+        <Dialog open={desfazerDialog} onOpenChange={setDesfazerDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-red-600">Desfazer Alocação</DialogTitle>
+              <DialogDescription>
+                Tem certeza que deseja desfazer a alocação da NF <strong>{desfazerNf}</strong>?
+                O lote será removido e a NFe voltará a aparecer como pendente.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-sm text-red-700">
+                  <strong>Atenção:</strong> Esta ação irá deletar o lote do banco de dados.
+                  Se o lote já teve consumo PEPS, não será possível desfazer.
+                </p>
+              </div>
+
+              <div>
+                <Label>Justificativa (opcional)</Label>
+                <Textarea
+                  value={desfazerJustificativa}
+                  onChange={(e) => setDesfazerJustificativa(e.target.value)}
+                  placeholder="Ex: Alocação feita para o posto errado"
+                  rows={2}
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setDesfazerDialog(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={confirmarDesfazerAlocacao}
+                  disabled={desfazerAlocacaoMutation.isPending}
+                >
+                  <Undo2 className="w-4 h-4 mr-1" />
+                  {desfazerAlocacaoMutation.isPending ? 'Desfazendo...' : 'Confirmar Desfazer'}
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

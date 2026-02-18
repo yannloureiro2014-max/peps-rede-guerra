@@ -421,7 +421,74 @@ export async function obterHistoricoLote(loteId: number): Promise<
 }
 
 /**
- * Cancelar alocação
+ * Desfazer alocação - deleta o lote completamente para que a NFe volte a aparecer como pendente
+ */
+export async function desfazerAlocacao(dados: {
+  loteId: number;
+  justificativa: string;
+  usuarioId: number;
+}): Promise<{ numeroNf: string; volumeAlocado: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection failed");
+
+  // Buscar lote antes de deletar para registrar auditoria
+  const lote = await db
+    .select()
+    .from(lotes)
+    .where(eq(lotes.id, dados.loteId))
+    .limit(1);
+
+  if (!lote || lote.length === 0) {
+    throw new Error(`Lote ${dados.loteId} não encontrado`);
+  }
+
+  const loteAtual = lote[0] as any;
+
+  // Verificar se o lote já teve consumo (não pode desfazer se já foi consumido parcialmente)
+  const consumos = await db
+    .select()
+    .from(consumoLotes)
+    .where(eq(consumoLotes.loteId, dados.loteId));
+
+  if (consumos.length > 0) {
+    throw new Error("Não é possível desfazer alocação de um lote que já teve consumo PEPS. Exclua os consumos primeiro.");
+  }
+
+  // Registrar auditoria ANTES de deletar
+  await db.insert(historicoAlteracoes).values({
+    tabela: "lotes",
+    registroId: dados.loteId,
+    acao: "delete",
+    camposAlterados: "lote completo",
+    valoresAntigos: JSON.stringify({
+      id: loteAtual.id,
+      chaveNfe: loteAtual.chaveNfe,
+      numeroNf: loteAtual.numeroNf,
+      postoId: loteAtual.postoId,
+      tanqueId: loteAtual.tanqueId,
+      volumeAlocado: loteAtual.quantidadeOriginal,
+      custoUnitario: loteAtual.custoUnitario,
+      custoTotal: loteAtual.custoTotal,
+      nomeFornecedor: loteAtual.nomeFornecedor,
+      nomeProduto: loteAtual.nomeProduto,
+    }),
+    valoresNovos: JSON.stringify({ status: "desfeito" }),
+    usuarioId: dados.usuarioId,
+    justificativa: dados.justificativa || "Alocação desfeita pelo usuário",
+  } as InsertHistoricoAlteracao);
+
+  // Deletar o lote completamente
+  await db.delete(lotes).where(eq(lotes.id, dados.loteId));
+
+  return {
+    numeroNf: loteAtual.numeroNf,
+    volumeAlocado: parseFloat(loteAtual.quantidadeOriginal),
+  };
+}
+
+/**
+ * Cancelar alocação (soft delete - mantém no banco como cancelado)
+ * @deprecated Use desfazerAlocacao para deletar completamente
  */
 export async function cancelarAlocacao(dados: {
   loteId: number;

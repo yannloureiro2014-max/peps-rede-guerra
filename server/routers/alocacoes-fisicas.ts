@@ -24,6 +24,7 @@ import {
   atualizarDisponibilidadeLote,
   obterLotesDisponiveisPEPS,
   cancelarAlocacao,
+  desfazerAlocacao,
 } from "../db-nfe-alocacoes";
 
 
@@ -280,6 +281,41 @@ export const alocacoesFisicasRouter = router({
         };
       } catch (erro) {
         console.error("[ALOCACOES] Erro ao recalcular CMV:", erro);
+        return {
+          sucesso: false,
+          erro: erro instanceof Error ? erro.message : "Erro desconhecido",
+        };
+      }
+    }),
+
+  /**
+   * Desfazer alocação - deleta o lote e a NFe volta para pendentes
+   */
+  desfazerAlocacao: protectedProcedure
+    .input(
+      z.object({
+        loteId: z.number(),
+        justificativa: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const resultado = await desfazerAlocacao({
+          loteId: input.loteId,
+          justificativa: input.justificativa || "Alocação desfeita pelo usuário",
+          usuarioId: ctx.user.id,
+        });
+
+        return {
+          sucesso: true,
+          dados: {
+            numeroNf: resultado.numeroNf,
+            volumeAlocado: resultado.volumeAlocado,
+            mensagem: `Alocação da NF ${resultado.numeroNf} desfeita com sucesso. A NFe voltará a aparecer como pendente.`,
+          },
+        };
+      } catch (erro) {
+        console.error("[ALOCACOES] Erro ao desfazer alocação:", erro);
         return {
           sucesso: false,
           erro: erro instanceof Error ? erro.message : "Erro desconhecido",

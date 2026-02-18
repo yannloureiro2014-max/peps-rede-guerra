@@ -568,3 +568,10 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [x] Replicar todas as informações da aba NFes Pendentes na aba NFes Alocadas - mesmas colunas + Posto Destino + Tanque + Status
 - [x] Salvar dados extras na criação do lote (fornecedor, produto, tipoFrete, custos) para independência do ACS
 - [x] Schema atualizado com 6 novos campos na tabela lotes (nomeFornecedor, nomeProduto, tipoFrete, custoUnitarioProduto, custoUnitarioFrete, valorFrete)
+
+## Botão Desfazer Alocação
+
+- [x] Criar endpoint backend `desfazerAlocacao` - deleta lote, verifica consumo PEPS, registra auditoria
+- [x] Adicionar botão "Desfazer" na aba NFes Alocadas com dialog de confirmação (justificativa opcional)
+- [x] Ao desfazer, NFe volta a aparecer na aba NFes Pendentes - testado com NFe 000021650 (SETTA, FOB)
+- [x] Fluxo completo testado: alocar -> desfazer -> aba Alocadas mostra 0 registros
