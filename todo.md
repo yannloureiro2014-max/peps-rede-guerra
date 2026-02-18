@@ -575,3 +575,9 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [x] Adicionar botão "Desfazer" na aba NFes Alocadas com dialog de confirmação (justificativa opcional)
 - [x] Ao desfazer, NFe volta a aparecer na aba NFes Pendentes - testado com NFe 000021650 (SETTA, FOB)
 - [x] Fluxo completo testado: alocar -> desfazer -> aba Alocadas mostra 0 registros
+
+## Bug: NFe alocada continua aparecendo nas Pendentes
+
+- [x] NFe alocada deve ser removida da aba Pendentes após alocação - filtro implementado no buscarNfesDoACS
+- [x] Filtrar NFes já alocadas (busca chaveNfe da tabela lotes e exclui do resultado: 195 total -> 194 pendentes)
+- [x] Testado: alocar NFe -> buscar pendentes -> NFe não aparece (1 filtrada com sucesso)

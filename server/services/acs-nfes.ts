@@ -13,7 +13,7 @@
 import pg from "pg";
 import { executeWithRetry } from "../utils/retry";
 import { getDb } from "../db";
-import { postos } from "../../drizzle/schema";
+import { postos, lotes } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 
 const ACS_CONFIG = {
@@ -440,7 +440,20 @@ export async function buscarNfesDoACS(filtros?: {
     codEmpresaList: codEmpresaListFiltro,
   });
 
-  // 4. Enriquecer dados
+  // 4. Buscar chaves de NFes já alocadas no banco PEPS para filtrar
+  let chavesAlocadas = new Set<string>();
+  try {
+    const db = await getDb();
+    if (db) {
+      const lotesExistentes = await db.select({ chaveNfe: lotes.chaveNfe }).from(lotes);
+      chavesAlocadas = new Set(lotesExistentes.map((l: any) => l.chaveNfe).filter(Boolean));
+      console.log(`[ACS-NFES] ${chavesAlocadas.size} NFes já alocadas serão filtradas`);
+    }
+  } catch (err) {
+    console.error("[ACS-NFES] Erro ao buscar lotes existentes:", err);
+  }
+
+  // 5. Enriquecer dados e filtrar alocadas
   const nfesEnriquecidas = await Promise.all(
     compras.map(async (c: any) => {
       const codEmpTrimmed = (c.codEmpresa || "").trim();
@@ -485,5 +498,9 @@ export async function buscarNfesDoACS(filtros?: {
     })
   );
 
-  return nfesEnriquecidas;
+  // 6. Filtrar NFes já alocadas
+  const nfesPendentes = nfesEnriquecidas.filter((nfe: any) => !chavesAlocadas.has(nfe.chaveNfe));
+  console.log(`[ACS-NFES] ${nfesEnriquecidas.length} total -> ${nfesPendentes.length} pendentes (${chavesAlocadas.size} já alocadas)`);
+
+  return nfesPendentes;
 }
