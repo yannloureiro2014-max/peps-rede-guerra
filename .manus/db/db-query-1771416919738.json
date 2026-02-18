@@ -1,0 +1,76 @@
+{
+  "query": "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'lotes' ORDER BY ORDINAL_POSITION",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'lotes' ORDER BY ORDINAL_POSITION",
+  "rows": [
+    {
+      "COLUMN_NAME": "id"
+    },
+    {
+      "COLUMN_NAME": "tanqueId"
+    },
+    {
+      "COLUMN_NAME": "numeroNf"
+    },
+    {
+      "COLUMN_NAME": "fornecedor"
+    },
+    {
+      "COLUMN_NAME": "dataEntrada"
+    },
+    {
+      "COLUMN_NAME": "quantidadeOriginal"
+    },
+    {
+      "COLUMN_NAME": "quantidadeDisponivel"
+    },
+    {
+      "COLUMN_NAME": "custoUnitario"
+    },
+    {
+      "COLUMN_NAME": "ordemConsumo"
+    },
+    {
+      "COLUMN_NAME": "status"
+    },
+    {
+      "COLUMN_NAME": "createdAt"
+    },
+    {
+      "COLUMN_NAME": "updatedAt"
+    },
+    {
+      "COLUMN_NAME": "codigoAcs"
+    },
+    {
+      "COLUMN_NAME": "postoId"
+    },
+    {
+      "COLUMN_NAME": "produtoId"
+    },
+    {
+      "COLUMN_NAME": "fornecedorId"
+    },
+    {
+      "COLUMN_NAME": "serieNf"
+    },
+    {
+      "COLUMN_NAME": "chaveNfe"
+    },
+    {
+      "COLUMN_NAME": "dataEmissao"
+    },
+    {
+      "COLUMN_NAME": "dataLmc"
+    },
+    {
+      "COLUMN_NAME": "custoTotal"
+    },
+    {
+      "COLUMN_NAME": "origem"
+    }
+  ],
+  "messages": [],
+  "stdout": "COLUMN_NAME\nid\ntanqueId\nnumeroNf\nfornecedor\ndataEntrada\nquantidadeOriginal\nquantidadeDisponivel\ncustoUnitario\nordemConsumo\nstatus\ncreatedAt\nupdatedAt\ncodigoAcs\npostoId\nprodutoId\nfornecedorId\nserieNf\nchaveNfe\ndataEmissao\ndataLmc\ncustoTotal\norigem\n",
+  "stderr": "",
+  "execution_time_ms": 380
+}

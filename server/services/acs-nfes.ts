@@ -44,6 +44,24 @@ interface Compra {
   despesas: number;
 }
 
+/**
+ * Mapear tipo_frete do ACS para FOB/CIF
+ * No ACS: C=CIF, F=FOB, R=Remetente(CIF), T=Terceiros, S=Sem Frete
+ * Para CMV: FOB = comprador paga frete (soma no custo)
+ *           CIF = fornecedor paga frete (já incluso no preço)
+ */
+function mapTipoFrete(tipoFreteAcs: string | null): string {
+  const tipo = (tipoFreteAcs || '').trim().toUpperCase();
+  switch (tipo) {
+    case 'F': return 'FOB'; // FOB - comprador paga frete
+    case 'C': return 'CIF'; // CIF - fornecedor paga frete
+    case 'R': return 'CIF'; // Remetente = CIF (fornecedor paga)
+    case 'T': return 'FOB'; // Terceiros = FOB (comprador paga)
+    case 'S': return 'CIF'; // Sem frete = CIF
+    default: return 'CIF';  // Padrão = CIF
+  }
+}
+
 async function getAcsClient(): Promise<pg.Client | null> {
   try {
     const client = new pg.Client({
@@ -191,7 +209,8 @@ export async function buscarComprasDoACS(filtros?: {
             totalItens: Number(row.total_itens) || 0,
             totalLitros: Number(row.total_litros) || 0,
             quantidadePendente: Number(row.total_litros) || 0,
-            tipoFrete: row.tipo_frete || 'CIF',
+            tipoFrete: mapTipoFrete(row.tipo_frete),
+            tipoFreteOriginal: (row.tipo_frete || '').trim(),
             frete: Number(row.frete) || 0,
             despesas: Number(row.despesas) || 0,
           }));
@@ -280,7 +299,8 @@ export async function buscarCompraPorCodigo(
             totalItens: Number(row.total_itens) || 0,
             totalLitros: Number(row.total_litros) || 0,
             quantidadePendente: Number(row.total_litros) || 0,
-            tipoFrete: row.tipo_frete || 'CIF',
+            tipoFrete: mapTipoFrete(row.tipo_frete),
+            tipoFreteOriginal: (row.tipo_frete || '').trim(),
             frete: Number(row.frete) || 0,
             despesas: Number(row.despesas) || 0,
           };
@@ -453,6 +473,7 @@ export async function buscarNfesDoACS(filtros?: {
         chaveNfe: `ACS-${codEmpTrimmed}-${c.codigo}`,
         itens: itens,
         tipoFrete: c.tipoFrete || 'CIF',
+        tipoFreteOriginal: c.tipoFreteOriginal || '',
         frete: c.frete || 0,
         despesas: c.despesas || 0,
       };

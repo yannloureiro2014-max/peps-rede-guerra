@@ -1,0 +1,34 @@
+{
+  "query": "SELECT * FROM lotes ORDER BY id DESC LIMIT 1",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT * FROM lotes ORDER BY id DESC LIMIT 1",
+  "rows": [
+    {
+      "id": "450013",
+      "tanqueId": "1",
+      "numeroNf": "000021650",
+      "fornecedor": "NULL",
+      "dataEntrada": "2026-02-17",
+      "quantidadeOriginal": "5000.000",
+      "quantidadeDisponivel": "5000.000",
+      "custoUnitario": "5.6200",
+      "ordemConsumo": "0",
+      "status": "ativo",
+      "createdAt": "2026-02-18 12:12:01",
+      "updatedAt": "2026-02-18 12:12:01",
+      "codigoAcs": "NULL",
+      "postoId": "2",
+      "produtoId": "1",
+      "fornecedorId": "NULL",
+      "serieNf": "2",
+      "chaveNfe": "ACS-01-00000882",
+      "dataEmissao": "2026-02-09",
+      "dataLmc": "2026-02-17",
+      "custoTotal": "28100.00",
+      "origem": "manual"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttanqueId\tnumeroNf\tfornecedor\tdataEntrada\tquantidadeOriginal\tquantidadeDisponivel\tcustoUnitario\tordemConsumo\tstatus\tcreatedAt\tupdatedAt\tcodigoAcs\tpostoId\tprodutoId\tfornecedorId\tserieNf\tchaveNfe\tdataEmissao\tdataLmc\tcustoTotal\torigem\n450013\t1\t000021650\tNULL\t2026-02-17\t5000.000\t5000.000\t5.6200\t0\tativo\t2026-02-18 12:12:01\t2026-02-18 12:12:01\tNULL\t2\t1\tNULL\t2\tACS-01-00000882\t2026-02-09\t2026-02-17\t28100.00\tmanual\n",
+  "stderr": "",
+  "execution_time_ms": 364
+}

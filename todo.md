@@ -548,3 +548,10 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [x] Custo unitário do litro (produto) - coluna CUSTO PRODUTO/L
 - [x] Custo unitário frete (se FOB) - coluna FRETE com badge tipo (C/F/R/T)
 - [x] Custo unitário total (produto + frete) - coluna CUSTO TOTAL/L
+
+## Melhoria: Valor do Frete R$/L na Coluna + Teste Alocação Real
+
+- [x] Mostrar valor do frete em R$/L na coluna FRETE (além do tipo C/F/R/T) - exibe +R$ X,XXXX/L para FOB
+- [x] Calcular custoUnitarioFrete = frete / totalLitros quando FOB - implementado no backend
+- [x] Testar alocação real de uma NFe no browser - NFe 000021650 (SETTA, FOB R$ 5,62/L) alocada com sucesso para POSTO GUERRA FORTIM
+- [x] Corrigir bug dataEmissao: Date vs string no criarAlocacao - convertido para ISO string antes de enviar

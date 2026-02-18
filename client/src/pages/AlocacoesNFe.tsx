@@ -135,7 +135,9 @@ export default function AlocacoesNFe() {
       chaveNfe: selectedNfe.chaveNfe,
       numeroNf: selectedNfe.numeroNf,
       serieNf: selectedNfe.serieNf || '1',
-      dataEmissao: selectedNfe.dataEmissao,
+      dataEmissao: typeof selectedNfe.dataEmissao === 'string' 
+        ? selectedNfe.dataEmissao 
+        : new Date(selectedNfe.dataEmissao).toISOString(),
       postoDestinoId: parseInt(novaAlocacao.postoDestino),
       tanqueDestinoId: parseInt(novaAlocacao.tanqueDestino),
       volumeAlocado,
@@ -307,22 +309,35 @@ export default function AlocacoesNFe() {
                         <div>
                           <p className="text-xs text-gray-400 lg:hidden">Frete</p>
                           <div className="flex flex-col">
-                            <span className={`inline-block w-fit px-2 py-0.5 rounded text-xs font-semibold ${
-                              nfe.tipoFrete === 'FOB' 
-                                ? 'bg-blue-100 text-blue-800' 
-                                : 'bg-green-100 text-green-800'
-                            }`}>
-                              {nfe.tipoFrete || 'CIF'}
-                            </span>
+                            <div className="flex items-center gap-1">
+                              <span className={`inline-block w-fit px-2 py-0.5 rounded text-xs font-semibold ${
+                                nfe.tipoFrete === 'FOB' 
+                                  ? 'bg-amber-100 text-amber-800' 
+                                  : 'bg-green-100 text-green-800'
+                              }`}>
+                                {nfe.tipoFrete}
+                              </span>
+                              {nfe.tipoFreteOriginal && nfe.tipoFreteOriginal !== nfe.tipoFrete && (
+                                <span className="text-[10px] text-gray-400">({nfe.tipoFreteOriginal})</span>
+                              )}
+                            </div>
                             {nfe.tipoFrete === 'FOB' && nfe.custoUnitarioFrete > 0 && (
-                              <span className="text-xs text-blue-700 mt-0.5">
+                              <span className="text-xs text-amber-700 font-semibold mt-0.5">
                                 +{formatCurrency(nfe.custoUnitarioFrete, 4)}/L
+                              </span>
+                            )}
+                            {nfe.tipoFrete === 'FOB' && nfe.frete > 0 && (
+                              <span className="text-[10px] text-gray-500 mt-0.5">
+                                Total frete: {formatCurrency(nfe.frete)}
                               </span>
                             )}
                             {nfe.tipoFrete === 'FOB' && (!nfe.frete || nfe.frete === 0) && (
                               <span className="text-xs text-red-600 font-semibold mt-0.5">
                                 ⚠ Sem frete
                               </span>
+                            )}
+                            {nfe.tipoFrete === 'CIF' && (
+                              <span className="text-[10px] text-green-600 mt-0.5">Incluso</span>
                             )}
                           </div>
                         </div>

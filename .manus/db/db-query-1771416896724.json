@@ -1,0 +1,55 @@
+{
+  "query": "SHOW TABLES",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SHOW TABLES",
+  "rows": [
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV": "__drizzle_migrations"
+    },
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV": "alertas"
+    },
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV": "configuracoes"
+    },
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV": "consumoLotes"
+    },
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV": "fornecedores"
+    },
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV": "historicoAlteracoes"
+    },
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV": "inicializacaoMensalLotes"
+    },
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV": "lotes"
+    },
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV": "medicoes"
+    },
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV": "postos"
+    },
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV": "produtos"
+    },
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV": "syncLogs"
+    },
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV": "tanques"
+    },
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV": "users"
+    },
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV": "vendas"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_GsoitYr3hHiyZTgQLwp9sV\n__drizzle_migrations\nalertas\nconfiguracoes\nconsumoLotes\nfornecedores\nhistoricoAlteracoes\ninicializacaoMensalLotes\nlotes\nmedicoes\npostos\nprodutos\nsyncLogs\ntanques\nusers\nvendas\n",
+  "stderr": "",
+  "execution_time_ms": 358
+}

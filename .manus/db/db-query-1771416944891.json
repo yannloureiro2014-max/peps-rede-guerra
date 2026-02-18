@@ -1,0 +1,43 @@
+{
+  "query": "SELECT id, chaveNfe, numeroNf, custoUnitario, quantidadeOriginal, custoTotal, dataEntrada, origem, status FROM lotes ORDER BY id DESC LIMIT 3",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT id, chaveNfe, numeroNf, custoUnitario, quantidadeOriginal, custoTotal, dataEntrada, origem, status FROM lotes ORDER BY id DESC LIMIT 3",
+  "rows": [
+    {
+      "id": "450013",
+      "chaveNfe": "ACS-01-00000882",
+      "numeroNf": "000021650",
+      "custoUnitario": "5.6200",
+      "quantidadeOriginal": "5000.000",
+      "custoTotal": "28100.00",
+      "dataEntrada": "2026-02-17",
+      "origem": "manual",
+      "status": "ativo"
+    },
+    {
+      "id": "450012",
+      "chaveNfe": "35240216123456789012345678901234567890",
+      "numeroNf": "001234",
+      "custoUnitario": "5.4200",
+      "quantidadeOriginal": "1000.000",
+      "custoTotal": "5420.00",
+      "dataEntrada": "2026-02-16",
+      "origem": "manual",
+      "status": "ativo"
+    },
+    {
+      "id": "450011",
+      "chaveNfe": "ACS-01-12347",
+      "numeroNf": "001236",
+      "custoUnitario": "5.4200",
+      "quantidadeOriginal": "5000.000",
+      "custoTotal": "27100.00",
+      "dataEntrada": "2026-02-16",
+      "origem": "manual",
+      "status": "ativo"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tchaveNfe\tnumeroNf\tcustoUnitario\tquantidadeOriginal\tcustoTotal\tdataEntrada\torigem\tstatus\n450013\tACS-01-00000882\t000021650\t5.6200\t5000.000\t28100.00\t2026-02-17\tmanual\tativo\n450012\t35240216123456789012345678901234567890\t001234\t5.4200\t1000.000\t5420.00\t2026-02-16\tmanual\tativo\n450011\tACS-01-12347\t001236\t5.4200\t5000.000\t27100.00\t2026-02-16\tmanual\tativo\n",
+  "stderr": "",
+  "execution_time_ms": 390
+}
