@@ -494,3 +494,29 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [ ] Corrigir filtro de NFes Pendentes: mostrar apenas NFes emitidas PARA o posto selecionado (não alocadas)
 - [ ] Corrigir filtro de NFes Alocadas: mostrar todas as alocadas PARA o posto, independente de faturamento
 - [ ] Testar filtros com dados reais
+
+
+## Adição de Colunas de Frete na Interface (CONCLUÍDO)
+
+### Backend - acs-nfes.ts
+- [x] Adicionar campos tipo_frete, frete e despesas na query SQL
+- [x] Incluir estes campos na interface Compra
+- [x] Retornar tipoFrete, frete e despesas na resposta de NFes
+- [x] Atualizar cálculo de custoUnitario para incluir frete quando tipoFrete = FOB
+- [x] Fórmula: custoUnitario = (totalNota + frete) / totalLitros para NFes FOB
+- [x] Fórmula: custoUnitario = totalNota / totalLitros para NFes CIF
+
+### Frontend - AlocacoesNFe.tsx
+- [x] Expandir grid de 6 para 8 colunas
+- [x] Adicionar coluna "Tipo Frete" com badges coloridas (FOB azul, CIF verde)
+- [x] Adicionar alerta visual para NFes FOB sem frete cadastrado
+- [x] Adicionar coluna "Valor Frete" mostrando R$ ou "-"
+
+### Testes Unitários
+- [x] Criar 5 testes para validar cálculo de custoUnitario com frete
+- [x] Todos os testes passando (5/5)
+  - Cálculo com frete FOB
+  - Cálculo sem frete CIF
+  - Cálculo FOB sem frete cadastrado
+  - Tratamento de divisão por zero
+  - Inclusão de despesas

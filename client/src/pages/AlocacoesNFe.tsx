@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
 
-export default function AlocacoesSEFAZ() {
+export default function AlocacoesNFe() {
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedNfeId, setSelectedNfeId] = useState<string | null>(null);
   const [sincronizando, setSincronizando] = useState(false);
@@ -161,8 +161,8 @@ export default function AlocacoesSEFAZ() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold">Alocações SEFAZ</h1>
-          <p className="text-gray-600">Aloque NFes da SEFAZ para postos e tanques específicos, mesmo quando comprado por CNPJ diferente</p>
+          <h1 className="text-3xl font-bold">Alocações NFe</h1>
+          <p className="text-gray-600">Aloque NFes do ACS para postos e tanques específicos, mesmo quando comprado por CNPJ diferente</p>
         </div>
 
         {/* Info Alert */}
@@ -246,7 +246,7 @@ export default function AlocacoesSEFAZ() {
                 {nfesFiltradas.map((nfe: any) => (
                   <Card key={nfe.id}>
                     <CardContent className="pt-6">
-                      <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
+                      <div className="grid grid-cols-1 md:grid-cols-8 gap-4 items-center">
                         <div>
                           <p className="text-sm text-gray-500">NF</p>
                           <p className="font-semibold">{nfe.numeroNf}</p>
@@ -262,6 +262,25 @@ export default function AlocacoesSEFAZ() {
                         <div>
                           <p className="text-sm text-gray-500">Custo Unit.</p>
                           <p className="font-semibold">R$ {nfe.custoUnitario.toFixed(4)}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Tipo Frete</p>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                              nfe.tipoFrete === 'FOB' 
+                                ? 'bg-blue-100 text-blue-800' 
+                                : 'bg-green-100 text-green-800'
+                            }`}>
+                              {nfe.tipoFrete || 'CIF'}
+                            </span>
+                            {nfe.tipoFrete === 'FOB' && !nfe.frete && (
+                              <span className="text-xs text-red-600 font-semibold">⚠ Sem frete</span>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Valor Frete</p>
+                          <p className="font-semibold">{nfe.frete ? `R$ ${nfe.frete.toFixed(2)}` : '-'}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-500">Posto</p>

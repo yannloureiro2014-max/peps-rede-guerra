@@ -43,7 +43,7 @@ const menuItems: MenuItem[] = [
   { icon: FileText, label: "Relatórios", path: "/relatorios" },
   { icon: Bell, label: "Alertas", path: "/alertas" },
   { icon: Building2, label: "Postos", path: "/postos" },
-  { icon: FileCheck, label: "Alocações SEFAZ", path: "/alocacoes-sefaz", adminOnly: true },
+  { icon: FileCheck, label: "Alocações NFe", path: "/alocacoes-nfe", adminOnly: true },
   { icon: Users, label: "Usuários", path: "/usuarios", adminOnly: true },
   { icon: Sparkles, label: "Assistente IA", path: "/assistente-ia" },
   { icon: Settings, label: "Configurações", path: "/configuracoes" },

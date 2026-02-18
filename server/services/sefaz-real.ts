@@ -5,7 +5,7 @@
  */
 
 import { buscarComprasDoACS } from "./acs-nfes";
-import { listarNfesAlocadas } from "../db-sefaz-alocacoes";
+import { listarNfesAlocadas } from "../db-nfe-alocacoes";
 
 interface NFeReal {
   id: string;

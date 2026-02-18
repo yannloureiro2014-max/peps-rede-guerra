@@ -24,7 +24,7 @@ import {
   atualizarDisponibilidadeLote,
   obterLotesDisponiveisPEPS,
   cancelarAlocacao,
-} from "../db-sefaz-alocacoes";
+} from "../db-nfe-alocacoes";
 
 
 export const alocacoesFisicasRouter = router({

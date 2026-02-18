@@ -28,6 +28,9 @@ interface Compra {
   totalItens: number;
   totalLitros: number;
   quantidadePendente: number;
+  tipoFrete?: string; // FOB ou CIF
+  frete?: number;
+  despesas?: number;
 }
 
 async function getAcsClient(): Promise<pg.Client | null> {
@@ -78,6 +81,9 @@ export async function buscarComprasDoACS(filtros?: {
               c.cod_fornecedor,
               c.total_nota,
               c.total_produtos,
+              c.tipo_frete,
+              c.frete,
+              c.despesas,
               COUNT(i.numero) as total_itens,
               SUM(i.quantidade::numeric) as total_litros
             FROM compras_comb c
@@ -103,7 +109,7 @@ export async function buscarComprasDoACS(filtros?: {
             params.push(filtros.codEmpresa);
           }
 
-          query += ` GROUP BY c.cod_empresa, c.codigo, c.documento, c.serie, c.dt_emissao, c.dt_lmc, c.cod_fornecedor, c.total_nota, c.total_produtos
+          query += ` GROUP BY c.cod_empresa, c.codigo, c.documento, c.serie, c.dt_emissao, c.dt_lmc, c.cod_fornecedor, c.total_nota, c.total_produtos, c.tipo_frete, c.frete, c.despesas
             ORDER BY c.dt_emissao DESC
             LIMIT 500`;
 
@@ -125,6 +131,9 @@ export async function buscarComprasDoACS(filtros?: {
             totalItens: Number(row.total_itens) || 0,
             totalLitros: Number(row.total_litros) || 0,
             quantidadePendente: Number(row.total_litros) || 0,
+            tipoFrete: row.tipo_frete || 'CIF',
+            frete: Number(row.frete) || 0,
+            despesas: Number(row.despesas) || 0,
           }));
 
           console.log(
@@ -320,7 +329,13 @@ export async function buscarNfesDoACS(filtros?: {
   const nfesEnriquecidas = await Promise.all(
     compras.map(async (c: any) => {
       const codEmpTrimmed = (c.codEmpresa || "").trim();
-      const custoUnitario = c.totalLitros > 0 ? c.totalNota / c.totalLitros : 0;
+      
+      // Calcular custo unitario: produto + frete (se FOB)
+      let custoTotal = c.totalNota;
+      if (c.tipoFrete === 'FOB' && c.frete) {
+        custoTotal += c.frete;
+      }
+      const custoUnitario = c.totalLitros > 0 ? custoTotal / c.totalLitros : 0;
       
       // Buscar itens da NFe para obter tipo de combustível
       const itens = await buscarItensNfeComCombustivel(codEmpTrimmed, c.codigo);
@@ -332,7 +347,7 @@ export async function buscarNfesDoACS(filtros?: {
         ...c,
         quantidade: c.totalLitros,
         custoUnitario,
-        custoTotal: c.totalNota,
+        custoTotal: custoTotal,
         postoDestino: MAPA_POSTOS[codEmpTrimmed] || `Empresa ${codEmpTrimmed}`,
         produto: produtoDescricao,
         statusAlocacao: "pendente",
@@ -342,6 +357,9 @@ export async function buscarNfesDoACS(filtros?: {
         dataEmissao: c.dataEmissao,
         chaveNfe: `ACS-${codEmpTrimmed}-${c.codigo}`,
         itens: itens,
+        tipoFrete: c.tipoFrete || 'CIF',
+        frete: c.frete || 0,
+        despesas: c.despesas || 0,
       };
     })
   );
