@@ -555,3 +555,9 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [x] Calcular custoUnitarioFrete = frete / totalLitros quando FOB - implementado no backend
 - [x] Testar alocação real de uma NFe no browser - NFe 000021650 (SETTA, FOB R$ 5,62/L) alocada com sucesso para POSTO GUERRA FORTIM
 - [x] Corrigir bug dataEmissao: Date vs string no criarAlocacao - convertido para ISO string antes de enviar
+
+## Limpeza e Melhorias Visuais
+
+- [x] Limpar 12 alocações antigas do banco - DELETE de consumo_lotes e lotes, base zerada
+- [x] Mapear códigos de combustíveis do ACS - JOIN com tabela 'produtos' (tipo='C'): GASOLINA C COMUM, ETANOL HIDRATADO COMUM, OLEO DIESEL B S10, etc.
+- [x] Melhorar nomes dos tanques no dropdown - corrigido mapeamento de campos (codigoAcs, produtoDescricao, capacidade)

@@ -1,0 +1,170 @@
+{
+  "query": "SELECT t.id, t.postoId, t.codigoAcs, t.capacidade, p.nome as postoNome, pr.descricao as produto FROM tanques t INNER JOIN postos p ON t.postoId = p.id LEFT JOIN produtos pr ON t.produtoId = pr.id WHERE t.ativo = 1 ORDER BY p.nome, t.codigoAcs LIMIT 20",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT t.id, t.postoId, t.codigoAcs, t.capacidade, p.nome as postoNome, pr.descricao as produto FROM tanques t INNER JOIN postos p ON t.postoId = p.id LEFT JOIN produtos pr ON t.produtoId = pr.id WHERE t.ativo = 1 ORDER BY p.nome, t.codigoAcs LIMIT 20",
+  "rows": [
+    {
+      "id": "17",
+      "postoId": "1",
+      "codigoAcs": "01",
+      "capacidade": "20000.000",
+      "postoNome": "MÃE E FILHO",
+      "produto": "GASOLINA C COMUM"
+    },
+    {
+      "id": "18",
+      "postoId": "1",
+      "codigoAcs": "02",
+      "capacidade": "10000.000",
+      "postoNome": "MÃE E FILHO",
+      "produto": "ETANOL HIDRATADO COMUM"
+    },
+    {
+      "id": "19",
+      "postoId": "1",
+      "codigoAcs": "03",
+      "capacidade": "10000.000",
+      "postoNome": "MÃE E FILHO",
+      "produto": "ETANOL HIDRATADO COMUM"
+    },
+    {
+      "id": "20",
+      "postoId": "1",
+      "codigoAcs": "04",
+      "capacidade": "10000.000",
+      "postoNome": "MÃE E FILHO",
+      "produto": "OLEO DIESEL B S10"
+    },
+    {
+      "id": "30016",
+      "postoId": "30006",
+      "codigoAcs": "01",
+      "capacidade": "10000.000",
+      "postoNome": "POSTO ARACATI",
+      "produto": "GASOLINA C COMUM"
+    },
+    {
+      "id": "30017",
+      "postoId": "30006",
+      "codigoAcs": "02",
+      "capacidade": "10000.000",
+      "postoNome": "POSTO ARACATI",
+      "produto": "GASOLINA C ADITIVADA"
+    },
+    {
+      "id": "30018",
+      "postoId": "30006",
+      "codigoAcs": "03",
+      "capacidade": "10000.000",
+      "postoNome": "POSTO ARACATI",
+      "produto": "OLEO DIESEL B S10"
+    },
+    {
+      "id": "30012",
+      "postoId": "30005",
+      "codigoAcs": "09",
+      "capacidade": "10000.000",
+      "postoNome": "POSTO GUARARAPES VIP",
+      "produto": "ETANOL HIDRATADO COMUM"
+    },
+    {
+      "id": "30013",
+      "postoId": "30005",
+      "codigoAcs": "10",
+      "capacidade": "20000.000",
+      "postoNome": "POSTO GUARARAPES VIP",
+      "produto": "GASOLINA C COMUM"
+    },
+    {
+      "id": "30014",
+      "postoId": "30005",
+      "codigoAcs": "11",
+      "capacidade": "10000.000",
+      "postoNome": "POSTO GUARARAPES VIP",
+      "produto": "OLEO DIESEL B S10 ADITIVADO"
+    },
+    {
+      "id": "30015",
+      "postoId": "30005",
+      "codigoAcs": "12",
+      "capacidade": "20000.000",
+      "postoNome": "POSTO GUARARAPES VIP",
+      "produto": "GASOLINA SHELL V-POWER"
+    },
+    {
+      "id": "1",
+      "postoId": "2",
+      "codigoAcs": "01",
+      "capacidade": "10000.000",
+      "postoNome": "POSTO GUERRA FORTIM",
+      "produto": "ETANOL HIDRATADO COMUM"
+    },
+    {
+      "id": "2",
+      "postoId": "2",
+      "codigoAcs": "02",
+      "capacidade": "10000.000",
+      "postoNome": "POSTO GUERRA FORTIM",
+      "produto": "GASOLINA C COMUM"
+    },
+    {
+      "id": "3",
+      "postoId": "2",
+      "codigoAcs": "03",
+      "capacidade": "10000.000",
+      "postoNome": "POSTO GUERRA FORTIM",
+      "produto": "OLEO DIESEL B S10"
+    },
+    {
+      "id": "6",
+      "postoId": "4",
+      "codigoAcs": "01",
+      "capacidade": "10000.000",
+      "postoNome": "POSTO GUERRA PALHANO",
+      "produto": "GASOLINA C COMUM"
+    },
+    {
+      "id": "7",
+      "postoId": "4",
+      "codigoAcs": "02",
+      "capacidade": "10000.000",
+      "postoNome": "POSTO GUERRA PALHANO",
+      "produto": "OLEO DIESEL B S10"
+    },
+    {
+      "id": "30008",
+      "postoId": "30003",
+      "codigoAcs": "01",
+      "capacidade": "10000.000",
+      "postoNome": "POSTO GUERRA SAO JOAO DO JAGUARIBE",
+      "produto": "GASOLINA C COMUM"
+    },
+    {
+      "id": "30009",
+      "postoId": "30003",
+      "codigoAcs": "02",
+      "capacidade": "10000.000",
+      "postoNome": "POSTO GUERRA SAO JOAO DO JAGUARIBE",
+      "produto": "OLEO DIESEL B S10"
+    },
+    {
+      "id": "30019",
+      "postoId": "30007",
+      "codigoAcs": "01",
+      "capacidade": "30000.000",
+      "postoNome": "POSTO HORIZONTE",
+      "produto": "GASOLINA C COMUM"
+    },
+    {
+      "id": "30020",
+      "postoId": "30007",
+      "codigoAcs": "02",
+      "capacidade": "10000.000",
+      "postoNome": "POSTO HORIZONTE",
+      "produto": "GASOLINA C ADITIVADA"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tpostoId\tcodigoAcs\tcapacidade\tpostoNome\tproduto\n17\t1\t01\t20000.000\tMÃE E FILHO\tGASOLINA C COMUM\n18\t1\t02\t10000.000\tMÃE E FILHO\tETANOL HIDRATADO COMUM\n19\t1\t03\t10000.000\tMÃE E FILHO\tETANOL HIDRATADO COMUM\n20\t1\t04\t10000.000\tMÃE E FILHO\tOLEO DIESEL B S10\n30016\t30006\t01\t10000.000\tPOSTO ARACATI\tGASOLINA C COMUM\n30017\t30006\t02\t10000.000\tPOSTO ARACATI\tGASOLINA C ADITIVADA\n30018\t30006\t03\t10000.000\tPOSTO ARACATI\tOLEO DIESEL B S10\n30012\t30005\t09\t10000.000\tPOSTO GUARARAPES VIP\tETANOL HIDRATADO COMUM\n30013\t30005\t10\t20000.000\tPOSTO GUARARAPES VIP\tGASOLINA C COMUM\n30014\t30005\t11\t10000.000\tPOSTO GUARARAPES VIP\tOLEO DIESEL B S10 ADITIVADO\n30015\t30005\t12\t20000.000\tPOSTO GUARARAPES VIP\tGASOLINA SHELL V-POWER\n1\t2\t01\t10000.000\tPOSTO GUERRA FORTIM\tETANOL HIDRATADO COMUM\n2\t2\t02\t10000.000\tPOSTO GUERRA FORTIM\tGASOLINA C COMUM\n3\t2\t03\t10000.000\tPOSTO GUERRA FORTIM\tOLEO DIESEL B S10\n6\t4\t01\t10000.000\tPOSTO GUERRA PALHANO\tGASOLINA C COMUM\n7\t4\t02\t10000.000\tPOSTO GUERRA PALHANO\tOLEO DIESEL B S10\n30008\t30003\t01\t10000.000\tPOSTO GUERRA SAO JOAO DO JAGUARIBE\tGASOLINA C COMUM\n30009\t30003\t02\t10000.000\tPOSTO GUERRA SAO JOAO DO JAGUARIBE\tOLEO DIESEL B S10\n30019\t30007\t01\t30000.000\tPOSTO HORIZONTE\tGASOLINA C COMUM\n30020\t30007\t02\t10000.000\tPOSTO HORIZONTE\tGASOLINA C ADITIVADA\n",
+  "stderr": "",
+  "execution_time_ms": 350
+}

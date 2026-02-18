@@ -256,10 +256,11 @@ export default function AlocacoesNFe() {
                 </div>
 
                 {/* Cabeçalho da tabela */}
-                <div className="hidden lg:grid grid-cols-9 gap-2 px-4 py-2 bg-gray-100 rounded-lg text-xs font-semibold text-gray-600 uppercase">
+                <div className="hidden lg:grid grid-cols-10 gap-2 px-4 py-2 bg-gray-100 rounded-lg text-xs font-semibold text-gray-600 uppercase">
                   <div>NF</div>
                   <div>Data</div>
                   <div>Fornecedor</div>
+                  <div>Produto</div>
                   <div>Volume</div>
                   <div>Custo Produto/L</div>
                   <div>Frete</div>
@@ -271,7 +272,7 @@ export default function AlocacoesNFe() {
                 {nfesFiltradas.map((nfe: any) => (
                   <Card key={nfe.id} className="hover:shadow-md transition-shadow">
                     <CardContent className="pt-4 pb-4">
-                      <div className="grid grid-cols-2 lg:grid-cols-9 gap-3 items-center">
+                      <div className="grid grid-cols-2 lg:grid-cols-10 gap-3 items-center">
                         {/* NF */}
                         <div>
                           <p className="text-xs text-gray-400 lg:hidden">NF</p>
@@ -290,6 +291,14 @@ export default function AlocacoesNFe() {
                           <p className="text-xs text-gray-400 lg:hidden">Fornecedor</p>
                           <p className="text-sm truncate" title={nfe.nomeFornecedor}>
                             {nfe.nomeFornecedor || `Cód: ${nfe.codFornecedor}`}
+                          </p>
+                        </div>
+
+                        {/* Produto */}
+                        <div>
+                          <p className="text-xs text-gray-400 lg:hidden">Produto</p>
+                          <p className="text-sm truncate" title={nfe.produto}>
+                            {nfe.produto || 'Combustível'}
                           </p>
                         </div>
 
@@ -581,7 +590,7 @@ export default function AlocacoesNFe() {
                       <SelectContent>
                         {tanquesDoPosto.map((t: any) => (
                           <SelectItem key={t.id} value={String(t.id)}>
-                            {t.numero} - {t.combustivel} ({t.capacidade?.toLocaleString()}L)
+                            Tanque {t.codigoAcs} - {t.produtoDescricao || 'Sem produto'} ({Number(t.capacidade)?.toLocaleString('pt-BR')}L)
                           </SelectItem>
                         ))}
                       </SelectContent>

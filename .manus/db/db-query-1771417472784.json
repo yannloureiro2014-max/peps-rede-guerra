@@ -1,0 +1,180 @@
+{
+  "query": "SELECT id, numeroNf, chaveNfe, custoUnitario, quantidadeOriginal, status, origem, dataEntrada FROM lotes ORDER BY id ASC LIMIT 20",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT id, numeroNf, chaveNfe, custoUnitario, quantidadeOriginal, status, origem, dataEntrada FROM lotes ORDER BY id ASC LIMIT 20",
+  "rows": [
+    {
+      "id": "450001",
+      "numeroNf": "001234",
+      "chaveNfe": "ACS-01-12345",
+      "custoUnitario": "5.4200",
+      "quantidadeOriginal": "5000.000",
+      "status": "ativo",
+      "origem": "manual",
+      "dataEntrada": "2026-02-16"
+    },
+    {
+      "id": "450002",
+      "numeroNf": "001235",
+      "chaveNfe": "ACS-01-12346",
+      "custoUnitario": "6.1500",
+      "quantidadeOriginal": "3000.000",
+      "status": "ativo",
+      "origem": "manual",
+      "dataEntrada": "2026-02-16"
+    },
+    {
+      "id": "450003",
+      "numeroNf": "001236",
+      "chaveNfe": "ACS-01-12347",
+      "custoUnitario": "5.4200",
+      "quantidadeOriginal": "5000.000",
+      "status": "ativo",
+      "origem": "manual",
+      "dataEntrada": "2026-02-16"
+    },
+    {
+      "id": "450004",
+      "numeroNf": "001234",
+      "chaveNfe": "35240216123456789012345678901234567890",
+      "custoUnitario": "5.4200",
+      "quantidadeOriginal": "1000.000",
+      "status": "ativo",
+      "origem": "manual",
+      "dataEntrada": "2026-02-16"
+    },
+    {
+      "id": "450005",
+      "numeroNf": "001234",
+      "chaveNfe": "ACS-01-12345",
+      "custoUnitario": "5.4200",
+      "quantidadeOriginal": "5000.000",
+      "status": "ativo",
+      "origem": "manual",
+      "dataEntrada": "2026-02-16"
+    },
+    {
+      "id": "450006",
+      "numeroNf": "001235",
+      "chaveNfe": "ACS-01-12346",
+      "custoUnitario": "6.1500",
+      "quantidadeOriginal": "3000.000",
+      "status": "ativo",
+      "origem": "manual",
+      "dataEntrada": "2026-02-16"
+    },
+    {
+      "id": "450007",
+      "numeroNf": "001236",
+      "chaveNfe": "ACS-01-12347",
+      "custoUnitario": "5.4200",
+      "quantidadeOriginal": "5000.000",
+      "status": "ativo",
+      "origem": "manual",
+      "dataEntrada": "2026-02-16"
+    },
+    {
+      "id": "450008",
+      "numeroNf": "001234",
+      "chaveNfe": "35240216123456789012345678901234567890",
+      "custoUnitario": "5.4200",
+      "quantidadeOriginal": "1000.000",
+      "status": "ativo",
+      "origem": "manual",
+      "dataEntrada": "2026-02-16"
+    },
+    {
+      "id": "450009",
+      "numeroNf": "001234",
+      "chaveNfe": "ACS-01-12345",
+      "custoUnitario": "5.4200",
+      "quantidadeOriginal": "5000.000",
+      "status": "ativo",
+      "origem": "manual",
+      "dataEntrada": "2026-02-16"
+    },
+    {
+      "id": "450010",
+      "numeroNf": "001235",
+      "chaveNfe": "ACS-01-12346",
+      "custoUnitario": "6.1500",
+      "quantidadeOriginal": "3000.000",
+      "status": "ativo",
+      "origem": "manual",
+      "dataEntrada": "2026-02-16"
+    },
+    {
+      "id": "450011",
+      "numeroNf": "001236",
+      "chaveNfe": "ACS-01-12347",
+      "custoUnitario": "5.4200",
+      "quantidadeOriginal": "5000.000",
+      "status": "ativo",
+      "origem": "manual",
+      "dataEntrada": "2026-02-16"
+    },
+    {
+      "id": "450012",
+      "numeroNf": "001234",
+      "chaveNfe": "35240216123456789012345678901234567890",
+      "custoUnitario": "5.4200",
+      "quantidadeOriginal": "1000.000",
+      "status": "ativo",
+      "origem": "manual",
+      "dataEntrada": "2026-02-16"
+    },
+    {
+      "id": "450013",
+      "numeroNf": "000021650",
+      "chaveNfe": "ACS-01-00000882",
+      "custoUnitario": "5.6200",
+      "quantidadeOriginal": "5000.000",
+      "status": "ativo",
+      "origem": "manual",
+      "dataEntrada": "2026-02-17"
+    },
+    {
+      "id": "450014",
+      "numeroNf": "001234",
+      "chaveNfe": "ACS-01-12345",
+      "custoUnitario": "5.4200",
+      "quantidadeOriginal": "5000.000",
+      "status": "ativo",
+      "origem": "manual",
+      "dataEntrada": "2026-02-16"
+    },
+    {
+      "id": "450015",
+      "numeroNf": "001235",
+      "chaveNfe": "ACS-01-12346",
+      "custoUnitario": "6.1500",
+      "quantidadeOriginal": "3000.000",
+      "status": "ativo",
+      "origem": "manual",
+      "dataEntrada": "2026-02-16"
+    },
+    {
+      "id": "450016",
+      "numeroNf": "001236",
+      "chaveNfe": "ACS-01-12347",
+      "custoUnitario": "5.4200",
+      "quantidadeOriginal": "5000.000",
+      "status": "ativo",
+      "origem": "manual",
+      "dataEntrada": "2026-02-16"
+    },
+    {
+      "id": "450017",
+      "numeroNf": "000021349",
+      "chaveNfe": "ACS-04-00000900",
+      "custoUnitario": "4.4300",
+      "quantidadeOriginal": "1000.000",
+      "status": "ativo",
+      "origem": "manual",
+      "dataEntrada": "2026-02-16"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tnumeroNf\tchaveNfe\tcustoUnitario\tquantidadeOriginal\tstatus\torigem\tdataEntrada\n450001\t001234\tACS-01-12345\t5.4200\t5000.000\tativo\tmanual\t2026-02-16\n450002\t001235\tACS-01-12346\t6.1500\t3000.000\tativo\tmanual\t2026-02-16\n450003\t001236\tACS-01-12347\t5.4200\t5000.000\tativo\tmanual\t2026-02-16\n450004\t001234\t35240216123456789012345678901234567890\t5.4200\t1000.000\tativo\tmanual\t2026-02-16\n450005\t001234\tACS-01-12345\t5.4200\t5000.000\tativo\tmanual\t2026-02-16\n450006\t001235\tACS-01-12346\t6.1500\t3000.000\tativo\tmanual\t2026-02-16\n450007\t001236\tACS-01-12347\t5.4200\t5000.000\tativo\tmanual\t2026-02-16\n450008\t001234\t35240216123456789012345678901234567890\t5.4200\t1000.000\tativo\tmanual\t2026-02-16\n450009\t001234\tACS-01-12345\t5.4200\t5000.000\tativo\tmanual\t2026-02-16\n450010\t001235\tACS-01-12346\t6.1500\t3000.000\tativo\tmanual\t2026-02-16\n450011\t001236\tACS-01-12347\t5.4200\t5000.000\tativo\tmanual\t2026-02-16\n450012\t001234\t35240216123456789012345678901234567890\t5.4200\t1000.000\tativo\tmanual\t2026-02-16\n450013\t000021650\tACS-01-00000882\t5.6200\t5000.000\tativo\tmanual\t2026-02-17\n450014\t001234\tACS-01-12345\t5.4200\t5000.000\tativo\tmanual\t2026-02-16\n450015\t001235\tACS-01-12346\t6.1500\t3000.000\tativo\tmanual\t2026-02-16\n450016\t001236\tACS-01-12347\t5.4200\t5000.000\tativo\tmanual\t2026-02-16\n450017\t000021349\tACS-04-00000900\t4.4300\t1000.000\tativo\tmanual\t2026-02-16\n",
+  "stderr": "",
+  "execution_time_ms": 349
+}

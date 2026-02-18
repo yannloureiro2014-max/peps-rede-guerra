@@ -159,7 +159,15 @@ export async function buscarComprasDoACS(filtros?: {
               c.frete,
               c.despesas,
               COUNT(i.numero) as total_itens,
-              SUM(i.quantidade::numeric) as total_litros
+              SUM(i.quantidade::numeric) as total_litros,
+              (
+                SELECT COALESCE(p.descricao, 'Combustível')
+                FROM itens_compra_comb ic
+                LEFT JOIN produtos p ON TRIM(ic.cod_combustivel) = TRIM(p.codigo)
+                WHERE ic.cod_compra = c.codigo AND ic.cod_empresa = c.cod_empresa AND ic.cancelado = 'N'
+                ORDER BY ic.quantidade::numeric DESC
+                LIMIT 1
+              ) as nome_combustivel
             FROM compras_comb c
             LEFT JOIN itens_compra_comb i ON c.codigo = i.cod_compra AND c.cod_empresa = i.cod_empresa
             LEFT JOIN fornecedores f ON c.cod_fornecedor = f.codigo
@@ -186,7 +194,7 @@ export async function buscarComprasDoACS(filtros?: {
             paramIdx += filtros.codEmpresaList.length;
           }
 
-          query += ` GROUP BY c.cod_empresa, c.codigo, c.documento, c.serie, c.dt_emissao, c.dt_lmc, c.cod_fornecedor, f.razao_social, c.total_nota, c.total_produtos, c.tipo_frete, c.frete, c.despesas
+          query += ` GROUP BY c.cod_empresa, c.codigo, c.documento, c.serie, c.dt_emissao, c.dt_lmc, c.cod_fornecedor, f.razao_social, c.total_nota, c.total_produtos, c.tipo_frete, c.frete, c.despesas, nome_combustivel
             ORDER BY c.dt_emissao DESC
             LIMIT 500`;
 
@@ -213,6 +221,7 @@ export async function buscarComprasDoACS(filtros?: {
             tipoFreteOriginal: (row.tipo_frete || '').trim(),
             frete: Number(row.frete) || 0,
             despesas: Number(row.despesas) || 0,
+            nomeCombustivel: row.nome_combustivel || 'Combustível',
           }));
 
           console.log(
@@ -448,11 +457,8 @@ export async function buscarNfesDoACS(filtros?: {
       const custoUnitarioTotal = custoUnitarioProduto + custoUnitarioFrete;
       const custoTotal = c.totalNota + (c.tipoFrete === 'FOB' ? (c.frete || 0) : 0);
       
-      // Buscar itens da NFe para obter tipo de combustível
-      const itens = await buscarItensNfeComCombustivel(codEmpTrimmed, c.codigo);
-      const produtoDescricao = itens.length > 0 
-        ? itens[0].descricao_combustivel 
-        : "Combustível";
+      // Nome do combustível já vem da query principal (subquery)
+      const produtoDescricao = c.nomeCombustivel || 'Combustível';
 
       return {
         ...c,
@@ -471,7 +477,6 @@ export async function buscarNfesDoACS(filtros?: {
         serieNf: c.serie,
         dataEmissao: c.dataEmissao,
         chaveNfe: `ACS-${codEmpTrimmed}-${c.codigo}`,
-        itens: itens,
         tipoFrete: c.tipoFrete || 'CIF',
         tipoFreteOriginal: c.tipoFreteOriginal || '',
         frete: c.frete || 0,
