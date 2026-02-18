@@ -300,21 +300,21 @@ export async function buscarNfesDoACS(filtros?: {
     codEmpresa: filtros?.postoId,
   });
 
-  // Mapeamento de cod_empresa para nomes de postos
+  // Mapeamento de cod_empresa para nomes de postos (baseado em codigoAcs do banco PEPS)
   const MAPA_POSTOS: Record<string, string> = {
-    "01": "NOVO GUERRA - Fotim",
-    "02": "PALHANO",
-    "03": "NOVO GUERRA - Itaiçaba",
-    "04": "PAI TEREZA",
-    "05": "LEITE LEITE",
-    "06": "MÃE E FILHO",
-    "07": "GUERRA COMB.",
-    "08": "JAGUARUANA",
-    "09": "GUERRA COMB. LTDA",
+    "01": "POSTO GUERRA FORTIM",
+    "02": "POSTO POTIRETAMA",
+    "03": "POSTO GUERRA PALHANO",
+    "04": "POSTO PAI TEREZA",
+    "05": "POSTO LEITE",
+    "06": "REDE SUPER PETROLEO",
+    "07": "POSTO GUERRA SAO JOAO DO JAGUARIBE",
+    "08": "POSTO JAGUARUANA",
+    "09": "POSTO ITAIÇABA",
     "10": "SG PETROLEO",
-    "11": "GUARARAPES",
-    "12": "ARACATI",
-    "13": "HORIZONTE",
+    "11": "POSTO GUARARAPES VIP",
+    "12": "POSTO ARACATI",
+    "13": "POSTO HORIZONTE",
   };
 
   const nfesEnriquecidas = await Promise.all(
