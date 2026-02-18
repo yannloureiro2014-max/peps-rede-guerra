@@ -26,6 +26,13 @@ export async function criarLoteDoSEFAZ(dados: {
   custoUnitario: number;
   justificativa?: string;
   usuarioId: number;
+  // Dados extras da NFe
+  nomeFornecedor?: string;
+  nomeProduto?: string;
+  tipoFrete?: string;
+  custoUnitarioProduto?: number;
+  custoUnitarioFrete?: number;
+  valorFrete?: number;
 }): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("Database connection failed");
@@ -44,6 +51,12 @@ export async function criarLoteDoSEFAZ(dados: {
     tanqueId: dados.tanqueId,
     produtoId: dados.produtoId,
     fornecedorId: dados.fornecedorId,
+    nomeFornecedor: dados.nomeFornecedor || null,
+    nomeProduto: dados.nomeProduto || null,
+    tipoFrete: dados.tipoFrete || null,
+    custoUnitarioProduto: dados.custoUnitarioProduto?.toString() || null,
+    custoUnitarioFrete: dados.custoUnitarioFrete?.toString() || null,
+    valorFrete: dados.valorFrete?.toString() || null,
     quantidadeOriginal: dados.volumeAlocado.toString(),
     quantidadeDisponivel: dados.volumeAlocado.toString(),
     custoUnitario: dados.custoUnitario.toString(),
@@ -84,9 +97,19 @@ export async function listarNfesAlocadas(filtros: {
     id: number;
     chaveNfe: string;
     numeroNf: string;
+    serieNf: string;
+    dataEmissao: Date | null;
     dataEntrada: Date;
     postoId: number;
     tanqueId: number;
+    nomePosto: string;
+    nomeTanque: string;
+    nomeFornecedor: string | null;
+    nomeProduto: string | null;
+    tipoFrete: string | null;
+    custoUnitarioProduto: number;
+    custoUnitarioFrete: number;
+    valorFrete: number;
     volumeAlocado: number;
     custoUnitario: number;
     custoTotal: number;
@@ -117,13 +140,30 @@ export async function listarNfesAlocadas(filtros: {
     .where(and(...conditions))
     .orderBy(desc(lotes.dataEntrada));
 
+  // Buscar nomes dos postos e tanques
+  const { postos: postosTable, tanques: tanquesTable } = await import("../drizzle/schema");
+  const todosPostos = await db.select().from(postosTable);
+  const todosTanques = await db.select().from(tanquesTable);
+  const postosMap = new Map(todosPostos.map((p: any) => [p.id, p.nome]));
+  const tanquesMap = new Map(todosTanques.map((t: any) => [t.id, `Tanque ${t.codigoAcs} - ${t.produtoDescricao || 'Sem produto'} (${Number(t.capacidade)?.toLocaleString('pt-BR')}L)`]));
+
   return resultados.map((r: any) => ({
     id: r.id,
     chaveNfe: r.chaveNfe,
     numeroNf: r.numeroNf,
+    serieNf: r.serieNf || '1',
+    dataEmissao: r.dataEmissao,
     dataEntrada: r.dataEntrada,
     postoId: r.postoId,
     tanqueId: r.tanqueId,
+    nomePosto: postosMap.get(r.postoId) || `Posto ${r.postoId}`,
+    nomeTanque: tanquesMap.get(r.tanqueId) || `Tanque ${r.tanqueId}`,
+    nomeFornecedor: r.nomeFornecedor || null,
+    nomeProduto: r.nomeProduto || null,
+    tipoFrete: r.tipoFrete || null,
+    custoUnitarioProduto: parseFloat(r.custoUnitarioProduto || '0'),
+    custoUnitarioFrete: parseFloat(r.custoUnitarioFrete || '0'),
+    valorFrete: parseFloat(r.valorFrete || '0'),
     volumeAlocado: parseFloat(r.quantidadeOriginal),
     custoUnitario: parseFloat(r.custoUnitario),
     custoTotal: parseFloat(r.custoTotal),

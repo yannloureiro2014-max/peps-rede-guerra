@@ -124,6 +124,13 @@ export const alocacoesFisicasRouter = router({
         volumeAlocado: z.number().positive(),
         custoUnitarioAplicado: z.number().positive(),
         justificativa: z.string().optional(),
+        // Dados extras da NFe para persistir
+        nomeFornecedor: z.string().optional(),
+        nomeProduto: z.string().optional(),
+        tipoFrete: z.string().optional(),
+        custoUnitarioProduto: z.number().optional(),
+        custoUnitarioFrete: z.number().optional(),
+        valorFrete: z.number().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -142,6 +149,12 @@ export const alocacoesFisicasRouter = router({
           custoUnitario: input.custoUnitarioAplicado,
           justificativa: input.justificativa,
           usuarioId: ctx.user.id,
+          nomeFornecedor: input.nomeFornecedor,
+          nomeProduto: input.nomeProduto,
+          tipoFrete: input.tipoFrete,
+          custoUnitarioProduto: input.custoUnitarioProduto,
+          custoUnitarioFrete: input.custoUnitarioFrete,
+          valorFrete: input.valorFrete,
         });
 
         const custoTotalAlocado = input.volumeAlocado * input.custoUnitarioAplicado;

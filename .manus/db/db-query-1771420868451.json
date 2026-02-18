@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE lotes ADD COLUMN nomeFornecedor VARCHAR(300) NULL AFTER chaveNfe; ALTER TABLE lotes ADD COLUMN nomeProduto VARCHAR(200) NULL AFTER nomeFornecedor; ALTER TABLE lotes ADD COLUMN tipoFrete VARCHAR(10) NULL AFTER nomeProduto; ALTER TABLE lotes ADD COLUMN custoUnitarioProduto DECIMAL(12,4) NULL AFTER tipoFrete; ALTER TABLE lotes ADD COLUMN custoUnitarioFrete DECIMAL(12,4) NULL AFTER custoUnitarioProduto; ALTER TABLE lotes ADD COLUMN valorFrete DECIMAL(12,2) NULL AFTER custoUnitarioFrete;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute ALTER TABLE lotes ADD COLUMN nomeFornecedor VARCHAR(300) NULL AFTER chaveNfe; ALTER TABLE lotes ADD COLUMN nomeProduto VARCHAR(200) NULL AFTER nomeFornecedor; ALTER TABLE lotes ADD COLUMN tipoFrete VARCHAR(10) NULL AFTER nomeProduto; ALTER TABLE lotes ADD COLUMN custoUnitarioProduto DECIMAL(12,4) NULL AFTER tipoFrete; ALTER TABLE lotes ADD COLUMN custoUnitarioFrete DECIMAL(12,4) NULL AFTER custoUnitarioProduto; ALTER TABLE lotes ADD COLUMN valorFrete DECIMAL(12,2) NULL AFTER custoUnitarioFrete;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 7068
+}

@@ -561,3 +561,10 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [x] Limpar 12 alocações antigas do banco - DELETE de consumo_lotes e lotes, base zerada
 - [x] Mapear códigos de combustíveis do ACS - JOIN com tabela 'produtos' (tipo='C'): GASOLINA C COMUM, ETANOL HIDRATADO COMUM, OLEO DIESEL B S10, etc.
 - [x] Melhorar nomes dos tanques no dropdown - corrigido mapeamento de campos (codigoAcs, produtoDescricao, capacidade)
+
+## Filtro por Combustível + Informações na Aba Alocadas
+
+- [x] Adicionar filtro por tipo de combustível (Gasolina, Diesel, Etanol) na aba NFes Pendentes - dropdown filtra 195 NFes por tipo (Etanol=25, Diesel, Gasolina)
+- [x] Replicar todas as informações da aba NFes Pendentes na aba NFes Alocadas - mesmas colunas + Posto Destino + Tanque + Status
+- [x] Salvar dados extras na criação do lote (fornecedor, produto, tipoFrete, custos) para independência do ACS
+- [x] Schema atualizado com 6 novos campos na tabela lotes (nomeFornecedor, nomeProduto, tipoFrete, custoUnitarioProduto, custoUnitarioFrete, valorFrete)

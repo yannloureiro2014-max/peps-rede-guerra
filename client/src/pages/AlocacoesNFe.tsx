@@ -19,6 +19,7 @@ export default function AlocacoesNFe() {
 
   // Filtros
   const [filtroPostoId, setFiltroPostoId] = useState("todos");
+  const [filtroCombustivel, setFiltroCombustivel] = useState("todos");
   const [dataInicioInput, setDataInicioInput] = useState("2025-12-01");
   const [dataFimInput, setDataFimInput] = useState(() => new Date().toISOString().split("T")[0]);
 
@@ -67,10 +68,22 @@ export default function AlocacoesNFe() {
     { enabled: true }
   );
 
-  // NFes filtradas (já vem filtradas do backend agora)
-  const nfesFiltradas = useMemo(() => {
-    return nfesQuery.data?.dados || [];
+  // Tipos de combustíveis disponíveis (extraídos das NFes)
+  const combustiveisDisponiveis = useMemo(() => {
+    const dados = nfesQuery.data?.dados || [];
+    const tipos = new Set<string>();
+    dados.forEach((nfe: any) => {
+      if (nfe.produto) tipos.add(nfe.produto);
+    });
+    return Array.from(tipos).sort();
   }, [nfesQuery.data]);
+
+  // NFes filtradas (backend + filtro local de combustível)
+  const nfesFiltradas = useMemo(() => {
+    const dados = nfesQuery.data?.dados || [];
+    if (filtroCombustivel === 'todos') return dados;
+    return dados.filter((nfe: any) => nfe.produto === filtroCombustivel);
+  }, [nfesQuery.data, filtroCombustivel]);
 
   // Encontrar NFe selecionada
   const selectedNfe = useMemo(() => {
@@ -145,6 +158,13 @@ export default function AlocacoesNFe() {
       dataDescargaReal: novaAlocacao.dataDescarga,
       horaDescargaReal: novaAlocacao.horaDescarga,
       justificativa: novaAlocacao.justificativa,
+      // Dados extras da NFe para persistir
+      nomeFornecedor: selectedNfe.nomeFornecedor || undefined,
+      nomeProduto: selectedNfe.produto || undefined,
+      tipoFrete: selectedNfe.tipoFrete || undefined,
+      custoUnitarioProduto: selectedNfe.custoUnitarioProduto || undefined,
+      custoUnitarioFrete: selectedNfe.custoUnitarioFrete || undefined,
+      valorFrete: selectedNfe.frete || undefined,
     });
   };
 
@@ -232,10 +252,9 @@ export default function AlocacoesNFe() {
 
         {/* Abas */}
         <Tabs defaultValue="pendentes" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="pendentes">NFes Pendentes</TabsTrigger>
             <TabsTrigger value="alocadas">NFes Alocadas</TabsTrigger>
-            <TabsTrigger value="realizadas">Alocações Realizadas</TabsTrigger>
           </TabsList>
 
           {/* NFes Pendentes */}
@@ -250,9 +269,23 @@ export default function AlocacoesNFe() {
               <Card><CardContent className="pt-6 text-center text-gray-500">Nenhuma NFe encontrada para o período e posto selecionados</CardContent></Card>
             ) : (
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-600 font-semibold">{nfesFiltradas.length} NFe(s) encontrada(s)</p>
-                  <p className="text-xs text-gray-400">Origem: {nfesQuery.data?.origem || 'ACS'}</p>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <p className="text-sm text-gray-600 font-semibold">{nfesFiltradas.length} NFe(s) encontrada(s){filtroCombustivel !== 'todos' ? ` (filtro: ${filtroCombustivel})` : ''}</p>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs">Combustível:</Label>
+                    <Select value={filtroCombustivel} onValueChange={setFiltroCombustivel}>
+                      <SelectTrigger className="w-[220px] h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os combustíveis</SelectItem>
+                        {combustiveisDisponiveis.map((c: string) => (
+                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-400">Origem: {nfesQuery.data?.origem || 'ACS'}</p>
+                  </div>
                 </div>
 
                 {/* Cabeçalho da tabela */}
@@ -399,80 +432,128 @@ export default function AlocacoesNFe() {
             ) : (
               <div className="space-y-3">
                 <p className="text-sm text-gray-600 font-semibold">{alocacoesQuery.data?.total || 0} alocação(ões) encontrada(s)</p>
-                {(alocacoesQuery.data?.dados || []).map((alocacao: any) => (
-                  <Card key={alocacao.id}>
+
+                {/* Cabeçalho da tabela de alocadas */}
+                <div className="hidden lg:grid grid-cols-11 gap-2 px-4 py-2 bg-gray-100 rounded-lg text-xs font-semibold text-gray-600 uppercase">
+                  <div>NF</div>
+                  <div>Data Emissão</div>
+                  <div>Fornecedor</div>
+                  <div>Produto</div>
+                  <div>Volume</div>
+                  <div>Custo Produto/L</div>
+                  <div>Frete</div>
+                  <div>Custo Total/L</div>
+                  <div>Posto Destino</div>
+                  <div>Tanque</div>
+                  <div>Status</div>
+                </div>
+
+                {(alocacoesQuery.data?.dados || []).map((a: any) => (
+                  <Card key={a.id} className="hover:shadow-md transition-shadow">
                     <CardContent className="pt-4 pb-4">
-                      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 items-center">
+                      <div className="grid grid-cols-2 lg:grid-cols-11 gap-3 items-center">
+                        {/* NF */}
                         <div>
-                          <p className="text-xs text-gray-400">NF</p>
-                          <p className="font-semibold">{alocacao.numeroNf}</p>
+                          <p className="text-xs text-gray-400 lg:hidden">NF</p>
+                          <p className="font-semibold text-sm">{a.numeroNf}</p>
+                          <p className="text-xs text-gray-400">Série {a.serieNf || '1'}</p>
                         </div>
+
+                        {/* Data Emissão */}
                         <div>
-                          <p className="text-xs text-gray-400">Data Entrada</p>
-                          <p className="text-sm">{formatDate(alocacao.dataEntrada)}</p>
+                          <p className="text-xs text-gray-400 lg:hidden">Data Emissão</p>
+                          <p className="text-sm">{formatDate(a.dataEmissao)}</p>
+                          <p className="text-[10px] text-gray-400">Desc: {formatDate(a.dataEntrada)}</p>
                         </div>
+
+                        {/* Fornecedor */}
                         <div>
-                          <p className="text-xs text-gray-400">Volume</p>
-                          <p className="font-semibold">{alocacao.volumeAlocado?.toLocaleString('pt-BR')} L</p>
+                          <p className="text-xs text-gray-400 lg:hidden">Fornecedor</p>
+                          <p className="text-sm truncate" title={a.nomeFornecedor || '-'}>
+                            {a.nomeFornecedor || '-'}
+                          </p>
                         </div>
+
+                        {/* Produto */}
                         <div>
-                          <p className="text-xs text-gray-400">Custo Unit.</p>
-                          <p className="text-sm">{formatCurrency(alocacao.custoUnitario || 0, 4)}</p>
+                          <p className="text-xs text-gray-400 lg:hidden">Produto</p>
+                          <p className="text-sm truncate" title={a.nomeProduto || '-'}>
+                            {a.nomeProduto || '-'}
+                          </p>
                         </div>
+
+                        {/* Volume */}
                         <div>
-                          <p className="text-xs text-gray-400">Custo Total</p>
-                          <p className="font-semibold">{formatCurrency(alocacao.custoTotal || 0)}</p>
+                          <p className="text-xs text-gray-400 lg:hidden">Volume</p>
+                          <p className="font-semibold text-sm">{a.volumeAlocado?.toLocaleString('pt-BR')} L</p>
                         </div>
+
+                        {/* Custo Produto/L */}
+                        <div>
+                          <p className="text-xs text-gray-400 lg:hidden">Custo Produto/L</p>
+                          <p className="text-sm">{a.custoUnitarioProduto > 0 ? formatCurrency(a.custoUnitarioProduto, 4) : formatCurrency(a.custoUnitario, 4)}</p>
+                        </div>
+
+                        {/* Frete */}
+                        <div>
+                          <p className="text-xs text-gray-400 lg:hidden">Frete</p>
+                          <div className="flex flex-col">
+                            <span className={`inline-block w-fit px-2 py-0.5 rounded text-xs font-semibold ${
+                              a.tipoFrete === 'FOB' 
+                                ? 'bg-amber-100 text-amber-800' 
+                                : 'bg-green-100 text-green-800'
+                            }`}>
+                              {a.tipoFrete || 'CIF'}
+                            </span>
+                            {a.tipoFrete === 'FOB' && a.custoUnitarioFrete > 0 && (
+                              <span className="text-xs text-amber-700 font-semibold mt-0.5">
+                                +{formatCurrency(a.custoUnitarioFrete, 4)}/L
+                              </span>
+                            )}
+                            {a.tipoFrete === 'FOB' && a.valorFrete > 0 && (
+                              <span className="text-[10px] text-gray-500 mt-0.5">
+                                Total: {formatCurrency(a.valorFrete)}
+                              </span>
+                            )}
+                            {a.tipoFrete === 'FOB' && (!a.valorFrete || a.valorFrete === 0) && (
+                              <span className="text-xs text-red-600 font-semibold mt-0.5">⚠ Sem frete</span>
+                            )}
+                            {(!a.tipoFrete || a.tipoFrete === 'CIF') && (
+                              <span className="text-[10px] text-green-600 mt-0.5">Incluso</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Custo Total/L */}
+                        <div>
+                          <p className="text-xs text-gray-400 lg:hidden">Custo Total/L</p>
+                          <p className="font-bold text-sm text-emerald-700">
+                            {formatCurrency(a.custoUnitario || 0, 4)}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Total: {formatCurrency(a.custoTotal || 0)}
+                          </p>
+                        </div>
+
+                        {/* Posto Destino */}
+                        <div>
+                          <p className="text-xs text-gray-400 lg:hidden">Posto</p>
+                          <p className="text-sm truncate" title={a.nomePosto}>{a.nomePosto}</p>
+                        </div>
+
+                        {/* Tanque */}
+                        <div>
+                          <p className="text-xs text-gray-400 lg:hidden">Tanque</p>
+                          <p className="text-xs truncate" title={a.nomeTanque}>{a.nomeTanque}</p>
+                        </div>
+
+                        {/* Status */}
                         <div>
                           <span className={`text-xs font-semibold px-3 py-1 rounded ${
-                            alocacao.status === 'ativo' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                            a.status === 'ativo' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
                           }`}>
-                            {alocacao.status === 'ativo' ? 'Ativa' : alocacao.status}
+                            {a.status === 'ativo' ? 'Ativa' : a.status}
                           </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Alocações Realizadas */}
-          <TabsContent value="realizadas" className="space-y-4">
-            {alocacoesQuery.isLoading ? (
-              <Card><CardContent className="pt-6">Carregando...</CardContent></Card>
-            ) : alocacoesQuery.data?.total === 0 ? (
-              <Card><CardContent className="pt-6 text-center text-gray-500">Nenhuma alocação realizada ainda</CardContent></Card>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-gray-600 font-semibold">{alocacoesQuery.data?.total || 0} alocação(ões) realizada(s)</p>
-                {(alocacoesQuery.data?.dados || []).map((alocacao: any) => (
-                  <Card key={alocacao.id}>
-                    <CardContent className="pt-4 pb-4">
-                      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 items-center">
-                        <div>
-                          <p className="text-xs text-gray-400">NF</p>
-                          <p className="font-semibold">{alocacao.numeroNf}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-400">Volume</p>
-                          <p className="font-semibold">{alocacao.volumeAlocado?.toLocaleString('pt-BR')} L</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-400">Tanque</p>
-                          <p className="text-sm">{alocacao.tanqueId || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-400">Data Entrada</p>
-                          <p className="text-sm">{formatDate(alocacao.dataEntrada)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-400">Custo Total</p>
-                          <p className="font-semibold">{formatCurrency(alocacao.custoTotal || 0)}</p>
-                        </div>
-                        <div>
-                          <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-3 py-1 rounded">Realizada</span>
                         </div>
                       </div>
                     </CardContent>
