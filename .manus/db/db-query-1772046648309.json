@@ -1,0 +1,9 @@
+{
+  "query": "SELECT DATE(dataVenda) as data, COUNT(*) as qtd, SUM(quantidade) as litros FROM vendas WHERE dataVenda >= '2026-02-18' GROUP BY DATE(dataVenda) ORDER BY data DESC LIMIT 15",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT DATE(dataVenda) as data, COUNT(*) as qtd, SUM(quantidade) as litros FROM vendas WHERE dataVenda >= '2026-02-18' GROUP BY DATE(dataVenda) ORDER BY data DESC LIMIT 15",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 386
+}

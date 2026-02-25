@@ -12,6 +12,7 @@ export default function Configuracoes() {
   const [estoqueMinimo, setEstoqueMinimo] = useState("1000");
   const [toleranciaDiferenca, setToleranciaDiferenca] = useState("0.5");
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
+  const [syncVendasStatus, setSyncVendasStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
   const [mensagem, setMensagem] = useState<string | null>(null);
 
   const { data: ultimaSync, refetch: refetchSync } = trpc.dashboard.ultimaSincronizacao.useQuery();
@@ -38,11 +39,11 @@ export default function Configuracoes() {
     onSuccess: (result: any) => {
       if (result.success) {
         setSyncStatus("success");
-        setMensagem("Sincronização concluída com sucesso!");
+        setMensagem("Sincronização de medições concluída com sucesso!");
         refetchSync();
       } else {
         setSyncStatus("error");
-        setMensagem("Sincronização concluída com erros");
+        setMensagem("Sincronização de medições concluída com erros");
       }
       setTimeout(() => {
         setMensagem(null);
@@ -51,7 +52,7 @@ export default function Configuracoes() {
     },
     onError: (error: any) => {
       setSyncStatus("error");
-      setMensagem("Erro na sincronização: " + error.message);
+      setMensagem("Erro na sincronização de medições: " + error.message);
       setTimeout(() => {
         setMensagem(null);
         setSyncStatus("idle");
@@ -59,8 +60,41 @@ export default function Configuracoes() {
     }
   });
 
+  const sincronizarVendas = trpc.sync.sincronizarVendas.useMutation({
+    onMutate: () => {
+      setSyncVendasStatus("syncing");
+      setMensagem("Sincronizando vendas com ACS...");
+    },
+    onSuccess: (result: any) => {
+      if (result.success) {
+        setSyncVendasStatus("success");
+        setMensagem(`Vendas sincronizadas! ${result.inseridos || 0} novas, ${result.total || 0} processadas.`);
+        refetchSync();
+      } else {
+        setSyncVendasStatus("error");
+        setMensagem("Sincronização de vendas com erros: " + (result.error || ""));
+      }
+      setTimeout(() => {
+        setMensagem(null);
+        setSyncVendasStatus("idle");
+      }, 8000);
+    },
+    onError: (error: any) => {
+      setSyncVendasStatus("error");
+      setMensagem("Erro na sincronização de vendas: " + error.message);
+      setTimeout(() => {
+        setMensagem(null);
+        setSyncVendasStatus("idle");
+      }, 5000);
+    }
+  });
+
   const handleSincronizar = () => {
     sincronizarMedicoes.mutate({});
+  };
+
+  const handleSincronizarVendas = () => {
+    sincronizarVendas.mutate({ dias: 7 });
   };
 
   const salvarConfiguracoes = () => {
@@ -212,9 +246,41 @@ export default function Configuracoes() {
                 )}
               </Button>
 
+              <Separator />
+
+              {/* Botão de Sincronização de Vendas */}
+              <Button 
+                onClick={handleSincronizarVendas} 
+                disabled={syncVendasStatus === "syncing"}
+                className="w-full"
+                variant={syncVendasStatus === "success" ? "outline" : "default"}
+              >
+                {syncVendasStatus === "syncing" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Sincronizando Vendas...
+                  </>
+                ) : syncVendasStatus === "success" ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Vendas Sincronizadas!
+                  </>
+                ) : syncVendasStatus === "error" ? (
+                  <>
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    Tentar Novamente (Vendas)
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Sincronizar Vendas
+                  </>
+                )}
+              </Button>
+
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  <strong>Sincronização:</strong> Importa medições físicas diárias do banco de dados ACS em lotes de 7 dias para melhor performance.
+                  <strong>Sincronização Automática:</strong> Vendas e medições são sincronizadas automaticamente a cada 60 minutos. Use os botões acima para forçar uma sincronização imediata.
                 </p>
               </div>
             </CardContent>

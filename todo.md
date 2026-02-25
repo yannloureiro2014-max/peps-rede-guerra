@@ -581,3 +581,80 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [x] NFe alocada deve ser removida da aba Pendentes após alocação - filtro implementado no buscarNfesDoACS
 - [x] Filtrar NFes já alocadas (busca chaveNfe da tabela lotes e exclui do resultado: 195 total -> 194 pendentes)
 - [x] Testado: alocar NFe -> buscar pendentes -> NFe não aparece (1 filtrada com sucesso)
+
+
+## Sincronização Resiliente - Banco Espelho do ACS
+
+### Fase 1: Campos de Auditoria nas Tabelas Espelho
+- [ ] Adicionar coluna `ultimaSincronizacao` (timestamp) em vendas, lotes, medições, postos
+- [ ] Adicionar coluna `statusSincronizacao` (enum: pendente, sincronizando, sincronizado, erro)
+- [ ] Adicionar coluna `erroSincronizacao` (texto com mensagem de erro)
+- [ ] Criar tabela `sincronizacao_log` para auditoria de todas as sincronizações
+- [ ] Executar migration para adicionar campos
+
+### Fase 2: Tratamento de Erros no ETL
+- [ ] Implementar retry automático (3 tentativas com backoff exponencial)
+- [ ] Adicionar logging detalhado de cada sincronização
+- [ ] Implementar alertas quando sincronização falha por >2 horas
+- [ ] Criar função `sincronizarComFallback()` que usa banco espelho se ACS indisponível
+- [ ] Adicionar notificação ao owner quando ACS cair
+
+### Fase 3: Dashboard de Sincronização
+- [ ] Criar página Status de Sincronização com cards de status
+- [ ] Mostrar última sincronização bem-sucedida por tabela
+- [ ] Mostrar próxima sincronização agendada
+- [ ] Mostrar histórico das últimas 10 sincronizações (sucesso/erro)
+- [ ] Mostrar tempo de resposta do ACS
+- [ ] Indicador visual: ACS Online/Offline
+- [ ] Botão para forçar sincronização manual
+- [ ] Botão para testar conexão com ACS
+
+### Fase 4: Fallback Automático
+- [ ] Implementar fallback automático quando ACS não responde
+- [ ] Usar dados do banco espelho com notificação ao usuário
+- [ ] Mostrar badge "Usando dados em cache" quando em fallback
+- [ ] Mostrar timestamp da última sincronização bem-sucedida
+- [ ] Retentar conexão com ACS a cada 5 minutos
+- [ ] Voltar para ACS automaticamente quando online novamente
+
+
+## Próximas Melhorias - Fase 2 (Recomendações)
+
+### Alocação em Lote
+- [ ] Adicionar checkbox em cada linha da tabela de NFes Pendentes
+- [ ] Adicionar botão "Alocar Selecionadas" que aparece quando há NFes marcadas
+- [ ] Dialog de alocação em lote: selecionar um posto/tanque e alocar todas de uma vez
+- [ ] Validar que todas as NFes selecionadas têm o mesmo combustível
+- [ ] Testar alocação de múltiplas NFes
+
+### Validação de Volume no Tanque
+- [ ] Buscar estoque atual do tanque (soma de lotes ativos - consumo)
+- [ ] Calcular volume disponível = capacidade - estoque atual
+- [ ] Ao alocar, verificar se volume da NFe cabe no tanque
+- [ ] Mostrar alerta se volume ultrapassar capacidade
+- [ ] Permitir alocação parcial (alocar apenas parte do volume)
+
+### Dashboard de Sincronização
+- [ ] Criar nova página "Sincronização" no menu principal
+- [ ] Mostrar status de cada tabela (postos, vendas, lotes, medições)
+- [ ] Exibir última sincronização, próxima sincronização agendada
+- [ ] Botão "Sincronizar Agora" para forçar sincronização manual
+- [ ] Histórico de sincronizações (últimas 10)
+- [ ] Alertas de falhas de sincronização
+
+
+## Bug: NFes dos últimos 7 dias não sincronizam
+
+- [ ] Investigar filtro de data na query do ACS (buscarComprasDoACS)
+- [ ] Verificar se a data final está sendo passada corretamente
+- [ ] Corrigir e testar busca com datas recentes
+
+## Bug: Vendas dos últimos 7 dias não sincronizando (zeradas) - RESOLVIDO
+
+- [x] Investigar sincronização de vendas do ACS para os últimos 7 dias - ACS tinha dados, PEPS não
+- [x] Verificar se há dados de vendas no ACS para o período recente - SIM, ~1.600/dia
+- [x] Identificar causa raiz - função sincronizarVendasACS foi removida no commit 8e9eb2a, autoSync só sincronizava medições
+- [x] Corrigir sincronização de vendas - recriada sincronizarVendasACS com busca por empresa individual e batch insert
+- [x] Integrar ao autoSync - vendas sincronizadas a cada 60min junto com medições
+- [x] Adicionar botão "Sincronizar Vendas" na página de Configurações
+- [x] Testar e validar - 10.732 vendas inseridas (18/02 a 25/02), dados completos

@@ -1,7 +1,7 @@
 import pg from "pg";
 import { getDb } from "./db";
-import { medicoes, postos, tanques, syncLogs } from "../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { medicoes, postos, tanques, syncLogs, vendas, produtos } from "../drizzle/schema";
+import { eq, gte, sql } from "drizzle-orm";
 
 const ACS_CONFIG = {
   host: "177.87.120.172",
@@ -284,6 +284,223 @@ export async function sincronizarMedicoesACS(diasAtras: number = 90) {
     return { success: false, error: String(error), inseridos, atualizados, ignorados, total: totalRegistros };
   } finally {
     acsClient.release();
+  }
+}
+
+// NOVA FUNÇÃO: Sincronizar vendas (abastecimentos) do ACS
+export async function sincronizarVendasACS(diasAtras: number = 7) {
+  const db = await getDb();
+  if (!db) {
+    console.error("[ETL] Database PEPS not available");
+    return { success: false, error: "Database PEPS not available", inseridos: 0, ignorados: 0, total: 0 };
+  }
+
+  const tempoInicio = Date.now();
+  let inseridos = 0;
+  let ignorados = 0;
+  let totalRegistros = 0;
+
+  try {
+    // Calcular data de início
+    const dataInicioCalc = new Date();
+    dataInicioCalc.setDate(dataInicioCalc.getDate() - diasAtras);
+    const dataInicioStr = dataInicioCalc.toISOString().split("T")[0];
+    const dataInicioFinal = dataInicioStr > DATA_CORTE ? dataInicioStr : DATA_CORTE;
+
+    console.log(`[ETL] ⏱️ Iniciando sincronização de vendas (desde: ${dataInicioFinal}, diasAtras=${diasAtras})`);
+
+    // Buscar postos ATIVOS, tanques e produtos do PEPS
+    const postosDb = await db.select().from(postos).where(eq(postos.ativo, 1));
+    const tanquesDb = await db.select().from(tanques);
+    const produtosDb = await db.select().from(produtos);
+    console.log(`[ETL] 📍 ${postosDb.length} postos, ${tanquesDb.length} tanques, ${produtosDb.length} produtos`);
+
+    // Buscar codigoAcs existentes no período para evitar duplicatas
+    const existentes = await db.select({ codigoAcs: vendas.codigoAcs })
+      .from(vendas)
+      .where(gte(vendas.dataVenda, new Date(dataInicioFinal + 'T00:00:00.000Z')));
+    const existentesSet = new Set(existentes.map(e => e.codigoAcs));
+    console.log(`[ETL] 📊 ${existentesSet.size} vendas já existentes no período`);
+
+    // ETAPA 1: Buscar abastecimentos do ACS por empresa individualmente
+    // (evita timeout em queries grandes)
+    const codEmpresaList = postosDb.map(p => p.codigoAcs);
+    let acsRows: any[] = [];
+
+    for (const codEmpresa of codEmpresaList) {
+      const acsClient = await getAcsClient();
+      if (!acsClient) {
+        console.warn(`[ETL] ⚠️ Não foi possível conectar ao ACS para empresa ${codEmpresa}`);
+        continue;
+      }
+      try {
+        const result = await Promise.race([
+          acsClient.query(`
+            SELECT 
+              a.cod_empresa,
+              a.codigo as cod_abastecimento,
+              a.cod_tanque,
+              a.cod_combustivel,
+              a.dt_abast,
+              a.litros,
+              a.preco,
+              a.total,
+              a.tipo_combustivel,
+              a.afericao
+            FROM abastecimentos a
+            WHERE a.dt_abast >= $1
+              AND a.baixado = 'S'
+              AND a.cod_empresa = $2
+            ORDER BY a.dt_abast ASC
+          `, [dataInicioFinal, codEmpresa]),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`Timeout empresa ${codEmpresa}`)), 60000)
+          ),
+        ]);
+        if (result?.rows) {
+          acsRows = acsRows.concat(result.rows);
+          console.log(`[ETL]   Empresa ${codEmpresa}: ${result.rows.length} abastecimentos`);
+        }
+      } catch (queryError) {
+        console.error(`[ETL] ❌ Erro ao buscar empresa ${codEmpresa}:`, queryError);
+      } finally {
+        acsClient.release();
+      }
+    }
+
+    totalRegistros = acsRows.length;
+    console.log(`[ETL] 📦 Total: ${totalRegistros} abastecimentos do ACS`);
+
+    if (totalRegistros === 0) {
+      console.log(`[ETL] ✅ Nenhum abastecimento novo encontrado`);
+      return { success: true, inseridos: 0, ignorados: 0, total: 0 };
+    }
+
+    // ETAPA 2: Processar e preparar registros para inserção
+    const registrosParaInserir: any[] = [];
+
+    for (const row of acsRows) {
+      const codEmpresa = row.cod_empresa?.trim();
+      const codTanque = row.cod_tanque?.trim();
+      const codAbast = row.cod_abastecimento?.trim();
+
+      if (!codEmpresa || !codAbast) {
+        ignorados++;
+        continue;
+      }
+
+      const codigoVendaAcs = `${codEmpresa}-${codAbast}`;
+      if (existentesSet.has(codigoVendaAcs)) {
+        continue; // Já existe, pular
+      }
+
+      const posto = postosDb.find(p => p.codigoAcs === codEmpresa);
+      if (!posto) {
+        ignorados++;
+        continue;
+      }
+
+      const tanque = tanquesDb.find(t => t.postoId === posto.id && t.codigoAcs === codTanque);
+
+      const codCombustivel = row.cod_combustivel?.trim();
+      let produto = produtosDb.find(p => p.codigoAcs === codCombustivel);
+      if (!produto) {
+        const tipoComb = row.tipo_combustivel?.trim();
+        const descPadrao = TIPOS_COMBUSTIVEL[tipoComb] || tipoComb;
+        if (descPadrao) {
+          produto = produtosDb.find(p => p.descricao?.includes(descPadrao.split(" ")[0] || ""));
+        }
+      }
+
+      const isAfericao = row.afericao?.trim() === 'S' ? 1 : 0;
+      const litros = parseFloat(String(row.litros || "0"));
+      const preco = parseFloat(String(row.preco || "0"));
+      const total = parseFloat(String(row.total || "0"));
+
+      if (litros <= 0) {
+        ignorados++;
+        continue;
+      }
+
+      registrosParaInserir.push({
+        postoId: posto.id,
+        tanqueId: tanque?.id || null,
+        produtoId: produto?.id || null,
+        codigoAcs: codigoVendaAcs,
+        dataVenda: new Date(row.dt_abast),
+        quantidade: litros.toFixed(3),
+        valorUnitario: preco.toFixed(4),
+        valorTotal: total.toFixed(2),
+        afericao: isAfericao,
+        statusCmv: isAfericao ? "calculado" as const : "pendente" as const,
+        origem: "acs",
+      });
+      existentesSet.add(codigoVendaAcs);
+    }
+
+    console.log(`[ETL] 📝 ${registrosParaInserir.length} registros novos para inserir`);
+
+    // ETAPA 3: Inserir em batches no PEPS
+    const BATCH_SIZE = 200;
+    for (let i = 0; i < registrosParaInserir.length; i += BATCH_SIZE) {
+      const batch = registrosParaInserir.slice(i, i + BATCH_SIZE);
+      try {
+        await db.insert(vendas).values(batch).onDuplicateKeyUpdate({ set: { origem: "acs" } });
+        inseridos += batch.length;
+      } catch (batchError: any) {
+        // Se batch falhar, tentar um por um
+        for (const reg of batch) {
+          try {
+            await db.insert(vendas).values(reg).onDuplicateKeyUpdate({ set: { origem: "acs" } });
+            inseridos++;
+          } catch (singleError: any) {
+            if (!String(singleError).includes('Duplicate entry')) {
+              console.error(`[ETL] Erro ao inserir venda ${reg.codigoAcs}:`, singleError);
+            }
+            ignorados++;
+          }
+        }
+      }
+
+      if ((i + BATCH_SIZE) % 2000 < BATCH_SIZE) {
+        console.log(`[ETL] 📈 Inseridos: ${inseridos}/${registrosParaInserir.length}`);
+      }
+    }
+
+    const tempoTotal = Date.now() - tempoInicio;
+    console.log(`[ETL] ✅ Sincronização de vendas concluída em ${tempoTotal}ms`);
+    console.log(`[ETL] 📊 Resumo vendas: ${inseridos} inseridas, ${ignorados} ignoradas, ${totalRegistros} total`);
+
+    // Registrar log de sincronização
+    await db.insert(syncLogs).values({
+      tipo: "vendas",
+      dataInicio: new Date(tempoInicio),
+      dataFim: new Date(),
+      registrosProcessados: totalRegistros,
+      registrosInseridos: inseridos,
+      registrosIgnorados: ignorados,
+      status: "sucesso",
+      mensagem: `Sincronizadas ${inseridos} vendas em ${tempoTotal}ms (desde ${dataInicioFinal})`,
+    });
+
+    return { success: true, inseridos, ignorados, total: totalRegistros };
+  } catch (error) {
+    const tempoTotal = Date.now() - tempoInicio;
+    console.error(`[ETL] ❌ Erro geral ao sincronizar vendas (${tempoTotal}ms):`, error);
+
+    try {
+      await db.insert(syncLogs).values({
+        tipo: "vendas",
+        dataInicio: new Date(tempoInicio),
+        dataFim: new Date(),
+        registrosProcessados: 0,
+        registrosInseridos: 0,
+        status: "erro",
+        mensagem: `Erro: ${String(error)}`,
+      });
+    } catch (_) { /* ignore log error */ }
+
+    return { success: false, error: String(error), inseridos, ignorados, total: totalRegistros };
   }
 }
 

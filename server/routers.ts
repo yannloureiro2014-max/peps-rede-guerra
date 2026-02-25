@@ -7,6 +7,7 @@ import * as db from "./db";
 import { 
   sincronizarMedicoesACS,
   sincronizarComprasACS,
+  sincronizarVendasACS,
   verificarMedicoesFaltantes
 } from "./etl-acs";
 import { alocacoesFisicasRouter } from "./routers/alocacoes-fisicas";
@@ -445,6 +446,11 @@ export const appRouter = router({
       .input(z.object({ dias: z.number().optional() }).optional())
       .mutation(async ({ input }) => {
         return sincronizarComprasACS();
+      }),
+    sincronizarVendas: protectedProcedure
+      .input(z.object({ dias: z.number().optional() }).optional())
+      .mutation(async ({ input }) => {
+        return sincronizarVendasACS(input?.dias || 7);
       }),
     verificarMedicoesFaltantes: protectedProcedure
       .input(z.object({ dias: z.number().optional() }).optional())

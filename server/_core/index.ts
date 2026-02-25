@@ -7,7 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { sincronizarMedicoesACS } from "../etl-acs";
+import { sincronizarMedicoesACS, sincronizarVendasACS } from "../etl-acs";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -73,8 +73,18 @@ async function startServer() {
       syncRunning = true;
       try {
         console.log("[AUTO-SYNC] Iniciando sincronização automática...");
-        const result = await sincronizarMedicoesACS(7); // últimos 7 dias para sync incremental
-        console.log(`[AUTO-SYNC] Concluída: ${result.success ? 'SUCESSO' : 'COM ERROS'}`);
+        
+        // 1. Sincronizar vendas (abastecimentos) - últimos 3 dias
+        console.log("[AUTO-SYNC] Etapa 1/2: Sincronizando vendas...");
+        const vendasResult = await sincronizarVendasACS(3);
+        console.log(`[AUTO-SYNC] Vendas: ${vendasResult.success ? 'SUCESSO' : 'COM ERROS'} (${vendasResult.inseridos || 0} inseridas)`);
+        
+        // 2. Sincronizar medições - últimos 7 dias
+        console.log("[AUTO-SYNC] Etapa 2/2: Sincronizando medições...");
+        const medicoesResult = await sincronizarMedicoesACS(7);
+        console.log(`[AUTO-SYNC] Medições: ${medicoesResult.success ? 'SUCESSO' : 'COM ERROS'}`);
+        
+        console.log(`[AUTO-SYNC] Concluída: vendas=${vendasResult.success ? 'OK' : 'ERRO'}, medições=${medicoesResult.success ? 'OK' : 'ERRO'}`);
       } catch (error) {
         console.error("[AUTO-SYNC] Erro na sincronização automática:", error);
       } finally {

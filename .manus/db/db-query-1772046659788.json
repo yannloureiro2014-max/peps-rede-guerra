@@ -1,0 +1,110 @@
+{
+  "query": "SELECT DATE(dataVenda) as data, COUNT(*) as qtd, ROUND(SUM(quantidade), 2) as litros FROM vendas GROUP BY DATE(dataVenda) ORDER BY data DESC LIMIT 20",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT DATE(dataVenda) as data, COUNT(*) as qtd, ROUND(SUM(quantidade), 2) as litros FROM vendas GROUP BY DATE(dataVenda) ORDER BY data DESC LIMIT 20",
+  "rows": [
+    {
+      "data": "2026-02-17",
+      "qtd": "101",
+      "litros": "1174.89"
+    },
+    {
+      "data": "2026-02-16",
+      "qtd": "1786",
+      "litros": "15293.57"
+    },
+    {
+      "data": "2026-02-15",
+      "qtd": "1609",
+      "litros": "12119.73"
+    },
+    {
+      "data": "2026-02-14",
+      "qtd": "1919",
+      "litros": "17024.30"
+    },
+    {
+      "data": "2026-02-13",
+      "qtd": "1876",
+      "litros": "15790.28"
+    },
+    {
+      "data": "2026-02-12",
+      "qtd": "1631",
+      "litros": "13729.39"
+    },
+    {
+      "data": "2026-02-11",
+      "qtd": "1536",
+      "litros": "13581.71"
+    },
+    {
+      "data": "2026-02-10",
+      "qtd": "1628",
+      "litros": "13767.60"
+    },
+    {
+      "data": "2026-02-09",
+      "qtd": "1677",
+      "litros": "14118.12"
+    },
+    {
+      "data": "2026-02-08",
+      "qtd": "1414",
+      "litros": "11010.01"
+    },
+    {
+      "data": "2026-02-07",
+      "qtd": "1603",
+      "litros": "12287.39"
+    },
+    {
+      "data": "2026-02-06",
+      "qtd": "1598",
+      "litros": "14375.03"
+    },
+    {
+      "data": "2026-02-05",
+      "qtd": "1677",
+      "litros": "14786.18"
+    },
+    {
+      "data": "2026-02-04",
+      "qtd": "2059",
+      "litros": "15439.64"
+    },
+    {
+      "data": "2026-02-03",
+      "qtd": "1927",
+      "litros": "18253.04"
+    },
+    {
+      "data": "2026-02-02",
+      "qtd": "2020",
+      "litros": "17915.10"
+    },
+    {
+      "data": "2026-02-01",
+      "qtd": "1941",
+      "litros": "15078.52"
+    },
+    {
+      "data": "2026-01-31",
+      "qtd": "2203",
+      "litros": "15202.42"
+    },
+    {
+      "data": "2026-01-30",
+      "qtd": "1672",
+      "litros": "15743.38"
+    },
+    {
+      "data": "2026-01-29",
+      "qtd": "1405",
+      "litros": "11144.07"
+    }
+  ],
+  "messages": [],
+  "stdout": "data\tqtd\tlitros\n2026-02-17\t101\t1174.89\n2026-02-16\t1786\t15293.57\n2026-02-15\t1609\t12119.73\n2026-02-14\t1919\t17024.30\n2026-02-13\t1876\t15790.28\n2026-02-12\t1631\t13729.39\n2026-02-11\t1536\t13581.71\n2026-02-10\t1628\t13767.60\n2026-02-09\t1677\t14118.12\n2026-02-08\t1414\t11010.01\n2026-02-07\t1603\t12287.39\n2026-02-06\t1598\t14375.03\n2026-02-05\t1677\t14786.18\n2026-02-04\t2059\t15439.64\n2026-02-03\t1927\t18253.04\n2026-02-02\t2020\t17915.10\n2026-02-01\t1941\t15078.52\n2026-01-31\t2203\t15202.42\n2026-01-30\t1672\t15743.38\n2026-01-29\t1405\t11144.07\n",
+  "stderr": "",
+  "execution_time_ms": 404
+}

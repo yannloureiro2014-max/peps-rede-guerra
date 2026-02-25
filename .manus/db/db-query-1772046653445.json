@@ -1,0 +1,70 @@
+{
+  "query": "SELECT DATE(dataVenda) as data, COUNT(*) as qtd FROM vendas GROUP BY DATE(dataVenda) ORDER BY data DESC LIMIT 15",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT DATE(dataVenda) as data, COUNT(*) as qtd FROM vendas GROUP BY DATE(dataVenda) ORDER BY data DESC LIMIT 15",
+  "rows": [
+    {
+      "data": "2026-02-17",
+      "qtd": "101"
+    },
+    {
+      "data": "2026-02-16",
+      "qtd": "1786"
+    },
+    {
+      "data": "2026-02-15",
+      "qtd": "1609"
+    },
+    {
+      "data": "2026-02-14",
+      "qtd": "1919"
+    },
+    {
+      "data": "2026-02-13",
+      "qtd": "1876"
+    },
+    {
+      "data": "2026-02-12",
+      "qtd": "1631"
+    },
+    {
+      "data": "2026-02-11",
+      "qtd": "1536"
+    },
+    {
+      "data": "2026-02-10",
+      "qtd": "1628"
+    },
+    {
+      "data": "2026-02-09",
+      "qtd": "1677"
+    },
+    {
+      "data": "2026-02-08",
+      "qtd": "1414"
+    },
+    {
+      "data": "2026-02-07",
+      "qtd": "1603"
+    },
+    {
+      "data": "2026-02-06",
+      "qtd": "1598"
+    },
+    {
+      "data": "2026-02-05",
+      "qtd": "1677"
+    },
+    {
+      "data": "2026-02-04",
+      "qtd": "2059"
+    },
+    {
+      "data": "2026-02-03",
+      "qtd": "1927"
+    }
+  ],
+  "messages": [],
+  "stdout": "data\tqtd\n2026-02-17\t101\n2026-02-16\t1786\n2026-02-15\t1609\n2026-02-14\t1919\n2026-02-13\t1876\n2026-02-12\t1631\n2026-02-11\t1536\n2026-02-10\t1628\n2026-02-09\t1677\n2026-02-08\t1414\n2026-02-07\t1603\n2026-02-06\t1598\n2026-02-05\t1677\n2026-02-04\t2059\n2026-02-03\t1927\n",
+  "stderr": "",
+  "execution_time_ms": 403
+}
