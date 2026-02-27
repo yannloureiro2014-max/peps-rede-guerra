@@ -8,18 +8,21 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Funções puras extraídas do serviço para teste
 function calcularCustos(params: {
   totalNota: number;
+  totalProdutos?: number;
   totalLitros: number;
   tipoFrete: string;
   frete: number;
   despesas: number;
 }) {
-  const { totalNota, totalLitros, tipoFrete, frete, despesas } = params;
-  const custoUnitarioProduto = totalLitros > 0 ? totalNota / totalLitros : 0;
+  const { totalNota, totalProdutos, totalLitros, tipoFrete, frete, despesas } = params;
+  // CORREÇÃO: usar totalProdutos (valor sem frete) ao invés de totalNota (que pode incluir frete)
+  const valorProdutos = (totalProdutos && totalProdutos > 0) ? totalProdutos : totalNota;
+  const custoUnitarioProduto = totalLitros > 0 ? valorProdutos / totalLitros : 0;
   const custoUnitarioFrete = (tipoFrete === 'FOB' && frete && totalLitros > 0)
     ? frete / totalLitros
     : 0;
   const custoUnitarioTotal = custoUnitarioProduto + custoUnitarioFrete;
-  const custoTotal = totalNota + (tipoFrete === 'FOB' ? (frete || 0) : 0);
+  const custoTotal = valorProdutos + (tipoFrete === 'FOB' ? (frete || 0) : 0);
   return { custoUnitarioProduto, custoUnitarioFrete, custoUnitarioTotal, custoTotal };
 }
 
@@ -60,16 +63,34 @@ describe("Cálculo de Custos Unitários", () => {
 
   it("deve incluir frete no custo quando FOB", () => {
     const result = calcularCustos({
-      totalNota: 13000,
+      totalNota: 13500, // totalNota já inclui frete no ACS
+      totalProdutos: 13000, // totalProdutos é o valor sem frete
       totalLitros: 2500,
       tipoFrete: 'FOB',
       frete: 500,
       despesas: 0,
     });
-    expect(result.custoUnitarioProduto).toBeCloseTo(5.2, 4);
-    expect(result.custoUnitarioFrete).toBeCloseTo(0.2, 4);
-    expect(result.custoUnitarioTotal).toBeCloseTo(5.4, 4);
-    expect(result.custoTotal).toBe(13500);
+    expect(result.custoUnitarioProduto).toBeCloseTo(5.2, 4); // 13000/2500 = 5.2 (sem frete)
+    expect(result.custoUnitarioFrete).toBeCloseTo(0.2, 4); // 500/2500 = 0.2
+    expect(result.custoUnitarioTotal).toBeCloseTo(5.4, 4); // 5.2 + 0.2 = 5.4
+    expect(result.custoTotal).toBe(13500); // 13000 + 500 = 13500
+  });
+
+  it("deve usar totalProdutos ao invés de totalNota para evitar duplicação de frete (caso real SETTA)", () => {
+    // Caso real: NFe 000021167 - SETTA COMBUSTIVEIS
+    // Valor Unitario: 5,29 | Quantidade: 5000 | Total Produtos: 26450 | Frete: 400 | Total Nota: 26850
+    const result = calcularCustos({
+      totalNota: 26850, // Total da nota (já inclui frete)
+      totalProdutos: 26450, // Valor dos produtos (sem frete)
+      totalLitros: 5000,
+      tipoFrete: 'FOB',
+      frete: 400,
+      despesas: 0,
+    });
+    expect(result.custoUnitarioProduto).toBeCloseTo(5.29, 2); // 26450/5000 = 5.29
+    expect(result.custoUnitarioFrete).toBeCloseTo(0.08, 2); // 400/5000 = 0.08
+    expect(result.custoUnitarioTotal).toBeCloseTo(5.37, 2); // 5.29 + 0.08 = 5.37
+    expect(result.custoTotal).toBe(26850); // 26450 + 400 = 26850
   });
 
   it("deve ignorar frete quando CIF", () => {

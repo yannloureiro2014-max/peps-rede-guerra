@@ -658,3 +658,11 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [x] Integrar ao autoSync - vendas sincronizadas a cada 60min junto com medições
 - [x] Adicionar botão "Sincronizar Vendas" na página de Configurações
 - [x] Testar e validar - 10.732 vendas inseridas (18/02 a 25/02), dados completos
+
+## Bug: Frete duplicado no custo unitário das NFes - RESOLVIDO
+
+- [x] Investigar por que o custo produto/L está incluindo o frete (5,37 ao invés de 5,29) - usava totalNota (com frete) ao invés de totalProdutos (sem frete)
+- [x] Corrigir cálculo para que custo produto/L = valor unitário da NFe (sem frete) - corrigido em acs-nfes.ts linha 466
+- [x] Custo total/L deve ser = custo produto/L + frete/L - corrigido custoTotal também
+- [x] Validar que NFes FOB mostram frete separado corretamente - teste SETTA passou: 5,29 + 0,08 = 5,37
+- [x] Corrigido também em sefaz-real.ts e acs-nfes-filtros.test.ts

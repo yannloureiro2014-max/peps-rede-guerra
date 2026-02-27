@@ -463,12 +463,15 @@ export async function buscarNfesDoACS(filtros?: {
       const postoNome = postoInfo?.nome || `Empresa ${codEmpTrimmed}`;
       
       // Calcular custos unitários separados
-      const custoUnitarioProduto = c.totalLitros > 0 ? c.totalNota / c.totalLitros : 0;
+      // CORREÇÃO: usar totalProdutos (valor dos produtos sem frete) ao invés de totalNota (que já inclui frete)
+      // Isso evita duplicação do frete no cálculo do custo unitário
+      const valorProdutos = c.totalProdutos > 0 ? c.totalProdutos : c.totalNota;
+      const custoUnitarioProduto = c.totalLitros > 0 ? valorProdutos / c.totalLitros : 0;
       const custoUnitarioFrete = (c.tipoFrete === 'FOB' && c.frete && c.totalLitros > 0) 
         ? c.frete / c.totalLitros 
         : 0;
       const custoUnitarioTotal = custoUnitarioProduto + custoUnitarioFrete;
-      const custoTotal = c.totalNota + (c.tipoFrete === 'FOB' ? (c.frete || 0) : 0);
+      const custoTotal = valorProdutos + (c.tipoFrete === 'FOB' ? (c.frete || 0) : 0);
       
       // Nome do combustível já vem da query principal (subquery)
       const produtoDescricao = c.nomeCombustivel || 'Combustível';
