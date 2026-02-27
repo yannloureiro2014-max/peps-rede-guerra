@@ -748,3 +748,10 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [x] Adicionar logs detalhados da sincronização
 - [x] Gerar alertas para NFes que não puderam ser mapeadas
 - [x] Escrever testes unitários (11/11 passando)
+
+
+## Integração da Logo Rede Super Petróleo
+- [x] Copiar logo para client/public/logo-rede-super.png
+- [x] Substituir "RSP" no DashboardLayout (sidebar, header desktop, mobile menu) pela logo
+- [x] Adicionar logo no header da página Home (Dashboard)
+- [x] Testar responsividade e compilação

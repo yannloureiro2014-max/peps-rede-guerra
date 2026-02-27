@@ -218,9 +218,12 @@ export default function Home() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground">Visão geral da rede de postos</p>
+          <div className="flex items-center gap-4">
+            <img src="/logo-rede-super.png" alt="Rede Super Petróleo" className="h-12 w-auto" />
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+              <p className="text-muted-foreground">Visão geral da rede de postos</p>
+            </div>
           </div>
           {ultimaSync && (
             <div className="text-sm text-muted-foreground bg-card px-4 py-2 rounded-lg border">

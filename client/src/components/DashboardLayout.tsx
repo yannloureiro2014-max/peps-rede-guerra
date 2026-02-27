@@ -124,8 +124,7 @@ export default function DashboardLayout({
           </button>
           {sidebarOpen && (
             <div className="flex items-center gap-2">
-              <Fuel className="h-5 w-5 text-primary" />
-              <span className="font-bold text-primary">RSP</span>
+              <img src="/logo-rede-super.png" alt="Rede Super Petróleo" className="h-8 w-auto" />
             </div>
           )}
         </div>
@@ -192,8 +191,7 @@ export default function DashboardLayout({
           <Menu className="h-5 w-5" />
         </button>
         <div className="flex items-center gap-2">
-          <Fuel className="h-5 w-5 text-primary" />
-          <span className="font-bold text-primary">RSP</span>
+          <img src="/logo-rede-super.png" alt="Rede Super Petróleo" className="h-8 w-auto" />
         </div>
         <div className="w-9" /> {/* Spacer */}
       </div>
@@ -208,8 +206,7 @@ export default function DashboardLayout({
           <aside className="absolute left-0 top-0 bottom-0 w-64 bg-white shadow-xl">
             <div className="h-14 flex items-center justify-between px-4 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <Fuel className="h-5 w-5 text-primary" />
-                <span className="font-bold text-primary">RSP</span>
+                <img src="/logo-rede-super.png" alt="Rede Super Petróleo" className="h-8 w-auto" />
               </div>
               <button
                 onClick={() => setMobileMenuOpen(false)}
