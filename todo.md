@@ -705,3 +705,28 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [x] Interface de transferência física (modal com origem, destino, volume)
 - [x] Interface de bloqueio mensal de DRE
 - [x] Exibir alertas de coerência e medições ausentes
+
+## Redesign: Fluxo Baseado em Transferências (não alocação manual)
+
+### Schema e Backend
+- [x] Adicionar status à NFe: PROVISORIA / CONFIRMADA
+- [x] Auto-alocar NFes importadas do ACS como provisórias no posto de origem
+- [x] Motor de sugestão: cruzar alertas complementares (sobra em A + falta em B)
+- [x] Sugerir NFe candidata, volume provável e direção da transferência
+- [x] Validação: não permitir transferência que estoure capacidade do tanque
+- [x] Validação: não permitir transferência que gere estoque negativo
+- [x] Validação: verificar coerência com medições dentro de tolerância
+- [x] Confirmar NFe automaticamente quando coerência bater
+
+### Frontend
+- [x] Página "Pendências de Estoque" com alertas e botão "Resolver"
+- [x] Tela "Resolver" com sugestão automática de NFe e transferência
+- [x] Transferências como ação principal de correção
+- [x] Manter alocação manual apenas para casos raros/excepcionais
+
+### Integração pós-transferência
+- [x] Recalcular estoque dos dois postos/tanques após transferência
+- [x] Recalcular lotes PEPS de ambos os postos
+- [x] Recalcular CMV das vendas de ambos os postos
+- [x] Revalidar coerência física após transferência
+- [x] Atualizar alertas automaticamente

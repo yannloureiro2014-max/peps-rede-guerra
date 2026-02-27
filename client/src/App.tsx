@@ -23,6 +23,7 @@ import Reconciliacao from "./pages/Reconciliacao";
 import CoerenciaFisica from "./pages/CoerenciaFisica";
 import Transferencias from "./pages/Transferencias";
 import BloqueioDRE from "./pages/BloqueioDRE";
+import PendenciasEstoque from "./pages/PendenciasEstoque";
 
 function Router() {
   return (
@@ -44,6 +45,7 @@ function Router() {
       <Route path={"/alocacoes-fisicas"} component={AlocacoesFisicas} />
       <Route path={"/alocacoes-nfe"} component={AlocacoesNFe} />
       <Route path={"/reconciliacao"} component={Reconciliacao} />
+      <Route path={"/pendencias-estoque"} component={PendenciasEstoque} />
       <Route path={"/coerencia-fisica"} component={CoerenciaFisica} />
       <Route path={"/transferencias"} component={Transferencias} />
       <Route path={"/bloqueio-dre"} component={BloqueioDRE} />

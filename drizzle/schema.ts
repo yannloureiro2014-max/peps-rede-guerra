@@ -101,7 +101,8 @@ export const lotes = mysqlTable("lotes", {
   custoTotal: decimal("custoTotal", { precision: 14, scale: 2 }).notNull(),
   ordemConsumo: int("ordemConsumo").default(0).notNull(),
   status: mysqlEnum("status", ["ativo", "consumido", "cancelado"]).default("ativo").notNull(),
-  origem: mysqlEnum("origem", ["acs", "manual"]).default("manual").notNull(),
+  statusNfe: mysqlEnum("statusNfe", ["provisoria", "confirmada"]).default("provisoria").notNull(),
+  origem: mysqlEnum("origem", ["acs", "manual", "transferencia"]).default("manual").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

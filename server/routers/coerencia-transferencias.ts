@@ -1,5 +1,12 @@
 /**
- * tRPC Router para Coerência Física, Transferências e Bloqueio DRE
+ * tRPC Router para Coerência Física, Transferências Inteligentes e Bloqueio DRE
+ * 
+ * Fluxo principal:
+ * 1. NFes entram como provisórias no posto de origem
+ * 2. Coerência física detecta sobras/faltas
+ * 3. Motor de sugestão cruza alertas complementares
+ * 4. Usuário resolve via transferência (não alocação manual)
+ * 5. Recálculo automático de CMV, lotes e coerência
  */
 
 import { router, protectedProcedure } from "../_core/trpc";
@@ -24,13 +31,122 @@ import {
   fecharMesTodosPostos,
   isMesBloqueado,
 } from "../services/bloqueio-dre";
+import {
+  buscarPendenciasEstoque,
+  confirmarNfe,
+  buscarLotesProvisorisPosto,
+  validarCapacidadeTanque,
+  validarEstoqueNegativo,
+} from "../services/motor-sugestao";
 
 export const coerenciaTransferenciasRouter = router({
-  // ==================== COERÊNCIA FÍSICA ====================
+  // ==================== PENDÊNCIAS DE ESTOQUE (FLUXO PRINCIPAL) ====================
 
   /**
-   * Verificar coerência física de um posto específico
+   * Buscar pendências de estoque com sugestões de transferência
+   * Este é o endpoint principal do novo fluxo
    */
+  buscarPendencias: protectedProcedure
+    .input(
+      z.object({
+        dataInicio: z.string(),
+        dataFim: z.string(),
+        postoId: z.number().optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      try {
+        const pendencias = await buscarPendenciasEstoque(
+          input.dataInicio,
+          input.dataFim,
+          input.postoId
+        );
+        return { sucesso: true, dados: pendencias };
+      } catch (erro) {
+        console.error("[PENDENCIAS] Erro:", erro);
+        return {
+          sucesso: false,
+          erro: erro instanceof Error ? erro.message : "Erro desconhecido",
+          dados: [],
+        };
+      }
+    }),
+
+  /**
+   * Buscar lotes provisórios (NFes não confirmadas)
+   */
+  buscarLotesProvisórios: protectedProcedure
+    .input(
+      z.object({
+        postoId: z.number().optional(),
+      }).optional()
+    )
+    .query(async ({ input }) => {
+      try {
+        const lotes = await buscarLotesProvisorisPosto(input?.postoId);
+        return { sucesso: true, dados: lotes };
+      } catch (erro) {
+        console.error("[PROVISORIOS] Erro:", erro);
+        return {
+          sucesso: false,
+          erro: erro instanceof Error ? erro.message : "Erro desconhecido",
+          dados: [],
+        };
+      }
+    }),
+
+  /**
+   * Confirmar NFe como corretamente alocada
+   */
+  confirmarNfe: protectedProcedure
+    .input(z.object({ loteId: z.number() }))
+    .mutation(async ({ input }) => {
+      try {
+        return await confirmarNfe(input.loteId);
+      } catch (erro) {
+        return {
+          sucesso: false,
+          mensagem: erro instanceof Error ? erro.message : "Erro desconhecido",
+        };
+      }
+    }),
+
+  /**
+   * Validar transferência antes de executar (capacidade + estoque negativo)
+   */
+  validarTransferencia: protectedProcedure
+    .input(
+      z.object({
+        loteOrigemId: z.number(),
+        tanqueDestinoId: z.number(),
+        volumeTransferido: z.number().positive(),
+      })
+    )
+    .query(async ({ input }) => {
+      try {
+        const [validacaoEstoque, validacaoCapacidade] = await Promise.all([
+          validarEstoqueNegativo(input.loteOrigemId, input.volumeTransferido),
+          validarCapacidadeTanque(input.tanqueDestinoId, input.volumeTransferido),
+        ]);
+
+        return {
+          sucesso: true,
+          valido: validacaoEstoque.valido && validacaoCapacidade.valido,
+          estoque: validacaoEstoque,
+          capacidade: validacaoCapacidade,
+        };
+      } catch (erro) {
+        return {
+          sucesso: false,
+          valido: false,
+          estoque: { valido: false, saldoAtual: 0, mensagem: "Erro na validação" },
+          capacidade: { valido: false, capacidade: 0, saldoAtual: 0, espacoLivre: 0, mensagem: "Erro na validação" },
+        };
+      }
+    }),
+
+  // ==================== COERÊNCIA FÍSICA ====================
+
   verificarCoerenciaPosto: protectedProcedure
     .input(
       z.object({
@@ -58,9 +174,6 @@ export const coerenciaTransferenciasRouter = router({
       }
     }),
 
-  /**
-   * Verificar coerência física de todos os postos
-   */
   verificarCoerenciaTodos: protectedProcedure
     .input(
       z.object({
@@ -86,9 +199,6 @@ export const coerenciaTransferenciasRouter = router({
       }
     }),
 
-  /**
-   * Detectar medições ausentes
-   */
   detectarMedicoesAusentes: protectedProcedure
     .input(
       z.object({
@@ -109,9 +219,6 @@ export const coerenciaTransferenciasRouter = router({
       }
     }),
 
-  /**
-   * Buscar verificações salvas (cache)
-   */
   buscarVerificacoes: protectedProcedure
     .input(
       z.object({
@@ -139,9 +246,6 @@ export const coerenciaTransferenciasRouter = router({
       }
     }),
 
-  /**
-   * Resumo de coerência por posto (para dashboard)
-   */
   resumoCoerencia: protectedProcedure
     .input(
       z.object({
@@ -164,9 +268,6 @@ export const coerenciaTransferenciasRouter = router({
 
   // ==================== TRANSFERÊNCIAS FÍSICAS ====================
 
-  /**
-   * Realizar transferência física
-   */
   realizarTransferencia: protectedProcedure
     .input(
       z.object({
@@ -183,6 +284,19 @@ export const coerenciaTransferenciasRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        // Validar antes de executar
+        const [validacaoEstoque, validacaoCapacidade] = await Promise.all([
+          validarEstoqueNegativo(input.loteOrigemId, input.volumeTransferido),
+          validarCapacidadeTanque(input.tanqueDestinoId, input.volumeTransferido),
+        ]);
+
+        if (!validacaoEstoque.valido) {
+          return { sucesso: false, mensagem: validacaoEstoque.mensagem };
+        }
+        if (!validacaoCapacidade.valido) {
+          return { sucesso: false, mensagem: validacaoCapacidade.mensagem };
+        }
+
         const resultado = await realizarTransferencia({
           ...input,
           usuarioId: ctx.user.id,
@@ -198,9 +312,6 @@ export const coerenciaTransferenciasRouter = router({
       }
     }),
 
-  /**
-   * Listar transferências realizadas
-   */
   listarTransferencias: protectedProcedure
     .input(
       z.object({
@@ -226,9 +337,6 @@ export const coerenciaTransferenciasRouter = router({
       }
     }),
 
-  /**
-   * Cancelar transferência
-   */
   cancelarTransferencia: protectedProcedure
     .input(
       z.object({
@@ -254,14 +362,11 @@ export const coerenciaTransferenciasRouter = router({
       }
     }),
 
-  /**
-   * Verificar se mês está bloqueado para um posto
-   */
   verificarBloqueio: protectedProcedure
     .input(
       z.object({
         postoId: z.number(),
-        data: z.string(), // YYYY-MM-DD
+        data: z.string(),
       })
     )
     .query(async ({ input }) => {
@@ -275,14 +380,11 @@ export const coerenciaTransferenciasRouter = router({
 
   // ==================== BLOQUEIO MENSAL DRE ====================
 
-  /**
-   * Fechar mês de DRE para um posto
-   */
   fecharMes: protectedProcedure
     .input(
       z.object({
         postoId: z.number(),
-        mesReferencia: z.string(), // YYYY-MM
+        mesReferencia: z.string(),
         observacoes: z.string().optional(),
       })
     )
@@ -305,9 +407,6 @@ export const coerenciaTransferenciasRouter = router({
       }
     }),
 
-  /**
-   * Fechar mês para todos os postos
-   */
   fecharMesTodosPostos: protectedProcedure
     .input(
       z.object({
@@ -334,9 +433,6 @@ export const coerenciaTransferenciasRouter = router({
       }
     }),
 
-  /**
-   * Desbloquear mês de DRE (admin only)
-   */
   desbloquearMes: protectedProcedure
     .input(
       z.object({
@@ -346,7 +442,6 @@ export const coerenciaTransferenciasRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Verificar se é admin
       if (ctx.user.role !== "admin_geral") {
         return {
           sucesso: false,
@@ -372,9 +467,6 @@ export const coerenciaTransferenciasRouter = router({
       }
     }),
 
-  /**
-   * Listar status de bloqueio
-   */
   listarStatusBloqueio: protectedProcedure
     .input(
       z.object({
@@ -395,9 +487,6 @@ export const coerenciaTransferenciasRouter = router({
       }
     }),
 
-  /**
-   * Verificar se mês está bloqueado
-   */
   isMesBloqueado: protectedProcedure
     .input(
       z.object({

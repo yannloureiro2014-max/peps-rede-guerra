@@ -254,7 +254,21 @@ export async function realizarTransferencia(
       justificativa: input.justificativa,
     });
 
-    // 6. Recalcular CMV seletivamente (apenas postos afetados a partir da data)
+    // 6. Atualizar saldo dos tanques
+    try {
+      // Reduzir saldo do tanque de origem
+      await db.execute(
+        sql`UPDATE tanques SET saldoAtual = GREATEST(0, saldoAtual - ${input.volumeTransferido.toFixed(3)}) WHERE id = ${lote.tanqueId}`
+      );
+      // Aumentar saldo do tanque de destino
+      await db.execute(
+        sql`UPDATE tanques SET saldoAtual = saldoAtual + ${input.volumeTransferido.toFixed(3)} WHERE id = ${input.tanqueDestinoId}`
+      );
+    } catch (err) {
+      console.warn("[TRANSFERENCIA] Erro ao atualizar saldo dos tanques:", err);
+    }
+
+    // 7. Recalcular CMV seletivamente (apenas postos afetados a partir da data)
     let recalculoCMV;
     try {
       recalculoCMV = await recalcularCMVSeletivo(
@@ -267,6 +281,21 @@ export async function realizarTransferencia(
       console.warn("[TRANSFERENCIA] Erro no recálculo de CMV:", err);
     }
 
+    // 8. Revalidar coerência física dos postos afetados
+    try {
+      const { verificarCoerenciaFisicaPosto } = await import("./coerencia-fisica");
+      const dataFim = new Date();
+      const dataFimStr = dataFim.toISOString().split("T")[0];
+      
+      await verificarCoerenciaFisicaPosto(postoOrigemId, input.dataTransferencia, dataFimStr);
+      if (input.postoDestinoId !== postoOrigemId) {
+        await verificarCoerenciaFisicaPosto(input.postoDestinoId, input.dataTransferencia, dataFimStr);
+      }
+      console.log(`[TRANSFERENCIA] Coerência revalidada para postos ${postoOrigemId} e ${input.postoDestinoId}`);
+    } catch (err) {
+      console.warn("[TRANSFERENCIA] Erro ao revalidar coerência:", err);
+    }
+
     console.log(
       `[TRANSFERENCIA] Transferência ${transferenciaId} realizada: ${input.volumeTransferido}L do lote ${input.loteOrigemId} para posto ${input.postoDestinoId}/tanque ${input.tanqueDestinoId}`
     );
@@ -275,7 +304,7 @@ export async function realizarTransferencia(
       sucesso: true,
       transferenciaId,
       loteDestinoId,
-      mensagem: `Transferência de ${input.volumeTransferido.toFixed(3)} L realizada com sucesso. Lote ${loteDestinoId} criado no destino.`,
+      mensagem: `Transferência de ${input.volumeTransferido.toFixed(3)} L realizada com sucesso. Lote ${loteDestinoId} criado no destino. CMV recalculado.`,
       recalculoCMV,
     };
   } catch (err) {
