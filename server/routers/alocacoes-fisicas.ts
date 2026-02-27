@@ -26,6 +26,7 @@ import {
   cancelarAlocacao,
   desfazerAlocacao,
 } from "../db-nfe-alocacoes";
+import { verificarBloqueioMes } from "../services/transferencias-fisicas";
 
 
 export const alocacoesFisicasRouter = router({
@@ -136,6 +137,15 @@ export const alocacoesFisicasRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        // Verificar bloqueio mensal de DRE
+        const bloqueio = await verificarBloqueioMes(input.postoDestinoId, input.dataDescargaReal);
+        if (bloqueio.bloqueado) {
+          return {
+            sucesso: false,
+            erro: `Mês ${bloqueio.mesReferencia} está fechado para este posto. Fechado por ${bloqueio.fechadoPor}. Solicite desbloqueio ao admin.`,
+          };
+        }
+
         // Criar lote no banco de dados com persistencia
         const loteId = await criarLoteDoSEFAZ({
           chaveNfe: input.chaveNfe,

@@ -21,7 +21,10 @@ import {
   Sparkles,
   Truck,
   AlertCircle,
-  FileCheck
+  FileCheck,
+  ArrowLeftRight,
+  Lock,
+  CheckCircle2
 } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -44,6 +47,9 @@ const menuItems: MenuItem[] = [
   { icon: Bell, label: "Alertas", path: "/alertas" },
   { icon: Building2, label: "Postos", path: "/postos" },
   { icon: FileCheck, label: "Alocações NFe", path: "/alocacoes-nfe", adminOnly: true },
+  { icon: CheckCircle2, label: "Coerência Física", path: "/coerencia-fisica", adminOnly: true },
+  { icon: ArrowLeftRight, label: "Transferências", path: "/transferencias", adminOnly: true },
+  { icon: Lock, label: "Bloqueio DRE", path: "/bloqueio-dre", adminOnly: true },
   { icon: Users, label: "Usuários", path: "/usuarios", adminOnly: true },
   { icon: Sparkles, label: "Assistente IA", path: "/assistente-ia" },
   { icon: Settings, label: "Configurações", path: "/configuracoes" },

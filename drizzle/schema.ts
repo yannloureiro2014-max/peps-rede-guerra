@@ -172,7 +172,7 @@ export type InsertMedicao = typeof medicoes.$inferInsert;
 // Tabela de Alertas
 export const alertas = mysqlTable("alertas", {
   id: int("id").autoincrement().primaryKey(),
-  tipo: mysqlEnum("tipo", ["estoque_baixo", "diferenca_medicao", "cmv_pendente", "sincronizacao", "medicao_faltante", "lote_antigo", "lotes_insuficientes"]).notNull(),
+  tipo: mysqlEnum("tipo", ["estoque_baixo", "diferenca_medicao", "cmv_pendente", "sincronizacao", "medicao_faltante", "lote_antigo", "lotes_insuficientes", "coerencia_fisica", "medicao_ausente"]).notNull(),
   postoId: int("postoId"),
   tanqueId: int("tanqueId"),
   titulo: varchar("titulo", { length: 200 }).notNull(),
@@ -410,3 +410,91 @@ export const auditoriaFuelEngine = mysqlTable("auditoriaFuelEngine", {
 
 export type AuditoriaFuelEngine = typeof auditoriaFuelEngine.$inferSelect;
 export type InsertAuditoriaFuelEngine = typeof auditoriaFuelEngine.$inferInsert;
+
+// ============================================
+// TABELAS PARA SISTEMA DE ALOCAÇÃO INTELIGENTE v2
+// ============================================
+
+// Tabela de Transferências Físicas (rastreabilidade completa)
+export const transferenciasFisicas = mysqlTable("transferenciasFisicas", {
+  id: int("id").autoincrement().primaryKey(),
+  nfeStagingId: int("nfeStagingId"), // FK para nfeStaging (pode ser null se transferência manual)
+  loteOrigemId: int("loteOrigemId").notNull(), // FK para lotes (lote de origem)
+  loteDestinoId: int("loteDestinoId"), // FK para lotes (lote criado no destino)
+  postoOrigemId: int("postoOrigemId").notNull(), // FK para postos
+  postoDestinoId: int("postoDestinoId").notNull(), // FK para postos
+  tanqueOrigemId: int("tanqueOrigemId").notNull(), // FK para tanques
+  tanqueDestinoId: int("tanqueDestinoId").notNull(), // FK para tanques
+  produtoId: int("produtoId").notNull(), // FK para produtos
+  volumeTransferido: decimal("volumeTransferido", { precision: 12, scale: 3 }).notNull(),
+  custoUnitario: decimal("custoUnitario", { precision: 12, scale: 4 }).notNull(),
+  custoTotal: decimal("custoTotal", { precision: 14, scale: 2 }).notNull(),
+  dataTransferencia: date("dataTransferencia").notNull(), // Data real da transferência física
+  numeroNf: varchar("numeroNf", { length: 50 }), // Número da NFe relacionada
+  justificativa: text("justificativa").notNull(), // Obrigatório: motivo da transferência
+  tipo: mysqlEnum("tipo", ["correcao_alocacao", "transferencia_fisica", "divisao_nfe"]).notNull(),
+  status: mysqlEnum("status", ["confirmada", "cancelada"]).default("confirmada").notNull(),
+  usuarioId: int("usuarioId").notNull(), // FK para users (quem fez)
+  usuarioNome: varchar("usuarioNome", { length: 200 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  postoOrigemIdx: index("tf_postoOrigemId_idx").on(table.postoOrigemId),
+  postoDestinoIdx: index("tf_postoDestinoId_idx").on(table.postoDestinoId),
+  dataIdx: index("tf_dataTransferencia_idx").on(table.dataTransferencia),
+  nfeIdx: index("tf_nfeStagingId_idx").on(table.nfeStagingId),
+}));
+
+export type TransferenciaFisica = typeof transferenciasFisicas.$inferSelect;
+export type InsertTransferenciaFisica = typeof transferenciasFisicas.$inferInsert;
+
+// Tabela de Bloqueio Mensal de DRE
+export const bloqueioDre = mysqlTable("bloqueioDre", {
+  id: int("id").autoincrement().primaryKey(),
+  mesReferencia: varchar("mesReferencia", { length: 7 }).notNull(), // Formato: YYYY-MM
+  postoId: int("postoId").notNull(), // FK para postos
+  status: mysqlEnum("status", ["aberto", "fechado"]).default("aberto").notNull(),
+  fechadoPor: int("fechadoPor"), // FK para users (quem fechou)
+  fechadoNome: varchar("fechadoNome", { length: 200 }),
+  fechadoEm: timestamp("fechadoEm"),
+  desbloqueadoPor: int("desbloqueadoPor"), // FK para users (admin que desbloqueou)
+  desbloqueadoNome: varchar("desbloqueadoNome", { length: 200 }),
+  desbloqueadoEm: timestamp("desbloqueadoEm"),
+  observacoes: text("observacoes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  mesPostoUnique: uniqueIndex("bloqueio_mes_posto_unique").on(table.mesReferencia, table.postoId),
+  statusIdx: index("bloqueio_status_idx").on(table.status),
+}));
+
+export type BloqueioDre = typeof bloqueioDre.$inferSelect;
+export type InsertBloqueioDre = typeof bloqueioDre.$inferInsert;
+
+// Tabela de Verificação de Coerência Física (cache de resultados)
+export const verificacaoCoerencia = mysqlTable("verificacaoCoerencia", {
+  id: int("id").autoincrement().primaryKey(),
+  postoId: int("postoId").notNull(),
+  tanqueId: int("tanqueId").notNull(),
+  produtoId: int("produtoId"),
+  dataVerificacao: date("dataVerificacao").notNull(), // Dia verificado
+  medicaoInicial: decimal("medicaoInicial", { precision: 12, scale: 3 }), // Medição do dia
+  vendasDia: decimal("vendasDia", { precision: 12, scale: 3 }).default("0"), // Total vendido no dia
+  comprasDia: decimal("comprasDia", { precision: 12, scale: 3 }).default("0"), // Total comprado/alocado no dia
+  estoqueProjetado: decimal("estoqueProjetado", { precision: 12, scale: 3 }), // medicaoInicial - vendas + compras
+  medicaoDiaSeguinte: decimal("medicaoDiaSeguinte", { precision: 12, scale: 3 }), // Medição real do dia seguinte
+  diferenca: decimal("diferenca", { precision: 12, scale: 3 }), // estoqueProjetado - medicaoDiaSeguinte
+  diferencaAbsoluta: decimal("diferencaAbsoluta", { precision: 12, scale: 3 }), // |diferenca|
+  statusCoerencia: mysqlEnum("statusCoerencia", ["coerente", "alerta", "sem_medicao"]).default("coerente").notNull(),
+  alertaGerado: int("alertaGerado").default(0), // 1 se alerta foi gerado
+  alertaId: int("alertaId"), // FK para alertas
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  postoTanqueDataUnique: uniqueIndex("vc_posto_tanque_data_unique").on(table.postoId, table.tanqueId, table.dataVerificacao),
+  statusIdx: index("vc_statusCoerencia_idx").on(table.statusCoerencia),
+  dataIdx: index("vc_dataVerificacao_idx").on(table.dataVerificacao),
+}));
+
+export type VerificacaoCoerencia = typeof verificacaoCoerencia.$inferSelect;
+export type InsertVerificacaoCoerencia = typeof verificacaoCoerencia.$inferInsert;

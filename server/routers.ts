@@ -11,10 +11,12 @@ import {
   verificarMedicoesFaltantes
 } from "./etl-acs";
 import { alocacoesFisicasRouter } from "./routers/alocacoes-fisicas";
+import { coerenciaTransferenciasRouter } from "./routers/coerencia-transferencias";
 
 export const appRouter = router({
   system: systemRouter,
   alocacoesFisicas: alocacoesFisicasRouter,
+  coerenciaTransferencias: coerenciaTransferenciasRouter,
 
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),

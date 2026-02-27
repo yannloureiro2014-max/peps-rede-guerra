@@ -20,6 +20,9 @@ import AssistenteIA from "./pages/AssistenteIA";
 import AlocacoesFisicas from "./pages/AlocacoesFisicas";
 import AlocacoesNFe from "./pages/AlocacoesNFe";
 import Reconciliacao from "./pages/Reconciliacao";
+import CoerenciaFisica from "./pages/CoerenciaFisica";
+import Transferencias from "./pages/Transferencias";
+import BloqueioDRE from "./pages/BloqueioDRE";
 
 function Router() {
   return (
@@ -41,6 +44,9 @@ function Router() {
       <Route path={"/alocacoes-fisicas"} component={AlocacoesFisicas} />
       <Route path={"/alocacoes-nfe"} component={AlocacoesNFe} />
       <Route path={"/reconciliacao"} component={Reconciliacao} />
+      <Route path={"/coerencia-fisica"} component={CoerenciaFisica} />
+      <Route path={"/transferencias"} component={Transferencias} />
+      <Route path={"/bloqueio-dre"} component={BloqueioDRE} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>

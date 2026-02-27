@@ -1,0 +1,25 @@
+{
+  "query": "SHOW TABLES LIKE 'transferencias%'; SHOW TABLES LIKE 'bloqueio%'; SHOW TABLES LIKE 'verificacao%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SHOW TABLES LIKE 'transferencias%'; SHOW TABLES LIKE 'bloqueio%'; SHOW TABLES LIKE 'verificacao%';",
+  "rows": [
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV (transferencias%)": "transferenciasFisicas"
+    },
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV (transferencias%)": "Tables_in_GsoitYr3hHiyZTgQLwp9sV (bloqueio%)"
+    },
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV (transferencias%)": "bloqueioDre"
+    },
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV (transferencias%)": "Tables_in_GsoitYr3hHiyZTgQLwp9sV (verificacao%)"
+    },
+    {
+      "Tables_in_GsoitYr3hHiyZTgQLwp9sV (transferencias%)": "verificacaoCoerencia"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_GsoitYr3hHiyZTgQLwp9sV (transferencias%)\ntransferenciasFisicas\nTables_in_GsoitYr3hHiyZTgQLwp9sV (bloqueio%)\nbloqueioDre\nTables_in_GsoitYr3hHiyZTgQLwp9sV (verificacao%)\nverificacaoCoerencia\n",
+  "stderr": "",
+  "execution_time_ms": 486
+}

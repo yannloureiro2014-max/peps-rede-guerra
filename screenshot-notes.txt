@@ -1,0 +1,5 @@
+Screenshot 2026-02-27: Dashboard com sidebar mostrando novos itens de menu:
+- Coerência Física (com ícone admin)
+- Transferências (com ícone admin)
+- Bloqueio DRE (precisa scroll para ver)
+Servidor rodando sem erros. TypeScript OK. LSP OK.

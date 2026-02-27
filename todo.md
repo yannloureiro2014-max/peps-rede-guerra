@@ -666,3 +666,42 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [x] Custo total/L deve ser = custo produto/L + frete/L - corrigido custoTotal também
 - [x] Validar que NFes FOB mostram frete separado corretamente - teste SETTA passou: 5,29 + 0,08 = 5,37
 - [x] Corrigido também em sefaz-real.ts e acs-nfes-filtros.test.ts
+
+## Sistema de Alocação Inteligente de NFes (v2)
+
+### Fase 1: Schema do Banco de Dados
+- [x] Criar tabela transferencias_fisicas (log de transferências com rastreabilidade)
+- [x] Criar tabela bloqueio_dre (bloqueio mensal de DRE por posto)
+- [x] Criar tabela verificacaoCoerencia (cache de verificações diárias)
+- [x] Executar migrações via SQL direto
+
+### Fase 2: Verificação de Coerência Física
+- [x] Implementar função de cálculo de estoque projetado por dia/tanque
+- [x] Comparar estoque projetado com medição do dia seguinte
+- [x] Gerar alertas automáticos quando diferença > 1.000 litros
+- [x] Verificação em ordem cronológica (dia 1, dia 2, dia 3...)
+- [x] Revalidar dias posteriores quando corrigir alocação de dia anterior
+
+### Fase 3: Transferências Físicas
+- [x] Implementar API de transferência física (total ou parcial)
+- [x] Permitir dividir NFe entre múltiplos postos/tanques
+- [x] Atualizar lotes de origem e destino após transferência
+- [x] Recalcular CMV apenas do posto afetado a partir da data da NFe
+- [x] Registrar log completo (data, usuário, NFe, origem, destino, volume, justificativa)
+
+### Fase 4: Bloqueio Mensal de DRE
+- [x] Implementar bloqueio mensal por posto (impedir alterações após fechamento)
+- [x] Apenas admin pode desbloquear DRE fechada
+- [x] Verificar bloqueio antes de qualquer transferência ou recálculo
+- [x] Interface para fechar/abrir mês na DRE
+
+### Fase 5: Alertas de Medições Ausentes
+- [x] Detectar dias sem medição por posto
+- [x] Gerar alerta informando qual posto e quais dias estão sem medição
+- [x] Exibir na interface de alertas
+
+### Fase 6: Frontend
+- [x] Interface de verificação de coerência física (timeline por dia)
+- [x] Interface de transferência física (modal com origem, destino, volume)
+- [x] Interface de bloqueio mensal de DRE
+- [x] Exibir alertas de coerência e medições ausentes
