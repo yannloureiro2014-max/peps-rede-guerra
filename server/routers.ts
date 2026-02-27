@@ -12,6 +12,7 @@ import {
 } from "./etl-acs";
 import { alocacoesFisicasRouter } from "./routers/alocacoes-fisicas";
 import { coerenciaTransferenciasRouter } from "./routers/coerencia-transferencias";
+import { sincronizarNfesDoACS, obterUltimaSyncNfes } from "./services/sync-nfes-acs";
 
 export const appRouter = router({
   system: systemRouter,
@@ -458,6 +459,15 @@ export const appRouter = router({
       .input(z.object({ dias: z.number().optional() }).optional())
       .mutation(async ({ input }) => {
         return verificarMedicoesFaltantes();
+      }),
+    sincronizarNfes: protectedProcedure
+      .input(z.object({ dias: z.number().optional() }).optional())
+      .mutation(async ({ input }) => {
+        return sincronizarNfesDoACS(input?.dias || 30);
+      }),
+    ultimaSyncNfes: protectedProcedure
+      .query(async () => {
+        return obterUltimaSyncNfes();
       }),
   }),
 

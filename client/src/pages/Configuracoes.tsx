@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { trpc } from "@/lib/trpc";
-import { Settings, Database, RefreshCw, Save, CheckCircle, Loader2, AlertCircle } from "lucide-react";
+import { Settings, Database, RefreshCw, Save, CheckCircle, Loader2, AlertCircle, FileText } from "lucide-react";
 import { useState } from "react";
 
 export default function Configuracoes() {
@@ -13,6 +13,7 @@ export default function Configuracoes() {
   const [toleranciaDiferenca, setToleranciaDiferenca] = useState("0.5");
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
   const [syncVendasStatus, setSyncVendasStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
+  const [syncNfesStatus, setSyncNfesStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
   const [mensagem, setMensagem] = useState<string | null>(null);
 
   const { data: ultimaSync, refetch: refetchSync } = trpc.dashboard.ultimaSincronizacao.useQuery();
@@ -60,6 +61,38 @@ export default function Configuracoes() {
     }
   });
 
+  const { data: ultimaSyncNfes } = trpc.sync.ultimaSyncNfes.useQuery();
+
+  const sincronizarNfes = trpc.sync.sincronizarNfes.useMutation({
+    onMutate: () => {
+      setSyncNfesStatus("syncing");
+      setMensagem("Sincronizando NFes do ACS...");
+    },
+    onSuccess: (result: any) => {
+      if (result.success) {
+        setSyncNfesStatus("success");
+        const msg = `NFes sincronizadas! ${result.inseridos} novas, ${result.jaExistentes} já existentes, ${result.naoMapeados} não mapeadas.`;
+        setMensagem(msg);
+        refetchSync();
+      } else {
+        setSyncNfesStatus("error");
+        setMensagem("Sincronização de NFes com erros: " + (result.erros?.join(", ") || ""));
+      }
+      setTimeout(() => {
+        setMensagem(null);
+        setSyncNfesStatus("idle");
+      }, 8000);
+    },
+    onError: (error: any) => {
+      setSyncNfesStatus("error");
+      setMensagem("Erro na sincronização de NFes: " + error.message);
+      setTimeout(() => {
+        setMensagem(null);
+        setSyncNfesStatus("idle");
+      }, 5000);
+    }
+  });
+
   const sincronizarVendas = trpc.sync.sincronizarVendas.useMutation({
     onMutate: () => {
       setSyncVendasStatus("syncing");
@@ -95,6 +128,10 @@ export default function Configuracoes() {
 
   const handleSincronizarVendas = () => {
     sincronizarVendas.mutate({ dias: 7 });
+  };
+
+  const handleSincronizarNfes = () => {
+    sincronizarNfes.mutate({ dias: 30 });
   };
 
   const salvarConfiguracoes = () => {
@@ -278,9 +315,49 @@ export default function Configuracoes() {
                 )}
               </Button>
 
+              <Separator />
+
+              {/* Botão de Sincronização de NFes */}
+              <Button 
+                onClick={handleSincronizarNfes} 
+                disabled={syncNfesStatus === "syncing"}
+                className="w-full"
+                variant={syncNfesStatus === "success" ? "outline" : "default"}
+              >
+                {syncNfesStatus === "syncing" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Sincronizando NFes...
+                  </>
+                ) : syncNfesStatus === "success" ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    NFes Sincronizadas!
+                  </>
+                ) : syncNfesStatus === "error" ? (
+                  <>
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    Tentar Novamente (NFes)
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Sincronizar NFes (Compras)
+                  </>
+                )}
+              </Button>
+
+              {ultimaSyncNfes?.ultimaSync && (
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    <strong>Última sync NFes:</strong> {new Date(ultimaSyncNfes.ultimaSync).toLocaleString('pt-BR')} — {ultimaSyncNfes.resultado}
+                  </p>
+                </div>
+              )}
+
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  <strong>Sincronização Automática:</strong> Vendas e medições são sincronizadas automaticamente a cada 60 minutos. Use os botões acima para forçar uma sincronização imediata.
+                  <strong>Sincronização Automática:</strong> Vendas, medições e NFes são sincronizadas automaticamente a cada 60 minutos. Use os botões acima para forçar uma sincronização imediata.
                 </p>
               </div>
             </CardContent>

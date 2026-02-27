@@ -739,3 +739,12 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [x] Corrigir divergência de volume: NFe 000726262/1 (1.000 → 5.000L)
 - [x] Importar em massa 195 NFes faltantes do ACS como lotes provisórios (9 já existiam, 24 de postos sem mapeamento)
 - [x] Verificar resultado final com re-auditoria
+
+## Sincronização Automática de NFes do ACS
+- [x] Criar serviço de sincronização de NFes (buscar ACS → criar lotes provisórios)
+- [x] Mapear automaticamente posto, tanque e produto pela NFe do ACS
+- [x] Evitar duplicatas (verificar chaveNfe existente antes de inserir)
+- [x] Integrar ao auto-sync existente (junto com vendas e medições)
+- [x] Adicionar logs detalhados da sincronização
+- [x] Gerar alertas para NFes que não puderam ser mapeadas
+- [x] Escrever testes unitários (11/11 passando)
