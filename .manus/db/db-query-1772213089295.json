@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE lotes SET quantidadeOriginal = 10000.000, quantidadeDisponivel = quantidadeDisponivel + 5000.000, custoTotal = 53000.00, custoUnitarioProduto = 5.2600, custoUnitarioFrete = 0.0400, valorFrete = 400.00, tipoFrete = 'FOB', updatedAt = NOW() WHERE id = 690006",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute UPDATE lotes SET quantidadeOriginal = 10000.000, quantidadeDisponivel = quantidadeDisponivel + 5000.000, custoTotal = 53000.00, custoUnitarioProduto = 5.2600, custoUnitarioFrete = 0.0400, valorFrete = 400.00, tipoFrete = 'FOB', updatedAt = NOW() WHERE id = 690006",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 361
+}

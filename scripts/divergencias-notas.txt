@@ -1,0 +1,29 @@
+Divergências a corrigir:
+
+1. NFe 000442306/3 (Lote 690006) - VOLUME
+   ACS: 10.000L, R$ 53.000, FOB, frete R$ 400, produto R$ 52.600
+   PEPS: 5.000L, R$ 26.500, custoUnit 5.30
+   Correção: qtdOriginal=10000, qtdDisponivel+=5000, custoTotal=53000, custoUnit=5.30 (52600/10000 + 400/10000 = 5.26+0.04=5.30)
+   Tanque: 17 (Mãe e Filho, Gasolina) - CORRETO
+
+2. NFe 000726139/1 (Lote 720012) - POSTO + VOLUME
+   ACS: Palhano (cod_empresa=03), 5.000L, R$ 26.761, FOB, frete R$ 425, produto R$ 26.336
+   PEPS: Mãe e Filho (postoId=1), 1.000L, R$ 5.352,20, tanqueId=1
+   Correção: postoId=4, tanqueId=6 (Palhano Gasolina), qtdOriginal=5000, qtdDisponivel=5000, 
+             custoUnit=5.3522 (26336/5000 + 425/5000 = 5.2672+0.085=5.3522), custoTotal=26761
+             nomeProduto=GASOLINA C COMUM, nomeFornecedor=SP INDUSTRIA E DISTRIBUIDORA DE PETROLEO LTDA
+
+3. NFe 000726262/1 (Lote 720008) - VOLUME
+   ACS: Mãe e Filho (cod_empresa=06), 5.000L, R$ 26.736, FOB, frete R$ 400, produto R$ 26.336
+   PEPS: Mãe e Filho, 1.000L, R$ 5.347,20, tanqueId=1
+   Correção: qtdOriginal=5000, qtdDisponivel=5000, custoTotal=26736, 
+             custoUnit=5.3472 (26336/5000 + 400/5000 = 5.2672+0.08=5.3472)
+             nomeProduto=GASOLINA C COMUM, nomeFornecedor=SP INDUSTRIA E DISTRIBUIDORA DE PETROLEO LTDA
+   Tanque: 17 (Mãe e Filho, Gasolina) - precisa corrigir tanqueId de 1 para 17
+
+4. NFe 000726652/1 (Lote 720004) - POSTO + VOLUME
+   ACS: Pai Tereza (cod_empresa=04), 5.000L, R$ 27.336, CIF (tipo_frete=R=Remetente), frete R$ 0, produto R$ 27.336
+   PEPS: Mãe e Filho (postoId=1), 1.000L, R$ 5.467,20, tanqueId=1
+   Correção: postoId=5, tanqueId=10 (Pai Tereza Diesel S10), qtdOriginal=5000, qtdDisponivel=5000,
+             custoUnit=5.4672 (27336/5000 = 5.4672, CIF sem frete), custoTotal=27336
+             nomeProduto=OLEO DIESEL B S10, nomeFornecedor=SP INDUSTRIA E DISTRIBUIDORA DE PETROLEO LTDA

@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE lotes SET postoId = 4, tanqueId = 6, quantidadeOriginal = 5000.000, quantidadeDisponivel = 5000.000, custoUnitario = 5.3522, custoUnitarioProduto = 5.2672, custoUnitarioFrete = 0.0850, custoTotal = 26761.00, valorFrete = 425.00, tipoFrete = 'FOB', nomeProduto = 'GASOLINA C COMUM', nomeFornecedor = 'SP INDUSTRIA E DISTRIBUIDORA DE PETROLEO LTDA', produtoId = 3, dataEntrada = '2026-02-20', dataEmissao = '2026-02-20', statusNfe = 'provisoria', updatedAt = NOW() WHERE id = 720012",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute UPDATE lotes SET postoId = 4, tanqueId = 6, quantidadeOriginal = 5000.000, quantidadeDisponivel = 5000.000, custoUnitario = 5.3522, custoUnitarioProduto = 5.2672, custoUnitarioFrete = 0.0850, custoTotal = 26761.00, valorFrete = 425.00, tipoFrete = 'FOB', nomeProduto = 'GASOLINA C COMUM', nomeFornecedor = 'SP INDUSTRIA E DISTRIBUIDORA DE PETROLEO LTDA', produtoId = 3, dataEntrada = '2026-02-20', dataEmissao = '2026-02-20', statusNfe = 'provisoria', updatedAt = NOW() WHERE id = 720012",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 374
+}

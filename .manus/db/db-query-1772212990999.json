@@ -1,0 +1,118 @@
+{
+  "query": "SELECT id, numeroNf, serieNf, chaveNfe, postoId, ROUND(quantidadeOriginal, 3) as qtdOrig, ROUND(quantidadeDisponivel, 3) as qtdDisp, status, statusNfe, origem FROM lotes WHERE id IN (720001, 720002, 720003, 720005, 720006, 720007, 720009, 720010, 720011) ORDER BY id",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT id, numeroNf, serieNf, chaveNfe, postoId, ROUND(quantidadeOriginal, 3) as qtdOrig, ROUND(quantidadeDisponivel, 3) as qtdDisp, status, statusNfe, origem FROM lotes WHERE id IN (720001, 720002, 720003, 720005, 720006, 720007, 720009, 720010, 720011) ORDER BY id",
+  "rows": [
+    {
+      "id": "720001",
+      "numeroNf": "001234",
+      "serieNf": "1",
+      "chaveNfe": "ACS-01-12345",
+      "postoId": "1",
+      "qtdOrig": "5000.000",
+      "qtdDisp": "5000.000",
+      "status": "ativo",
+      "statusNfe": "confirmada",
+      "origem": "manual"
+    },
+    {
+      "id": "720002",
+      "numeroNf": "001235",
+      "serieNf": "1",
+      "chaveNfe": "ACS-01-12346",
+      "postoId": "1",
+      "qtdOrig": "3000.000",
+      "qtdDisp": "3000.000",
+      "status": "ativo",
+      "statusNfe": "confirmada",
+      "origem": "manual"
+    },
+    {
+      "id": "720003",
+      "numeroNf": "001236",
+      "serieNf": "1",
+      "chaveNfe": "ACS-01-12347",
+      "postoId": "1",
+      "qtdOrig": "5000.000",
+      "qtdDisp": "5000.000",
+      "status": "ativo",
+      "statusNfe": "confirmada",
+      "origem": "manual"
+    },
+    {
+      "id": "720005",
+      "numeroNf": "001234",
+      "serieNf": "1",
+      "chaveNfe": "ACS-01-12345",
+      "postoId": "1",
+      "qtdOrig": "5000.000",
+      "qtdDisp": "5000.000",
+      "status": "ativo",
+      "statusNfe": "confirmada",
+      "origem": "manual"
+    },
+    {
+      "id": "720006",
+      "numeroNf": "001235",
+      "serieNf": "1",
+      "chaveNfe": "ACS-01-12346",
+      "postoId": "1",
+      "qtdOrig": "3000.000",
+      "qtdDisp": "3000.000",
+      "status": "ativo",
+      "statusNfe": "confirmada",
+      "origem": "manual"
+    },
+    {
+      "id": "720007",
+      "numeroNf": "001236",
+      "serieNf": "1",
+      "chaveNfe": "ACS-01-12347",
+      "postoId": "1",
+      "qtdOrig": "5000.000",
+      "qtdDisp": "5000.000",
+      "status": "ativo",
+      "statusNfe": "confirmada",
+      "origem": "manual"
+    },
+    {
+      "id": "720009",
+      "numeroNf": "001234",
+      "serieNf": "1",
+      "chaveNfe": "ACS-01-12345",
+      "postoId": "1",
+      "qtdOrig": "5000.000",
+      "qtdDisp": "5000.000",
+      "status": "ativo",
+      "statusNfe": "provisoria",
+      "origem": "manual"
+    },
+    {
+      "id": "720010",
+      "numeroNf": "001235",
+      "serieNf": "1",
+      "chaveNfe": "ACS-01-12346",
+      "postoId": "1",
+      "qtdOrig": "3000.000",
+      "qtdDisp": "3000.000",
+      "status": "ativo",
+      "statusNfe": "provisoria",
+      "origem": "manual"
+    },
+    {
+      "id": "720011",
+      "numeroNf": "001236",
+      "serieNf": "1",
+      "chaveNfe": "ACS-01-12347",
+      "postoId": "1",
+      "qtdOrig": "5000.000",
+      "qtdDisp": "5000.000",
+      "status": "ativo",
+      "statusNfe": "provisoria",
+      "origem": "manual"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tnumeroNf\tserieNf\tchaveNfe\tpostoId\tqtdOrig\tqtdDisp\tstatus\tstatusNfe\torigem\n720001\t001234\t1\tACS-01-12345\t1\t5000.000\t5000.000\tativo\tconfirmada\tmanual\n720002\t001235\t1\tACS-01-12346\t1\t3000.000\t3000.000\tativo\tconfirmada\tmanual\n720003\t001236\t1\tACS-01-12347\t1\t5000.000\t5000.000\tativo\tconfirmada\tmanual\n720005\t001234\t1\tACS-01-12345\t1\t5000.000\t5000.000\tativo\tconfirmada\tmanual\n720006\t001235\t1\tACS-01-12346\t1\t3000.000\t3000.000\tativo\tconfirmada\tmanual\n720007\t001236\t1\tACS-01-12347\t1\t5000.000\t5000.000\tativo\tconfirmada\tmanual\n720009\t001234\t1\tACS-01-12345\t1\t5000.000\t5000.000\tativo\tprovisoria\tmanual\n720010\t001235\t1\tACS-01-12346\t1\t3000.000\t3000.000\tativo\tprovisoria\tmanual\n720011\t001236\t1\tACS-01-12347\t1\t5000.000\t5000.000\tativo\tprovisoria\tmanual\n",
+  "stderr": "",
+  "execution_time_ms": 387
+}

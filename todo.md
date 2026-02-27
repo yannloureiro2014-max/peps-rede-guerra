@@ -730,3 +730,12 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [x] Recalcular CMV das vendas de ambos os postos
 - [x] Revalidar coerência física após transferência
 - [x] Atualizar alertas automaticamente
+
+## Correção de Dados - Auditoria NFes (27/02/2026)
+- [x] Limpar 9 lotes fictícios/duplicados (720001-720012 de teste)
+- [x] Corrigir divergência de posto: NFe 000726139/1 (Mãe e Filho → Palhano)
+- [x] Corrigir divergência de posto: NFe 000726652/1 (Mãe e Filho → Pai Tereza)
+- [x] Corrigir divergência de volume: NFe 000442306/3 (5.000 → 10.000L)
+- [x] Corrigir divergência de volume: NFe 000726262/1 (1.000 → 5.000L)
+- [x] Importar em massa 195 NFes faltantes do ACS como lotes provisórios (9 já existiam, 24 de postos sem mapeamento)
+- [x] Verificar resultado final com re-auditoria

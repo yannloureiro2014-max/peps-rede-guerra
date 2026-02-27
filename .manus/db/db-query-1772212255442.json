@@ -1,0 +1,88 @@
+{
+  "query": "SELECT id, nome, cnpj, ativo FROM postos ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT id, nome, cnpj, ativo FROM postos ORDER BY id;",
+  "rows": [
+    {
+      "id": "1",
+      "nome": "MÃE E FILHO",
+      "cnpj": "50.489.002/0001-64",
+      "ativo": "1"
+    },
+    {
+      "id": "2",
+      "nome": "POSTO GUERRA FORTIM",
+      "cnpj": "30.951.450/0005-54",
+      "ativo": "1"
+    },
+    {
+      "id": "4",
+      "nome": "POSTO GUERRA PALHANO",
+      "cnpj": "30.951.450/0002-01",
+      "ativo": "1"
+    },
+    {
+      "id": "5",
+      "nome": "POSTO PAI TEREZA",
+      "cnpj": "04.212.366/0001-85",
+      "ativo": "1"
+    },
+    {
+      "id": "8",
+      "nome": "POSTO JAGUARUANA",
+      "cnpj": "53.776.141/0001-67",
+      "ativo": "1"
+    },
+    {
+      "id": "9",
+      "nome": "POSTO ITAIÇABA",
+      "cnpj": "30.951.450/0001-20",
+      "ativo": "1"
+    },
+    {
+      "id": "30001",
+      "nome": "POSTO POTIRETAMA",
+      "cnpj": "30.951.450/0004-73",
+      "ativo": "0"
+    },
+    {
+      "id": "30002",
+      "nome": "POSTO LEITE",
+      "cnpj": "07.259.906/0001-74",
+      "ativo": "0"
+    },
+    {
+      "id": "30003",
+      "nome": "POSTO GUERRA SAO JOAO DO JAGUARIBE",
+      "cnpj": "30.951.450/0003-92",
+      "ativo": "0"
+    },
+    {
+      "id": "30004",
+      "nome": "SG PETROLEO",
+      "cnpj": "44.808.070/0001-46",
+      "ativo": "0"
+    },
+    {
+      "id": "30005",
+      "nome": "POSTO GUARARAPES VIP",
+      "cnpj": "26.668.844/0001-07",
+      "ativo": "0"
+    },
+    {
+      "id": "30006",
+      "nome": "POSTO ARACATI",
+      "cnpj": "48.950.474/0001-20",
+      "ativo": "0"
+    },
+    {
+      "id": "30007",
+      "nome": "POSTO HORIZONTE",
+      "cnpj": "48.951.043/0001-89",
+      "ativo": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tnome\tcnpj\tativo\n1\tMÃE E FILHO\t50.489.002/0001-64\t1\n2\tPOSTO GUERRA FORTIM\t30.951.450/0005-54\t1\n4\tPOSTO GUERRA PALHANO\t30.951.450/0002-01\t1\n5\tPOSTO PAI TEREZA\t04.212.366/0001-85\t1\n8\tPOSTO JAGUARUANA\t53.776.141/0001-67\t1\n9\tPOSTO ITAIÇABA\t30.951.450/0001-20\t1\n30001\tPOSTO POTIRETAMA\t30.951.450/0004-73\t0\n30002\tPOSTO LEITE\t07.259.906/0001-74\t0\n30003\tPOSTO GUERRA SAO JOAO DO JAGUARIBE\t30.951.450/0003-92\t0\n30004\tSG PETROLEO\t44.808.070/0001-46\t0\n30005\tPOSTO GUARARAPES VIP\t26.668.844/0001-07\t0\n30006\tPOSTO ARACATI\t48.950.474/0001-20\t0\n30007\tPOSTO HORIZONTE\t48.951.043/0001-89\t0\n",
+  "stderr": "",
+  "execution_time_ms": 361
+}

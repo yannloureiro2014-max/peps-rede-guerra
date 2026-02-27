@@ -1,0 +1,418 @@
+{
+  "query": "DESCRIBE lotes; DESCRIBE nfeStaging;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute DESCRIBE lotes; DESCRIBE nfeStaging;",
+  "rows": [
+    {
+      "Field": "id",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": "auto_increment"
+    },
+    {
+      "Field": "tanqueId",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "numeroNf",
+      "Type": "varchar(50)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "fornecedor",
+      "Type": "varchar(200)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "dataEntrada",
+      "Type": "date",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "quantidadeOriginal",
+      "Type": "decimal(12,3)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "quantidadeDisponivel",
+      "Type": "decimal(12,3)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "custoUnitario",
+      "Type": "decimal(12,4)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "ordemConsumo",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "status",
+      "Type": "enum('ativo','consumido','cancelado')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "ativo",
+      "Extra": ""
+    },
+    {
+      "Field": "statusNfe",
+      "Type": "enum('provisoria','confirmada')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "provisoria",
+      "Extra": ""
+    },
+    {
+      "Field": "createdAt",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": ""
+    },
+    {
+      "Field": "updatedAt",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+    },
+    {
+      "Field": "codigoAcs",
+      "Type": "varchar(50)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "postoId",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "produtoId",
+      "Type": "int(11)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "fornecedorId",
+      "Type": "int(11)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "serieNf",
+      "Type": "varchar(10)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "chaveNfe",
+      "Type": "varchar(60)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "nomeFornecedor",
+      "Type": "varchar(300)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "nomeProduto",
+      "Type": "varchar(200)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "tipoFrete",
+      "Type": "varchar(10)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "custoUnitarioProduto",
+      "Type": "decimal(12,4)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "custoUnitarioFrete",
+      "Type": "decimal(12,4)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "valorFrete",
+      "Type": "decimal(12,2)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "dataEmissao",
+      "Type": "date",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "dataLmc",
+      "Type": "date",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "custoTotal",
+      "Type": "decimal(14,2)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "origem",
+      "Type": "enum('acs','manual','transferencia')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "manual",
+      "Extra": ""
+    },
+    {
+      "Field": "ultimaSincronizacao",
+      "Type": "timestamp",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "statusSincronizacao",
+      "Type": "enum('pendente','sincronizando','sincronizado','erro')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "pendente",
+      "Extra": ""
+    },
+    {
+      "Field": "erroSincronizacao",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "Field",
+      "Type": "Type",
+      "Null": "Null",
+      "Key": "Key",
+      "Default": "Default",
+      "Extra": "Extra"
+    },
+    {
+      "Field": "id",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": "auto_increment"
+    },
+    {
+      "Field": "chaveNfe",
+      "Type": "varchar(44)",
+      "Null": "NO",
+      "Key": "UNI",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "numeroNf",
+      "Type": "varchar(20)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "serieNf",
+      "Type": "varchar(10)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "dataEmissao",
+      "Type": "date",
+      "Null": "NO",
+      "Key": "MUL",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "cnpjFaturado",
+      "Type": "varchar(20)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "cnpjFornecedor",
+      "Type": "varchar(20)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "postoFiscalId",
+      "Type": "int(11)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "produtoId",
+      "Type": "int(11)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "quantidade",
+      "Type": "decimal(12,3)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "custoUnitario",
+      "Type": "decimal(10,4)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "custoTotal",
+      "Type": "decimal(14,2)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "statusAlocacao",
+      "Type": "enum('pendente','parcialmente_alocado','totalmente_alocado')",
+      "Null": "NO",
+      "Key": "MUL",
+      "Default": "pendente",
+      "Extra": ""
+    },
+    {
+      "Field": "quantidadeAlocada",
+      "Type": "decimal(12,3)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "observacoes",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "importadoEm",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": ""
+    },
+    {
+      "Field": "createdAt",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": ""
+    },
+    {
+      "Field": "updatedAt",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nid\tint(11)\tNO\tPRI\tNULL\tauto_increment\ntanqueId\tint(11)\tNO\t\tNULL\t\nnumeroNf\tvarchar(50)\tYES\t\tNULL\t\nfornecedor\tvarchar(200)\tYES\t\tNULL\t\ndataEntrada\tdate\tNO\t\tNULL\t\nquantidadeOriginal\tdecimal(12,3)\tNO\t\tNULL\t\nquantidadeDisponivel\tdecimal(12,3)\tNO\t\tNULL\t\ncustoUnitario\tdecimal(12,4)\tNO\t\tNULL\t\nordemConsumo\tint(11)\tNO\t\t0\t\nstatus\tenum('ativo','consumido','cancelado')\tNO\t\tativo\t\nstatusNfe\tenum('provisoria','confirmada')\tNO\t\tprovisoria\t\ncreatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t\nupdatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP\ncodigoAcs\tvarchar(50)\tYES\t\tNULL\t\npostoId\tint(11)\tNO\t\t0\t\nprodutoId\tint(11)\tYES\t\tNULL\t\nfornecedorId\tint(11)\tYES\t\tNULL\t\nserieNf\tvarchar(10)\tYES\t\tNULL\t\nchaveNfe\tvarchar(60)\tYES\t\tNULL\t\nnomeFornecedor\tvarchar(300)\tYES\t\tNULL\t\nnomeProduto\tvarchar(200)\tYES\t\tNULL\t\ntipoFrete\tvarchar(10)\tYES\t\tNULL\t\ncustoUnitarioProduto\tdecimal(12,4)\tYES\t\tNULL\t\ncustoUnitarioFrete\tdecimal(12,4)\tYES\t\tNULL\t\nvalorFrete\tdecimal(12,2)\tYES\t\tNULL\t\ndataEmissao\tdate\tYES\t\tNULL\t\ndataLmc\tdate\tYES\t\tNULL\t\ncustoTotal\tdecimal(14,2)\tNO\t\t0\t\norigem\tenum('acs','manual','transferencia')\tNO\t\tmanual\t\nultimaSincronizacao\ttimestamp\tYES\t\tNULL\t\nstatusSincronizacao\tenum('pendente','sincronizando','sincronizado','erro')\tNO\t\tpendente\t\nerroSincronizacao\ttext\tYES\t\tNULL\t\nField\tType\tNull\tKey\tDefault\tExtra\nid\tint(11)\tNO\tPRI\tNULL\tauto_increment\nchaveNfe\tvarchar(44)\tNO\tUNI\tNULL\t\nnumeroNf\tvarchar(20)\tNO\t\tNULL\t\nserieNf\tvarchar(10)\tNO\t\tNULL\t\ndataEmissao\tdate\tNO\tMUL\tNULL\t\ncnpjFaturado\tvarchar(20)\tNO\t\tNULL\t\ncnpjFornecedor\tvarchar(20)\tNO\t\tNULL\t\npostoFiscalId\tint(11)\tYES\t\tNULL\t\nprodutoId\tint(11)\tYES\t\tNULL\t\nquantidade\tdecimal(12,3)\tNO\t\tNULL\t\ncustoUnitario\tdecimal(10,4)\tNO\t\tNULL\t\ncustoTotal\tdecimal(14,2)\tNO\t\tNULL\t\nstatusAlocacao\tenum('pendente','parcialmente_alocado','totalmente_alocado')\tNO\tMUL\tpendente\t\nquantidadeAlocada\tdecimal(12,3)\tNO\t\t0\t\nobservacoes\ttext\tYES\t\tNULL\t\nimportadoEm\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t\ncreatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t\nupdatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP\n",
+  "stderr": "",
+  "execution_time_ms": 411
+}

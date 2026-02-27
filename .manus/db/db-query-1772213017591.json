@@ -1,0 +1,110 @@
+{
+  "query": "SELECT t.id, t.postoId, p.nome as postoNome, t.codigoAcs, t.produtoId, pr.descricao as produto, ROUND(t.capacidade, 0) as capacidade, ROUND(t.saldoAtual, 0) as saldo FROM tanques t JOIN postos p ON t.postoId = p.id LEFT JOIN produtos pr ON t.produtoId = pr.id WHERE t.postoId IN (1, 4, 5) AND t.ativo = 1 ORDER BY t.postoId, t.id",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41wMkRgfnqozYTj.root --database GsoitYr3hHiyZTgQLwp9sV --execute SELECT t.id, t.postoId, p.nome as postoNome, t.codigoAcs, t.produtoId, pr.descricao as produto, ROUND(t.capacidade, 0) as capacidade, ROUND(t.saldoAtual, 0) as saldo FROM tanques t JOIN postos p ON t.postoId = p.id LEFT JOIN produtos pr ON t.produtoId = pr.id WHERE t.postoId IN (1, 4, 5) AND t.ativo = 1 ORDER BY t.postoId, t.id",
+  "rows": [
+    {
+      "id": "17",
+      "postoId": "1",
+      "postoNome": "MÃE E FILHO",
+      "codigoAcs": "01",
+      "produtoId": "3",
+      "produto": "GASOLINA C COMUM",
+      "capacidade": "20000",
+      "saldo": "16749"
+    },
+    {
+      "id": "18",
+      "postoId": "1",
+      "postoNome": "MÃE E FILHO",
+      "codigoAcs": "02",
+      "produtoId": "5",
+      "produto": "ETANOL HIDRATADO COMUM",
+      "capacidade": "10000",
+      "saldo": "857"
+    },
+    {
+      "id": "19",
+      "postoId": "1",
+      "postoNome": "MÃE E FILHO",
+      "codigoAcs": "03",
+      "produtoId": "5",
+      "produto": "ETANOL HIDRATADO COMUM",
+      "capacidade": "10000",
+      "saldo": "4220"
+    },
+    {
+      "id": "20",
+      "postoId": "1",
+      "postoNome": "MÃE E FILHO",
+      "codigoAcs": "04",
+      "produtoId": "6",
+      "produto": "OLEO DIESEL B S10",
+      "capacidade": "10000",
+      "saldo": "5780"
+    },
+    {
+      "id": "6",
+      "postoId": "4",
+      "postoNome": "POSTO GUERRA PALHANO",
+      "codigoAcs": "01",
+      "produtoId": "3",
+      "produto": "GASOLINA C COMUM",
+      "capacidade": "10000",
+      "saldo": "-7708"
+    },
+    {
+      "id": "7",
+      "postoId": "4",
+      "postoNome": "POSTO GUERRA PALHANO",
+      "codigoAcs": "02",
+      "produtoId": "6",
+      "produto": "OLEO DIESEL B S10",
+      "capacidade": "10000",
+      "saldo": "1991"
+    },
+    {
+      "id": "8",
+      "postoId": "5",
+      "postoNome": "POSTO PAI TEREZA",
+      "codigoAcs": "01",
+      "produtoId": "5",
+      "produto": "ETANOL HIDRATADO COMUM",
+      "capacidade": "15000",
+      "saldo": "7220"
+    },
+    {
+      "id": "9",
+      "postoId": "5",
+      "postoNome": "POSTO PAI TEREZA",
+      "codigoAcs": "02",
+      "produtoId": "3",
+      "produto": "GASOLINA C COMUM",
+      "capacidade": "15000",
+      "saldo": "7507"
+    },
+    {
+      "id": "10",
+      "postoId": "5",
+      "postoNome": "POSTO PAI TEREZA",
+      "codigoAcs": "04",
+      "produtoId": "6",
+      "produto": "OLEO DIESEL B S10",
+      "capacidade": "15000",
+      "saldo": "2760"
+    },
+    {
+      "id": "11",
+      "postoId": "5",
+      "postoNome": "POSTO PAI TEREZA",
+      "codigoAcs": "05",
+      "produtoId": "4",
+      "produto": "GASOLINA C ADITIVADA",
+      "capacidade": "15000",
+      "saldo": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tpostoId\tpostoNome\tcodigoAcs\tprodutoId\tproduto\tcapacidade\tsaldo\n17\t1\tMÃE E FILHO\t01\t3\tGASOLINA C COMUM\t20000\t16749\n18\t1\tMÃE E FILHO\t02\t5\tETANOL HIDRATADO COMUM\t10000\t857\n19\t1\tMÃE E FILHO\t03\t5\tETANOL HIDRATADO COMUM\t10000\t4220\n20\t1\tMÃE E FILHO\t04\t6\tOLEO DIESEL B S10\t10000\t5780\n6\t4\tPOSTO GUERRA PALHANO\t01\t3\tGASOLINA C COMUM\t10000\t-7708\n7\t4\tPOSTO GUERRA PALHANO\t02\t6\tOLEO DIESEL B S10\t10000\t1991\n8\t5\tPOSTO PAI TEREZA\t01\t5\tETANOL HIDRATADO COMUM\t15000\t7220\n9\t5\tPOSTO PAI TEREZA\t02\t3\tGASOLINA C COMUM\t15000\t7507\n10\t5\tPOSTO PAI TEREZA\t04\t6\tOLEO DIESEL B S10\t15000\t2760\n11\t5\tPOSTO PAI TEREZA\t05\t4\tGASOLINA C ADITIVADA\t15000\t0\n",
+  "stderr": "",
+  "execution_time_ms": 366
+}
