@@ -793,3 +793,20 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [ ] Executar testes para garantir que as mudanças não quebraram nada
 - [ ] Testar manualmente as páginas principais (Dashboard, Pendências, Transferências, etc)
 - [ ] Verificar se postos inativos não aparecem em nenhuma parte do sistema
+
+## Correção: Erro 'column c.cod_tanque does not exist' - CONCLUÍDO
+
+### Problema Identificado
+- Query em `acs-nfes.ts` (função `buscarComprasDoACS`) estava tentando acessar `c.cod_tanque`
+- Tabela `compras_comb` do ACS não possui coluna `cod_tanque`
+- Coluna `cod_tanque` existe apenas na tabela `itens_compra_comb` (nível do item, não da compra)
+
+### Solução Implementada
+- [x] Remover `COALESCE(i.cod_tanque, c.cod_tanque)` e usar apenas `i.cod_tanque`
+- [x] Adicionar `i.cod_tanque` ao GROUP BY da query
+- [x] Verificar se há outras referências a `c.cod_tanque` em outros arquivos (nenhuma encontrada)
+
+### Resultado
+- Query agora seleciona apenas `i.cod_tanque` da tabela `itens_compra_comb`
+- Sincronização de compras do ACS deve funcionar corretamente agora
+- Tanque é mapeado no nível do item de compra (correto, pois cada item pode ter um tanque diferente)

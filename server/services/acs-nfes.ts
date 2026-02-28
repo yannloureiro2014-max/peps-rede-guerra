@@ -163,7 +163,7 @@ export async function buscarComprasDoACS(filtros?: {
               c.despesas,
               COUNT(i.numero) as total_itens,
               SUM(i.quantidade::numeric) as total_litros,
-              COALESCE(i.cod_tanque, c.cod_tanque) as cod_tanque,
+              i.cod_tanque,
               (
                 SELECT COALESCE(p.descricao, 'Combustível')
                 FROM itens_compra_comb ic
@@ -198,7 +198,7 @@ export async function buscarComprasDoACS(filtros?: {
             paramIdx += filtros.codEmpresaList.length;
           }
 
-          query += ` GROUP BY c.cod_empresa, c.codigo, c.documento, c.serie, c.dt_emissao, c.dt_lmc, c.cod_fornecedor, f.razao_social, c.total_nota, c.total_produtos, c.tipo_frete, c.frete, c.despesas, nome_combustivel
+          query += ` GROUP BY c.cod_empresa, c.codigo, c.documento, c.serie, c.dt_emissao, c.dt_lmc, c.cod_fornecedor, f.razao_social, c.total_nota, c.total_produtos, c.tipo_frete, c.frete, c.despesas, i.cod_tanque, nome_combustivel
             ORDER BY c.dt_emissao DESC
             LIMIT 500`;
 
