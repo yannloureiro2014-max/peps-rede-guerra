@@ -173,7 +173,7 @@ export async function buscarComprasDoACS(filtros?: {
                 LIMIT 1
               ) as nome_combustivel
             FROM compras_comb c
-            LEFT JOIN itens_compra_comb i ON c.codigo = i.cod_compra AND c.cod_empresa = i.cod_empresa
+            LEFT JOIN itens_compra_comb i ON c.codigo = i.cod_compra AND c.cod_empresa = i.cod_empresa AND i.cancelado = 'N'
             LEFT JOIN fornecedores f ON c.cod_fornecedor = f.codigo
             WHERE c.dt_emissao >= $${paramIdx}::date
           `;

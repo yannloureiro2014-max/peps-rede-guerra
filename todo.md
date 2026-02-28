@@ -765,3 +765,9 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [ ] Investigar campo de tanque/alocação no ACS
 - [ ] Modificar sincronização para usar tanque do ACS como alocação principal
 - [ ] Testar e validar alocações corretas
+
+
+## Correção de Bugs - Alocação NFe
+- [x] Remover NFes de postos inativos (Aracati) da lista de pendentes - corrigido em buscarNfesDoACS
+- [x] Corrigir filtro de data na busca de NFes - filtro já estava funcionando, erro era na query SQL
+- [x] Investigar contagem inconsistente de NFes - corrigido ao filtrar apenas postos ativos
