@@ -142,7 +142,7 @@ export async function listarNfesAlocadas(filtros: {
 
   // Buscar nomes dos postos e tanques
   const { postos: postosTable, tanques: tanquesTable } = await import("../drizzle/schema");
-  const todosPostos = await db.select().from(postosTable);
+  const todosPostos = await db.select().from(postosTable).where(eq(postosTable.ativo, 1));
   const todosTanques = await db.select().from(tanquesTable);
   const postosMap = new Map(todosPostos.map((p: any) => [p.id, p.nome]));
   const tanquesMap = new Map(todosTanques.map((t: any) => [t.id, `Tanque ${t.codigoAcs} - ${t.produtoDescricao || 'Sem produto'} (${Number(t.capacidade)?.toLocaleString('pt-BR')}L)`]));

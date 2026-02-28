@@ -428,7 +428,7 @@ export async function listarTransferencias(filtros?: {
   const tanquesMap = new Map<number, string>();
 
   if (postoIds.size > 0) {
-    const postosResult = await db.select({ id: postos.id, nome: postos.nome }).from(postos);
+    const postosResult = await db.select({ id: postos.id, nome: postos.nome }).from(postos).where(eq(postos.ativo, 1));
     for (const p of postosResult) postosMap.set(p.id, p.nome);
   }
 

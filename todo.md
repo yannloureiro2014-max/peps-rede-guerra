@@ -771,3 +771,25 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [x] Remover NFes de postos inativos (Aracati) da lista de pendentes - corrigido em buscarNfesDoACS
 - [x] Corrigir filtro de data na busca de NFes - filtro já estava funcionando, erro era na query SQL
 - [x] Investigar contagem inconsistente de NFes - corrigido ao filtrar apenas postos ativos
+
+## Auditoria Completa de Postos Inativos - Em Progresso
+
+### Backend - Filtros de Postos Ativos
+- [x] Corrigir db-nfe-alocacoes.ts: listarNfesAlocadas (linha 145) - filtrar apenas postos ativos
+- [x] Corrigir transferencias-fisicas.ts: listarTransferencias (linha 431) - filtrar apenas postos ativos
+- [x] Corrigir db.ts: getInicializacoesMensais - adicionar filtro postos.ativo=1
+- [x] Corrigir db.ts: getInicializacaoById - adicionar filtro postos.ativo=1
+- [x] Corrigir db.ts: getUsuarios - filtrar postos inativos (or(isNull(users.postoId), eq(postos.ativo, 1)))
+- [x] Corrigir db.ts: calcularDRE - adicionar filtro postos.ativo=1
+- [x] Adicionar importação de `or` em db.ts para suportar filtros opcionais
+
+### Verificação Realizada
+- [x] Todas as funções em db.ts que retornam dados de postos já filtram postos ativos
+- [x] Todas as funções em serviços (coerencia-fisica.ts, bloqueio-dre.ts, etc) já filtram postos ativos
+- [x] Frontend usa postos.list (ativos) em todas as páginas, exceto Postos.tsx que usa postos.listAll (correto)
+- [x] Queries SQL diretas em routers.ts: nenhuma encontrada (boas práticas)
+
+### Próximos Passos
+- [ ] Executar testes para garantir que as mudanças não quebraram nada
+- [ ] Testar manualmente as páginas principais (Dashboard, Pendências, Transferências, etc)
+- [ ] Verificar se postos inativos não aparecem em nenhuma parte do sistema

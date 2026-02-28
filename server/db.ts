@@ -1,4 +1,4 @@
-import { eq, desc, and, gte, lte, sql, sum, isNull } from "drizzle-orm";
+import { eq, desc, and, or, gte, lte, sql, sum, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { 
   users, InsertUser,
@@ -805,6 +805,7 @@ export async function getUsuarios() {
   })
   .from(users)
   .leftJoin(postos, eq(users.postoId, postos.id))
+  .where(or(isNull(users.postoId), eq(postos.ativo, 1)))
   .orderBy(users.createdAt);
 }
 
@@ -904,6 +905,8 @@ export async function getInicializacoesMensais(postoId?: number, produtoId?: num
   if (!db) return [];
   
   const conditions = [];
+  // Sempre filtrar apenas postos ativos
+  conditions.push(eq(postos.ativo, 1));
   if (postoId) conditions.push(eq(inicializacaoMensalLotes.postoId, postoId));
   if (produtoId) conditions.push(eq(inicializacaoMensalLotes.produtoId, produtoId));
   
@@ -963,7 +966,7 @@ export async function getInicializacaoById(id: number) {
   .from(inicializacaoMensalLotes)
   .leftJoin(postos, eq(inicializacaoMensalLotes.postoId, postos.id))
   .leftJoin(produtos, eq(inicializacaoMensalLotes.produtoId, produtos.id))
-  .where(eq(inicializacaoMensalLotes.id, id))
+  .where(and(eq(inicializacaoMensalLotes.id, id), eq(postos.ativo, 1)))
   .limit(1);
   
   return result[0] || null;
@@ -1180,6 +1183,9 @@ export async function calcularDRE(filtros: {
   
   // Buscar vendas do período com CMV já calculado
   const conditions = [];
+  
+  // Sempre filtrar apenas postos ativos
+  conditions.push(eq(postos.ativo, 1));
   
   // Usar UTC para evitar deslocamento de fuso horário
   const dataIni = new Date(filtros.dataInicio + 'T00:00:00.000Z');
