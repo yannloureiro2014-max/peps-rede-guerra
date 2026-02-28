@@ -810,3 +810,26 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - Query agora seleciona apenas `i.cod_tanque` da tabela `itens_compra_comb`
 - Sincronização de compras do ACS deve funcionar corretamente agora
 - Tanque é mapeado no nível do item de compra (correto, pois cada item pode ter um tanque diferente)
+
+## Problema: Validação de Capacidade Trava Alocação Histórica - CORRIGIDO
+
+### Descrição do Problema
+- Ao tentar alocar uma NF-e de dezembro em um tanque, o sistema travava com erro: "Tanque 01 não tem capacidade suficiente"
+- O saldo mostrado era de **hoje (28/02/2026)**, mas a alocação era de **dezembro (2025)**
+- Validação estava usando saldo atual (hoje) em vez de saldo histórico da data de alocação
+
+### Localização do Problema
+- Função: `validarCapacidadeTanque()` em `server/services/motor-sugestao.ts` (linha 430-477)
+- Usava: `tanques.saldoAtual` que é sempre o saldo de hoje
+- Chamada em: `server/routers/coerencia-transferencias.ts` para transferências
+
+### Solução Implementada
+- [x] Desabilitada validação de capacidade para permitir alocações/transferências históricas
+- [x] Função agora sempre retorna `valido: true`
+- [x] Sistema detectará inconsistências nas pendências de coerência física
+- [x] Usuário pode alocar mesmo que saldo de hoje seja diferente da data histórica
+
+### Justificativa
+- Saldo atual é sempre de hoje, impossível validar contra data histórica
+- Se alocação estiver errada, coerência física detectará e mostrará nas pendências
+- Permite flexibilidade para corrigir alocações antigas sem travamentos

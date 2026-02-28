@@ -426,6 +426,9 @@ export async function buscarLotesProvisorisPosto(postoId?: number): Promise<any[
 
 /**
  * Validação: verificar capacidade do tanque antes de transferência
+ * NOTA: Validação desabilitada para permitir alocações/transferências históricas.
+ * Se a alocação estiver errada, será detectada nas pendências de coerência física.
+ * Saldo atual é sempre de hoje, não da data histórica da transferência.
  */
 export async function validarCapacidadeTanque(
   tanqueId: number,
@@ -452,15 +455,17 @@ export async function validarCapacidadeTanque(
   const saldo = parseFloat(String(tanque[0].saldoAtual || "0"));
   const espacoLivre = cap - saldo;
 
-  if (cap > 0 && volumeAdicional > espacoLivre + 500) { // 500L de tolerância
-    return {
-      valido: false,
-      capacidade: cap,
-      saldoAtual: saldo,
-      espacoLivre,
-      mensagem: `Tanque ${tanque[0].codigoAcs} não tem capacidade suficiente. Capacidade: ${cap.toFixed(0)}L, Saldo: ${saldo.toFixed(0)}L, Espaço livre: ${espacoLivre.toFixed(0)}L, Volume solicitado: ${volumeAdicional.toFixed(0)}L`,
-    };
-  }
+  // DESABILITADO: Permitir alocações históricas sem validação de capacidade
+  // Inconsistências serão detectadas nas pendências de coerência física
+  // if (cap > 0 && volumeAdicional > espacoLivre + 500) { // 500L de tolerância
+  //   return {
+  //     valido: false,
+  //     capacidade: cap,
+  //     saldoAtual: saldo,
+  //     espacoLivre,
+  //     mensagem: `Tanque ${tanque[0].codigoAcs} não tem capacidade suficiente. Capacidade: ${cap.toFixed(0)}L, Saldo: ${saldo.toFixed(0)}L, Espaço livre: ${espacoLivre.toFixed(0)}L, Volume solicitado: ${volumeAdicional.toFixed(0)}L`,
+  //   };
+  // }
 
   return {
     valido: true,
