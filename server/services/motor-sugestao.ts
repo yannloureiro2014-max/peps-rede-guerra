@@ -273,7 +273,9 @@ async function gerarSugestoes(
         if (volumeLote <= 0) continue;
 
         // Calcular volume sugerido (menor entre: saldo do lote, sobra e falta)
-        const volumeSugerido = Math.min(volumeLote, volumeSobra, volumeFalta);
+        // Arredondar para múltiplos de 1.000 litros
+        const volumeBruto = Math.min(volumeLote, volumeSobra, volumeFalta);
+        const volumeSugerido = Math.round(volumeBruto / 1000) * 1000;
 
         // Calcular confiança
         let confianca: "alta" | "media" | "baixa" = "baixa";
@@ -308,7 +310,7 @@ async function gerarSugestoes(
           nfeVolume: parseFloat(String(lote.quantidadeOriginal || "0")),
           nfeCustoUnitario: parseFloat(String(lote.custoUnitario || "0")),
           nfeDataEntrada: dataEntradaStr,
-          volumeSugerido: Math.round(volumeSugerido * 1000) / 1000,
+          volumeSugerido: volumeSugerido > 0 ? volumeSugerido : 1000, // Mínimo de 1.000L
           dataReferencia: sobra.dataVerificacao,
           justificativaSugerida: `Correção de alocação: NFe ${nfeNumero} provavelmente descarregou em ${falta.postoNome} (${falta.tanqueCodigo}), não em ${sobra.postoNome} (${sobra.tanqueCodigo}). Sobra de ${volumeSobra.toFixed(0)}L em ${sobra.postoNome} e falta de ${volumeFalta.toFixed(0)}L em ${falta.postoNome}.`,
           explicacao: buildExplicacao(sobra, falta, lote, volumeSugerido, confianca),

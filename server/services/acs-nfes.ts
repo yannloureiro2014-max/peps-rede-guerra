@@ -42,6 +42,9 @@ interface Compra {
   tipoFrete: string;
   frete: number;
   despesas: number;
+  codTanque?: string; // Código do tanque no ACS onde a compra deve ser descarregada
+  nomeCombustivel?: string;
+  tipoFreteOriginal?: string;
 }
 
 /**
@@ -160,6 +163,7 @@ export async function buscarComprasDoACS(filtros?: {
               c.despesas,
               COUNT(i.numero) as total_itens,
               SUM(i.quantidade::numeric) as total_litros,
+              COALESCE(i.cod_tanque, c.cod_tanque) as cod_tanque,
               (
                 SELECT COALESCE(p.descricao, 'Combustível')
                 FROM itens_compra_comb ic
@@ -222,6 +226,7 @@ export async function buscarComprasDoACS(filtros?: {
             frete: Number(row.frete) || 0,
             despesas: Number(row.despesas) || 0,
             nomeCombustivel: row.nome_combustivel || 'Combustível',
+            codTanque: (row.cod_tanque || '').trim(),
           }));
 
           console.log(

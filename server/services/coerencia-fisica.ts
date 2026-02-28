@@ -3,7 +3,7 @@
  * 
  * Calcula o estoque projetado por tanque/dia e compara com a medição real do dia seguinte.
  * Fórmula: Estoque Projetado = Medição Inicial + Compras - Vendas
- * Se |Estoque Projetado - Medição Dia Seguinte| > TOLERANCIA (1.000 L), gera alerta.
+ * Se |Estoque Projetado - Medição Dia Seguinte| > TOLERANCIA (300 L), gera alerta.
  * 
  * Processamento cronológico: dia 1, dia 2, dia 3...
  * Se dia 5 for corrigido, revalida dias 6+
@@ -22,8 +22,8 @@ import {
   verificacaoCoerencia,
 } from "../../drizzle/schema";
 
-// Tolerância padrão: 1.000 litros
-const TOLERANCIA_LITROS = 1000;
+// Tolerância padrão: 300 litros
+const TOLERANCIA_LITROS = 300;
 
 // Tipo para resultado de verificação de um dia
 export interface ResultadoVerificacaoDia {

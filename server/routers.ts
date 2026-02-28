@@ -12,7 +12,7 @@ import {
 } from "./etl-acs";
 import { alocacoesFisicasRouter } from "./routers/alocacoes-fisicas";
 import { coerenciaTransferenciasRouter } from "./routers/coerencia-transferencias";
-import { sincronizarNfesDoACS, obterUltimaSyncNfes } from "./services/sync-nfes-acs";
+import { sincronizarNfesDoACS } from "./services/sync-nfes-acs";
 
 export const appRouter = router({
   system: systemRouter,
@@ -465,10 +465,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         return sincronizarNfesDoACS(input?.dias || 30);
       }),
-    ultimaSyncNfes: protectedProcedure
-      .query(async () => {
-        return obterUltimaSyncNfes();
-      }),
+
   }),
 
   // ==================== GESTÃO DE USUÁRIOS ====================

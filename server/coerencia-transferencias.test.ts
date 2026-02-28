@@ -70,7 +70,7 @@ describe("Coerência Física - Verificação", () => {
       postoId: 1,
       dataInicio: "2025-12-28",
       dataFim: "2025-12-30",
-      tolerancia: 1000,
+      tolerancia: 300,
     });
 
     expect(result).toHaveProperty("sucesso");

@@ -755,3 +755,13 @@ Separar completamente as camadas Fiscal, Física e Financeira para resolver inco
 - [x] Substituir "RSP" no DashboardLayout (sidebar, header desktop, mobile menu) pela logo
 - [x] Adicionar logo no header da página Home (Dashboard)
 - [x] Testar responsividade e compilação
+
+## Ajustes de Tolerância e Sugestões
+- [x] Reduzir limite de alerta de coerência de 1.000L para 300L
+- [x] Arredondar sugestões de transferência para múltiplos de 1.000L
+
+
+## Sincronização de NFes com Tanque do ACS
+- [ ] Investigar campo de tanque/alocação no ACS
+- [ ] Modificar sincronização para usar tanque do ACS como alocação principal
+- [ ] Testar e validar alocações corretas

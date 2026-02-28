@@ -61,8 +61,6 @@ export default function Configuracoes() {
     }
   });
 
-  const { data: ultimaSyncNfes } = trpc.sync.ultimaSyncNfes.useQuery();
-
   const sincronizarNfes = trpc.sync.sincronizarNfes.useMutation({
     onMutate: () => {
       setSyncNfesStatus("syncing");
@@ -347,13 +345,7 @@ export default function Configuracoes() {
                 )}
               </Button>
 
-              {ultimaSyncNfes?.ultimaSync && (
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    <strong>Última sync NFes:</strong> {new Date(ultimaSyncNfes.ultimaSync).toLocaleString('pt-BR')} — {ultimaSyncNfes.resultado}
-                  </p>
-                </div>
-              )}
+
 
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">

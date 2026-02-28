@@ -389,7 +389,7 @@ export default function CoerenciaFisica() {
                               {d.medicaoDiaSeguinte !== null ? Number(d.medicaoDiaSeguinte).toLocaleString("pt-BR", { maximumFractionDigits: 0 }) : "-"}
                             </td>
                             <td className={`p-2 text-right font-mono text-xs font-bold ${
-                              d.diferenca !== null && Math.abs(d.diferenca) > 1000 ? "text-red-600" :
+                              d.diferenca !== null && Math.abs(d.diferenca) > 300 ? "text-red-600" :
                               d.diferenca !== null ? "text-emerald-600" : ""
                             }`}>
                               {d.diferenca !== null ? Number(d.diferenca).toLocaleString("pt-BR", { maximumFractionDigits: 0 }) : "-"}

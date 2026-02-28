@@ -153,7 +153,7 @@ export const coerenciaTransferenciasRouter = router({
         postoId: z.number(),
         dataInicio: z.string(),
         dataFim: z.string(),
-        tolerancia: z.number().optional().default(1000),
+        tolerancia: z.number().optional().default(300),
       })
     )
     .query(async ({ input }) => {
@@ -179,7 +179,7 @@ export const coerenciaTransferenciasRouter = router({
       z.object({
         dataInicio: z.string(),
         dataFim: z.string(),
-        tolerancia: z.number().optional().default(1000),
+        tolerancia: z.number().optional().default(300),
       })
     )
     .query(async ({ input }) => {
